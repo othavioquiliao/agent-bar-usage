@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 1 complete — ready for Phase 2 planning
-stopped_at: Completed execute-phase 1
-last_updated: "2026-03-25T14:41:12Z"
-last_activity: 2026-03-25 — Phase 1 executed and verified (Node backend contract complete)
+status: Phase 2 planned — ready for execution
+stopped_at: Completed plan-phase 2
+last_updated: "2026-03-25T15:12:00Z"
+last_activity: 2026-03-25 — Phase 2 planned (Linux config, XDG persistence, and secret-store integration)
 progress:
   total_phases: 5
   completed_phases: 1
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 Phase: 2 of 5 (Linux Config & Secrets)
 Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-25 — Phase 1 executed and verified (Node backend contract complete)
+Status: Planned and ready to execute
+Last activity: 2026-03-25 — Phase 2 planned (Linux config, XDG persistence, and secret-store integration)
 
 ## Performance Metrics
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - [Stack]: Use a GNOME Shell extension in GJS for the frontend
 - [Init]: Prioritize Copilot, Codex CLI, and Claude CLI for v1
 - [Init]: Defer Cursor and browser-parity work until after the Linux contract is stable
+- [Phase 2]: Use XDG config persistence with JSON for v1
+- [Phase 2]: Use `secret-tool` as the primary persistent Linux secret-store boundary
+- [Phase 2]: Keep env-based secret resolution as explicit fallback for development and CI
 
 ### Pending Todos
 
@@ -68,11 +71,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Linux secret storage and desktop shell choice should stay decoupled from backend contract decisions
+- `secret-tool` availability can vary across desktop and terminal contexts, so execution must keep failure handling explicit
 - Browser-cookie-based parity work remains intentionally deferred
 
 ## Session Continuity
 
-Last session: 2026-03-25T14:41:12Z
-Stopped at: Completed execute-phase 1
+Last session: 2026-03-25T15:12:00Z
+Stopped at: Completed plan-phase 2
 Resume file: .planning/ROADMAP.md
