@@ -19,11 +19,12 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 
 ### Active
 
-- [ ] Build a Linux-native backend contract that can expose provider snapshots on Ubuntu
-- [ ] Support first-wave providers for v1: Copilot, Codex via CLI, and Claude via CLI
-- [ ] Provide Ubuntu-friendly configuration and secret handling instead of Apple-specific storage assumptions
-- [ ] Deliver a first desktop surface for Ubuntu users through a GNOME Shell extension on Ubuntu 24.04.4 LTS
-- [ ] Ship enough diagnostics and packaging guidance that the Ubuntu version is debuggable and maintainable
+- [x] Build a Linux-native backend contract that can expose provider snapshots on Ubuntu — Validated in Phase 1: Backend Contract
+- [x] Support first-wave providers for v1: Copilot, Codex via CLI, and Claude via CLI — Validated in Phase 3: First-Wave Providers
+- [x] Provide Ubuntu-friendly configuration and secret handling instead of Apple-specific storage assumptions — Validated in Phase 2: Linux Config & Secrets
+- [x] Deliver a first desktop surface for Ubuntu users through a GNOME Shell extension on Ubuntu 24.04.4 LTS — Validated in Phase 4: Ubuntu Desktop Surface
+- [x] Ship enough diagnostics and packaging guidance that the Ubuntu version is debuggable and maintainable — Validated in Phase 5: Delivery & Hardening
+- [x] Make all three providers work reliably from systemd service with node-pty PTY, GitHub Device Flow auth, and env capture — Validated in Phase 6: Provider Reliability
 
 ### Out of Scope
 
