@@ -8,6 +8,7 @@ import {
 } from "shared-contract";
 
 import { SnapshotCache } from "./cache/snapshot-cache.js";
+import { formatConfigCommandError, registerConfigCommand } from "./commands/config-command.js";
 import { normalizeBackendRequest } from "./config/backend-request.js";
 import { BackendCoordinator } from "./core/backend-coordinator.js";
 import type { ProviderAdapter } from "./core/provider-adapter.js";
@@ -154,9 +155,11 @@ program
     process.stdout.write(`${output}\n`);
   });
 
+registerConfigCommand(program);
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   program.parseAsync(process.argv).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : "Unknown CLI failure.";
+    const message = formatConfigCommandError(error);
     process.stderr.write(`${message}\n`);
     process.exitCode = 1;
   });

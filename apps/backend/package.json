@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "commander": "^14.0.2",
-    "shared-contract": "workspace:*"
+    "shared-contract": "workspace:*",
+    "zod": "^4.1.11"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",
