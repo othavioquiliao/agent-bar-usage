@@ -13,7 +13,7 @@ export function resolveRepoRoot(baseUrl = import.meta.url) {
 }
 
 export function buildBackendUsageArgs({ provider = null, forceRefresh = false } = {}) {
-  const args = ["usage", "--json"];
+  const args = ["usage", "--json", "--diagnostics"];
 
   if (provider) {
     args.push("--provider", provider);
@@ -21,6 +21,16 @@ export function buildBackendUsageArgs({ provider = null, forceRefresh = false } 
 
   if (forceRefresh) {
     args.push("--refresh");
+  }
+
+  return args;
+}
+
+export function buildBackendServiceArgs({ provider = null, forceRefresh = false } = {}) {
+  const args = ["service", forceRefresh ? "refresh" : "snapshot", "--json"];
+
+  if (provider) {
+    args.push("--provider", provider);
   }
 
   return args;
@@ -34,11 +44,10 @@ export function resolveBackendInvocation(options = {}, dependencies = {}) {
   );
   const agentBarBinary = findProgramInPath("agent-bar");
   const nodeBinary = dependencies.nodeBinary ?? findProgramInPath("node") ?? "node";
-  const usageArgs = buildBackendUsageArgs(options);
 
   if (agentBarBinary) {
     return {
-      argv: [agentBarBinary, ...usageArgs],
+      argv: [agentBarBinary, ...buildBackendServiceArgs(options)],
       cwd: dependencies.agentBarCwd ?? repoRoot,
       binary: agentBarBinary,
       mode: "installed",
@@ -46,7 +55,7 @@ export function resolveBackendInvocation(options = {}, dependencies = {}) {
   }
 
   return {
-    argv: [nodeBinary, "--import", "tsx", joinPath(repoRoot, BACKEND_CLI_RELATIVE_PATH), ...usageArgs],
+    argv: [nodeBinary, "--import", "tsx", joinPath(repoRoot, BACKEND_CLI_RELATIVE_PATH), ...buildBackendUsageArgs(options)],
     cwd: backendPackageRoot,
     binary: nodeBinary,
     mode: "workspace-dev",

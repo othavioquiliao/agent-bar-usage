@@ -14,7 +14,7 @@ The roadmap turns the existing `CodexBar` knowledge into a Linux-native Ubuntu p
 - [x] **Phase 2: Linux Config & Secrets** - Persist backend settings and introduce Ubuntu-friendly secret handling (completed 2026-03-25)
 - [x] **Phase 3: First-Wave Providers** - Deliver Copilot, Codex CLI, and Claude CLI adapters in the Node backend (completed 2026-03-25)
 - [x] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME Shell extension in GJS (completed 2026-03-25)
-- [ ] **Phase 5: Delivery & Hardening** - Add diagnostics, installation guidance, packaging, and release-grade operational polish
+- [x] **Phase 5: Delivery & Hardening** - Add diagnostics, installation guidance, packaging, and release-grade operational polish (completed 2026-03-25)
 
 ## Phase Details
 
@@ -105,4 +105,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Linux Config & Secrets | 3/3 | Complete | 2026-03-25 |
 | 3. First-Wave Providers | 3/3 | Complete | 2026-03-25 |
 | 4. Ubuntu Desktop Surface | 3/3 | Complete   | 2026-03-25 |
-| 5. Delivery & Hardening | 0/3 | Not started | - |
+| 5. Delivery & Hardening | 0/3 | Complete    | 2026-03-25 |

@@ -4,6 +4,7 @@ import {
   snapshotSchemaVersion,
   type ProviderSnapshot,
   type SnapshotEnvelope,
+  type ProviderSourceMode,
 } from "shared-contract";
 
 import type { BackendRequest } from "../config/backend-request.js";

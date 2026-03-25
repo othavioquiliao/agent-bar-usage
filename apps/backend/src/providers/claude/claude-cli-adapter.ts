@@ -10,15 +10,11 @@ export function createClaudeCliAdapter(): ProviderAdapter {
       return context.sourceMode === "cli" || context.sourceMode === "auto";
     },
     async fetch(context: ProviderAdapterContext) {
-      if (context.sourceMode !== "cli" && context.sourceMode !== "auto") {
-        return createUnavailableSnapshot(
-          context.providerId,
-          context.sourceMode === "auto" ? "cli" : context.sourceMode,
-          context.now().toISOString(),
-        );
+      if (context.sourceMode === "cli" || context.sourceMode === "auto") {
+        return await fetchClaudeUsage(context);
       }
 
-      return await fetchClaudeUsage(context);
+      return createUnavailableSnapshot(context.providerId, context.sourceMode, context.now().toISOString());
     },
   };
 }

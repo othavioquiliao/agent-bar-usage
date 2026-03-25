@@ -3,6 +3,10 @@
   "private": true,
   "packageManager": "pnpm@10.17.1",
   "scripts": {
-    "test:backend": "pnpm --filter backend test"
+    "build:backend": "pnpm --filter backend build",
+    "test:backend": "pnpm --filter backend test",
+    "test:gnome": "pnpm --filter gnome-extension test",
+    "install:ubuntu": "bash scripts/install-ubuntu.sh",
+    "verify:ubuntu": "bash scripts/verify-ubuntu-install.sh"
   }
 }

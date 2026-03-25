@@ -7,6 +7,8 @@ function formatRowLines(viewModel) {
     viewModel.resetText,
     viewModel.updatedAtText,
     viewModel.sourceText,
+    viewModel.diagnosticsSummaryText,
+    viewModel.suggestedCommandText,
     viewModel.errorText ? `Error: ${viewModel.errorText}` : null,
   ].filter(Boolean);
 
@@ -25,4 +27,3 @@ export function createProviderRow(viewModel) {
 
   return row;
 }
-

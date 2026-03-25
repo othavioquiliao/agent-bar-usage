@@ -14,7 +14,7 @@ describe("backend command resolution", () => {
     );
 
     expect(invocation).toMatchObject({
-      argv: ["/usr/bin/agent-bar", "usage", "--json", "--refresh"],
+      argv: ["/usr/bin/agent-bar", "service", "refresh", "--json"],
       cwd: "/repo",
       mode: "installed",
     });
@@ -32,7 +32,7 @@ describe("backend command resolution", () => {
     );
 
     expect(invocation).toMatchObject({
-      argv: ["node", "--import", "tsx", "/repo/apps/backend/src/cli.ts", "usage", "--json"],
+      argv: ["node", "--import", "tsx", "/repo/apps/backend/src/cli.ts", "usage", "--json", "--diagnostics"],
       cwd: "/repo/apps/backend",
       mode: "workspace-dev",
     });
@@ -95,4 +95,3 @@ describe("backend client", () => {
     await expect(client.fetchUsageSnapshot()).rejects.toThrow("Invalid JSON from backend stdout");
   });
 });
-

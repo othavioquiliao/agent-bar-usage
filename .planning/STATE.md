@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
+status: Milestone complete
 stopped_at: Phase 5 context gathered
-last_updated: "2026-03-25T17:24:58.378Z"
+last_updated: "2026-03-25T18:33:57.727Z"
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 12
+  total_plans: 15
   completed_plans: 12
 ---
 
@@ -19,7 +19,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 5 — Delivery & Hardening
+**Current focus:** Phase 5 — delivery-hardening
 
 ## Current Position
 

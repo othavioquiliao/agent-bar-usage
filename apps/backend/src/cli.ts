@@ -1,25 +1,17 @@
 #!/usr/bin/env node
 import { Command, InvalidArgumentError } from "commander";
-import {
-  providerIdSchema,
-  type ProviderId,
-  type ProviderSnapshot,
-  type ProviderSourceMode,
-} from "shared-contract";
+import { providerIdSchema, type ProviderId } from "shared-contract";
 
-import { SnapshotCache } from "./cache/snapshot-cache.js";
 import { formatConfigCommandError, registerConfigCommand } from "./commands/config-command.js";
 import { registerDoctorCommand } from "./commands/diagnostics-command.js";
-import { loadBackendConfig } from "./config/config-loader.js";
-import { normalizeBackendRequest } from "./config/backend-request.js";
-import { BackendCoordinator } from "./core/backend-coordinator.js";
-import { ProviderContextBuilder } from "./core/provider-context-builder.js";
-import { createProviderRegistry as createDefaultProviderRegistry } from "./core/provider-registry-factory.js";
+import { registerServiceCommand } from "./commands/service-command.js";
+import {
+  createUsageSnapshot,
+  type UsageCommandDependencies,
+  type UsageCommandOptions as SharedUsageCommandOptions,
+} from "./core/usage-snapshot.js";
 import { formatSnapshotAsText } from "./formatters/text-formatter.js";
-import { EnvSecretStore } from "./secrets/env-secret-store.js";
-import { SecretToolStore } from "./secrets/secret-tool-store.js";
-import { SecretResolver } from "./secrets/secret-store.js";
-import { serializeSnapshotEnvelope } from "./serializers/snapshot-serializer.js";
+import { snapshotEnvelopeSchema } from "shared-contract";
 
 function parseProviderId(value: string): ProviderId {
   const parsed = providerIdSchema.safeParse(value);
@@ -31,16 +23,9 @@ function parseProviderId(value: string): ProviderId {
   return parsed.data;
 }
 
-export interface UsageCommandOptions {
-  provider?: ProviderId | ProviderId[];
+export interface UsageCommandOptions extends SharedUsageCommandOptions {
   json?: boolean;
   pretty?: boolean;
-  refresh?: boolean;
-  diagnostics?: boolean;
-}
-
-export interface UsageCommandDependencies {
-  createProviderRegistry?: typeof createDefaultProviderRegistry;
 }
 
 function normalizeProviders(provider: UsageCommandOptions["provider"]): ProviderId[] | undefined {
@@ -50,59 +35,22 @@ function normalizeProviders(provider: UsageCommandOptions["provider"]): Provider
   return Array.isArray(provider) ? provider : [provider];
 }
 
-function withDiagnostics(snapshot: ProviderSnapshot): ProviderSnapshot {
-  if (snapshot.diagnostics) {
-    return snapshot;
-  }
-  return {
-    ...snapshot,
-    diagnostics: {
-      attempts: [],
-    },
-  };
-}
-
 export async function runUsageCommand(
   options: UsageCommandOptions = {},
   dependencies: UsageCommandDependencies = {},
 ): Promise<string> {
-  const request = normalizeBackendRequest({
-    providers: normalizeProviders(options.provider),
-    force_refresh: Boolean(options.refresh),
-    include_diagnostics: Boolean(options.diagnostics),
-  });
-
-  const loadedConfig = await loadBackendConfig();
-  const registry = dependencies.createProviderRegistry?.() ?? createDefaultProviderRegistry();
-  const secretResolver = new SecretResolver([new SecretToolStore(), new EnvSecretStore()]);
-  const contextBuilder = new ProviderContextBuilder({
-    registry,
-    config: loadedConfig.config,
-    secretResolver,
-  });
-
-  const coordinator = new BackendCoordinator({
-    registry,
-    contextBuilder,
-    cache: new SnapshotCache(),
-  });
-  const snapshot = await coordinator.getSnapshot(request);
-  const serialized = serializeSnapshotEnvelope(snapshot, {
-    includeDiagnostics: request.includeDiagnostics,
-  });
+  const snapshot = await createUsageSnapshot({
+    provider: normalizeProviders(options.provider),
+    refresh: Boolean(options.refresh),
+    diagnostics: Boolean(options.diagnostics),
+  }, dependencies);
 
   if (options.json) {
-    const normalizedForOutput = request.includeDiagnostics
-      ? {
-          ...serialized,
-          providers: serialized.providers.map((provider) => withDiagnostics(provider)),
-        }
-      : serialized;
-    return JSON.stringify(normalizedForOutput, null, options.pretty ? 2 : 0);
+    return JSON.stringify(snapshotEnvelopeSchema.parse(snapshot), null, options.pretty ? 2 : 0);
   }
 
-  return formatSnapshotAsText(serialized, {
-    includeDiagnostics: request.includeDiagnostics,
+  return formatSnapshotAsText(snapshotEnvelopeSchema.parse(snapshot), {
+    includeDiagnostics: Boolean(options.diagnostics),
   });
 }
 
@@ -125,6 +73,7 @@ program
 
 registerConfigCommand(program);
 registerDoctorCommand(program);
+registerServiceCommand(program);
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   program.parseAsync(process.argv).catch((error: unknown) => {

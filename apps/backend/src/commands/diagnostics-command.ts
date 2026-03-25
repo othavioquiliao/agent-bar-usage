@@ -2,9 +2,10 @@ import type { Command } from "commander";
 import {
   diagnosticsReportSchema,
   type DiagnosticsCheck,
-  type DiagnosticsCheckId,
   type DiagnosticsReport,
 } from "shared-contract";
+
+import { buildDiagnosticsReport } from "../core/prerequisite-checks.js";
 
 export interface DoctorCommandOptions {
   json?: boolean;
@@ -14,70 +15,6 @@ export interface DoctorCommandOptions {
 export interface DoctorCommandDependencies {
   buildReport?: () => Promise<DiagnosticsReport> | DiagnosticsReport;
   now?: () => Date;
-}
-
-const defaultChecks: Array<Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">> = [
-  {
-    id: "config",
-    label: "Config",
-    suggested_command: "agent-bar config validate",
-  },
-  {
-    id: "secret-tool",
-    label: "secret-tool",
-    suggested_command: "which secret-tool",
-  },
-  {
-    id: "codex-cli",
-    label: "Codex CLI",
-    suggested_command: "codex --version",
-  },
-  {
-    id: "claude-cli",
-    label: "Claude CLI",
-    suggested_command: "claude --version",
-  },
-  {
-    id: "copilot-token",
-    label: "Copilot token",
-    suggested_command: "agent-bar config validate",
-  },
-  {
-    id: "service-runtime",
-    label: "Service runtime",
-    suggested_command: "agent-bar service status --json",
-  },
-];
-
-function defaultMessageForCheck(checkId: DiagnosticsCheckId): string {
-  switch (checkId) {
-    case "config":
-      return "Configuration diagnostics are available through the backend doctor command.";
-    case "secret-tool":
-      return "Secret store availability will be inspected by the backend diagnostics helpers.";
-    case "codex-cli":
-      return "Codex CLI availability will be inspected by the backend diagnostics helpers.";
-    case "claude-cli":
-      return "Claude CLI availability will be inspected by the backend diagnostics helpers.";
-    case "copilot-token":
-      return "Copilot token sources will be inspected by the backend diagnostics helpers.";
-    case "service-runtime":
-      return "Runtime mode will be reported by backend diagnostics helpers.";
-    default:
-      return "Diagnostics check is defined but not yet inspected.";
-  }
-}
-
-function createDefaultDoctorReport(now: Date): DiagnosticsReport {
-  return {
-    generated_at: now.toISOString(),
-    runtime_mode: "cli",
-    checks: defaultChecks.map((check) => ({
-      ...check,
-      status: "warn",
-      message: defaultMessageForCheck(check.id),
-    })),
-  };
 }
 
 function formatDoctorRow(check: DiagnosticsCheck): string {
@@ -108,9 +45,8 @@ export async function runDoctorCommand(
   options: DoctorCommandOptions = {},
   dependencies: DoctorCommandDependencies = {},
 ): Promise<string> {
-  const now = dependencies.now?.() ?? new Date();
   const report = diagnosticsReportSchema.parse(
-    await (dependencies.buildReport?.() ?? createDefaultDoctorReport(now)),
+    await (dependencies.buildReport?.() ?? buildDiagnosticsReport()),
   );
 
   if (options.json) {

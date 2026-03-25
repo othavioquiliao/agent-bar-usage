@@ -68,7 +68,33 @@ describe("provider view models", () => {
       usageText: "Usage unavailable",
       errorText: "adapter exploded",
       sourceText: "Source: cli",
+      diagnosticsSummaryText: "Diagnostics: adapter exploded",
+      suggestedCommandText: "Suggested command: agent-bar doctor --json",
     });
+  });
+
+  it("surfaces missing prerequisite guidance for secret-tool failures", () => {
+    const row = buildProviderRowViewModel(
+      {
+        provider: "claude",
+        status: "error",
+        source: "cli",
+        updated_at: "2026-03-25T17:02:00.000Z",
+        usage: null,
+        reset_window: null,
+        error: {
+          code: "secret_store_unavailable",
+          message: "secret-tool is unavailable",
+          retryable: false,
+        },
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(row.diagnosticsSummaryText).toBe("Missing prerequisite: secret-tool");
+    expect(row.suggestedCommandText).toBe("Suggested command: agent-bar doctor --json");
   });
 
   it("maps an unavailable provider snapshot without losing the placeholder text", () => {
@@ -133,5 +159,21 @@ describe("snapshot view models", () => {
       labelText: "Refreshing",
     });
   });
-});
 
+  it("surfaces backend errors in the snapshot summary", () => {
+    const snapshot = buildSnapshotViewModel(
+      {
+        snapshotEnvelope: null,
+        isLoading: false,
+        lastUpdatedText: null,
+        lastError: "backend unavailable",
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(snapshot.diagnosticsSummaryText).toBe("Backend error: backend unavailable");
+    expect(snapshot.suggestedCommandText).toBe("Suggested command: agent-bar doctor --json");
+  });
+});

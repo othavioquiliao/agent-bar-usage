@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "bin": {
-    "agent-bar": "src/cli.ts"
+    "agent-bar": "dist/cli.js"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {

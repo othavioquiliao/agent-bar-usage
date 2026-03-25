@@ -58,7 +58,7 @@ export function rebuildMenu(menu, state, { onRefresh = null, now = new Date() } 
   });
   refreshItem.sensitive = !state.isLoading;
 
-  if (snapshotViewModel.lastUpdatedText || state.lastError) {
+  if (snapshotViewModel.lastUpdatedText || snapshotViewModel.diagnosticsSummaryText || state.lastError) {
     menu.addMenuItem(createSectionLabel("Details"));
   }
 
@@ -66,7 +66,11 @@ export function rebuildMenu(menu, state, { onRefresh = null, now = new Date() } 
     menu.addMenuItem(createMessageItem(snapshotViewModel.lastUpdatedText, "agent-bar-ubuntu-footer-item"));
   }
 
-  if (state.lastError) {
-    menu.addMenuItem(createMessageItem(`Backend error: ${state.lastError}`, "agent-bar-ubuntu-error-item"));
+  if (snapshotViewModel.diagnosticsSummaryText) {
+    menu.addMenuItem(createMessageItem(snapshotViewModel.diagnosticsSummaryText, "agent-bar-ubuntu-error-item"));
+  }
+
+  if (snapshotViewModel.suggestedCommandText) {
+    menu.addMenuItem(createMessageItem(snapshotViewModel.suggestedCommandText, "agent-bar-ubuntu-footer-item"));
   }
 }

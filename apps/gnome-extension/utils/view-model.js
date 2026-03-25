@@ -44,6 +44,41 @@ function formatResetWindowText(resetWindow) {
   return `Reset: ${resetWindow.label}`;
 }
 
+function formatDiagnosticsSummary(providerSnapshot) {
+  const error = providerSnapshot?.error ?? null;
+  const attempts = providerSnapshot?.diagnostics?.attempts ?? [];
+
+  if (error?.code === "secret_store_unavailable" || /secret-tool/i.test(error?.message ?? "")) {
+    return "Missing prerequisite: secret-tool";
+  }
+
+  if (error?.code === "secret_not_found") {
+    return "Missing prerequisite: stored credential";
+  }
+
+  if (error?.message) {
+    return `Diagnostics: ${error.message}`;
+  }
+
+  if (attempts.length > 0) {
+    return `Diagnostics: ${attempts.length} attempt${attempts.length === 1 ? "" : "s"}`;
+  }
+
+  return null;
+}
+
+function formatSuggestedCommand(providerSnapshot) {
+  if (!providerSnapshot) {
+    return null;
+  }
+
+  if (providerSnapshot.error || (providerSnapshot.diagnostics?.attempts?.length ?? 0) > 0) {
+    return "Suggested command: agent-bar doctor --json";
+  }
+
+  return null;
+}
+
 export function buildProviderRowViewModel(providerSnapshot, { now = new Date() } = {}) {
   const providerId = providerSnapshot?.provider ?? "provider";
   const title = formatProviderTitle(providerId);
@@ -56,6 +91,8 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
     : "Updated time unavailable";
   const errorText = providerSnapshot?.error?.message ?? null;
   const sourceText = providerSnapshot?.source ? `Source: ${providerSnapshot.source}` : null;
+  const diagnosticsSummaryText = formatDiagnosticsSummary(providerSnapshot);
+  const suggestedCommandText = formatSuggestedCommand(providerSnapshot);
 
   return {
     providerId,
@@ -67,6 +104,8 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
     updatedAtText,
     errorText,
     sourceText,
+    diagnosticsSummaryText,
+    suggestedCommandText,
     hasError: Boolean(errorText),
     hasUsage: Boolean(providerSnapshot?.usage),
     isUnavailable: status === "unavailable",
@@ -83,6 +122,16 @@ export function buildSnapshotViewModel(state = {}, { now = new Date() } = {}) {
   const errorCount = providerRows.filter((row) => row.hasError || row.status === "error").length;
   const unavailableCount = providerRows.filter((row) => row.status === "unavailable").length;
   const hasProviders = providerCount > 0;
+  const diagnosticsSummaryText = state.lastError
+    ? `Backend error: ${state.lastError}`
+    : errorCount > 0
+      ? `${errorCount} provider${errorCount === 1 ? "" : "s"} reported an error`
+      : unavailableCount > 0
+        ? `${unavailableCount} provider${unavailableCount === 1 ? "" : "s"} unavailable`
+        : null;
+  const suggestedCommandText = state.lastError || errorCount > 0 || unavailableCount > 0
+    ? "Suggested command: agent-bar doctor --json"
+    : null;
   const summaryTitle = state.isLoading
     ? "Refreshing provider snapshots"
     : hasProviders
@@ -108,6 +157,8 @@ export function buildSnapshotViewModel(state = {}, { now = new Date() } = {}) {
     hasProviders,
     summaryTitle,
     summaryBody,
+    diagnosticsSummaryText,
+    suggestedCommandText,
     lastUpdatedText,
     lastErrorText: state.lastError ?? null,
     emptyStateText: hasProviders ? null : "No provider snapshots yet",
@@ -145,4 +196,3 @@ export function buildIndicatorSummaryViewModel(state = {}, { now = new Date() } 
     lastUpdatedText: snapshot.lastUpdatedText,
   };
 }
-

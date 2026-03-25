@@ -1,0 +1,13 @@
+[Unit]
+Description=Agent Bar local backend service
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/agent-bar service run
+Restart=on-failure
+RestartSec=2
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target

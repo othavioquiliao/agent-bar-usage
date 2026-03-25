@@ -10,15 +10,11 @@ export function createCopilotAdapter(): ProviderAdapter {
       return context.sourceMode === "api" || context.sourceMode === "auto";
     },
     async fetch(context: ProviderAdapterContext) {
-      if (context.sourceMode !== "api" && context.sourceMode !== "auto") {
-        return createUnavailableSnapshot(
-          context.providerId,
-          context.sourceMode === "auto" ? "api" : context.sourceMode,
-          context.now().toISOString(),
-        );
+      if (context.sourceMode === "api" || context.sourceMode === "auto") {
+        return await fetchCopilotUsage(context);
       }
 
-      return await fetchCopilotUsage(context);
+      return createUnavailableSnapshot(context.providerId, context.sourceMode, context.now().toISOString());
     },
   };
 }
