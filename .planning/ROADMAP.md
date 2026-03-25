@@ -10,7 +10,7 @@ The roadmap turns the existing `CodexBar` knowledge into a Linux-native Ubuntu p
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Backend Contract** - Define and implement the Linux-facing backend contract and refresh flow
+- [x] **Phase 1: Backend Contract** - Define and implement the Linux-facing backend contract and refresh flow (completed 2026-03-25)
 - [ ] **Phase 2: Linux Config & Secrets** - Persist backend settings and introduce Ubuntu-friendly secret handling
 - [ ] **Phase 3: First-Wave Providers** - Deliver Copilot, Codex CLI, and Claude CLI adapters in the Node backend
 - [ ] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME Shell extension in GJS
@@ -29,9 +29,9 @@ The roadmap turns the existing `CodexBar` knowledge into a Linux-native Ubuntu p
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Scaffold the Node/TypeScript backend workspace and shared snapshot contract
-- [ ] 01-02: Implement the provider adapter runtime, refresh coordinator, and cache layer
-- [ ] 01-03: Implement CLI output modes, diagnostics, and backend contract tests
+- [x] 01-01: Scaffold the Node/TypeScript backend workspace and shared snapshot contract
+- [x] 01-02: Implement the provider adapter runtime, refresh coordinator, and cache layer
+- [x] 01-03: Implement CLI output modes, diagnostics, and backend contract tests
 
 ### Phase 2: Linux Config & Secrets
 **Goal**: Introduce Ubuntu-native configuration and secret management for the Node backend without inheriting Apple-specific assumptions
@@ -101,7 +101,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backend Contract | 0/3 | Not started | - |
+| 1. Backend Contract | 3/3 | Complete   | 2026-03-25 |
 | 2. Linux Config & Secrets | 0/3 | Not started | - |
 | 3. First-Wave Providers | 0/3 | Not started | - |
 | 4. Ubuntu Desktop Surface | 0/3 | Not started | - |

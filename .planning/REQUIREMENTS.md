@@ -7,9 +7,9 @@
 
 ### Backend Contract
 
-- [ ] **BACK-01**: User can run a Linux backend command and receive normalized JSON snapshots for enabled providers
-- [ ] **BACK-02**: User can refresh all enabled providers or one selected provider on demand
-- [ ] **BACK-03**: User can see provider-specific errors, source mode, and last refresh timestamp in backend output
+- [x] **BACK-01**: User can run a Linux backend command and receive normalized JSON snapshots for enabled providers
+- [x] **BACK-02**: User can refresh all enabled providers or one selected provider on demand
+- [x] **BACK-03**: User can see provider-specific errors, source mode, and last refresh timestamp in backend output
 
 ### Configuration & Secrets
 
@@ -65,9 +65,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BACK-01 | Phase 1 | Pending |
-| BACK-02 | Phase 1 | Pending |
-| BACK-03 | Phase 1 | Pending |
+| BACK-01 | Phase 1 | Complete |
+| BACK-02 | Phase 1 | Complete |
+| BACK-03 | Phase 1 | Complete |
 | CONF-01 | Phase 2 | Pending |
 | CONF-02 | Phase 2 | Pending |
 | SECR-01 | Phase 2 | Pending |
@@ -88,4 +88,4 @@
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after initial definition*
+*Last updated: 2026-03-25 after Phase 1 execution*

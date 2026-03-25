@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 planned
-last_updated: "2026-03-25T13:52:13Z"
-last_activity: 2026-03-25 — Stack shifted to Node.js/TypeScript backend plus GJS GNOME extension and Phase 1 was replanned
+status: Phase 1 complete — ready for Phase 2 planning
+stopped_at: Completed execute-phase 1
+last_updated: "2026-03-25T14:41:12Z"
+last_activity: 2026-03-25 — Phase 1 executed and verified (Node backend contract complete)
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 3
 ---
 
 # Project State
@@ -21,16 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 1 - Backend Contract
+**Current focus:** Phase 2 - Linux Config & Secrets
 
 ## Current Position
 
-Phase: 1 of 5 (Backend Contract)
-Plan: 3 planned, 0 completed in current phase
-Status: Planned
-Last activity: 2026-03-25 — Stack shifted to Node.js/TypeScript backend plus GJS GNOME extension and Phase 1 was replanned
-
-Progress: [░░░░░░░░░░] 0%
+Phase: 2 of 5 (Linux Config & Secrets)
+Plan: 0 of 3 in current phase
+Status: Ready to plan
+Last activity: 2026-03-25 — Phase 1 executed and verified (Node backend contract complete)
 
 ## Performance Metrics
 
@@ -76,6 +73,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T12:41:01Z
-Stopped at: Phase 1 planned
-Resume file: .planning/phases/01-backend-contract/01-01-PLAN.md
+Last session: 2026-03-25T14:41:12Z
+Stopped at: Completed execute-phase 1
+Resume file: .planning/ROADMAP.md
