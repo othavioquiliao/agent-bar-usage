@@ -6,6 +6,8 @@ export function createInitialState() {
     schemaVersion: null,
     generatedAt: null,
     providers: [],
+    lastUpdatedText: null,
+    lastError: null,
     error: null,
   };
 }
@@ -15,19 +17,26 @@ export function applyLoadingState(previousState = createInitialState()) {
     ...previousState,
     status: "loading",
     isLoading: true,
+    lastError: null,
     error: null,
   };
 }
 
-export function applySnapshotSuccess(previousState = createInitialState(), snapshotEnvelope) {
+export function applySnapshotSuccess(
+  previousState = createInitialState(),
+  snapshotEnvelope,
+  { lastUpdatedText = null } = {},
+) {
   return {
     ...previousState,
     status: "ready",
     isLoading: false,
     snapshotEnvelope,
-    schemaVersion: snapshotEnvelope.schema_version,
-    generatedAt: snapshotEnvelope.generated_at,
-    providers: snapshotEnvelope.providers,
+    schemaVersion: snapshotEnvelope?.schema_version ?? null,
+    generatedAt: snapshotEnvelope?.generated_at ?? null,
+    providers: Array.isArray(snapshotEnvelope?.providers) ? snapshotEnvelope.providers : [],
+    lastUpdatedText,
+    lastError: null,
     error: null,
   };
 }
@@ -37,6 +46,7 @@ export function applySnapshotError(previousState = createInitialState(), error) 
     ...previousState,
     status: "error",
     isLoading: false,
+    lastError: normalizeError(error),
     error: normalizeError(error),
   };
 }

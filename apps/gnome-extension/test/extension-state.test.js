@@ -17,6 +17,8 @@ describe("extension state", () => {
       schemaVersion: null,
       generatedAt: null,
       providers: [],
+      lastUpdatedText: null,
+      lastError: null,
       error: null,
     });
   });
@@ -32,12 +34,14 @@ describe("extension state", () => {
       },
       schemaVersion: "1",
       generatedAt: "2026-03-25T17:00:00Z",
+      lastUpdatedText: "Last updated 5 minutes ago",
     };
 
     expect(applyLoadingState(previousState)).toEqual({
       ...previousState,
       status: "loading",
       isLoading: true,
+      lastError: null,
       error: null,
     });
   });
@@ -64,13 +68,19 @@ describe("extension state", () => {
       ],
     };
 
-    expect(applySnapshotSuccess(applyLoadingState(createInitialState()), snapshotEnvelope)).toEqual({
+    expect(
+      applySnapshotSuccess(applyLoadingState(createInitialState()), snapshotEnvelope, {
+        lastUpdatedText: "Last updated now",
+      }),
+    ).toEqual({
       status: "ready",
       isLoading: false,
       snapshotEnvelope,
       schemaVersion: "1",
       generatedAt: "2026-03-25T17:15:00Z",
       providers: snapshotEnvelope.providers,
+      lastUpdatedText: "Last updated now",
+      lastError: null,
       error: null,
     });
   });
@@ -85,6 +95,33 @@ describe("extension state", () => {
       schemaVersion: null,
       generatedAt: null,
       providers: [],
+      lastUpdatedText: null,
+      lastError: "backend unavailable",
+      error: "backend unavailable",
+    });
+  });
+
+  it("preserves the previous snapshot while entering an error state", () => {
+    const previousState = applySnapshotSuccess(
+      applyLoadingState(createInitialState()),
+      {
+        schema_version: "1",
+        generated_at: "2026-03-25T17:15:00Z",
+        providers: [],
+      },
+      {
+        lastUpdatedText: "Last updated now",
+      },
+    );
+
+    const state = applySnapshotError(previousState, new Error("backend unavailable"));
+
+    expect(state).toEqual({
+      ...previousState,
+      status: "error",
+      isLoading: false,
+      lastUpdatedText: "Last updated now",
+      lastError: "backend unavailable",
       error: "backend unavailable",
     });
   });

@@ -13,7 +13,7 @@ The roadmap turns the existing `CodexBar` knowledge into a Linux-native Ubuntu p
 - [x] **Phase 1: Backend Contract** - Define and implement the Linux-facing backend contract and refresh flow (completed 2026-03-25)
 - [x] **Phase 2: Linux Config & Secrets** - Persist backend settings and introduce Ubuntu-friendly secret handling (completed 2026-03-25)
 - [x] **Phase 3: First-Wave Providers** - Deliver Copilot, Codex CLI, and Claude CLI adapters in the Node backend (completed 2026-03-25)
-- [ ] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME Shell extension in GJS
+- [x] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME Shell extension in GJS (completed 2026-03-25)
 - [ ] **Phase 5: Delivery & Hardening** - Add diagnostics, installation guidance, packaging, and release-grade operational polish
 
 ## Phase Details
@@ -75,9 +75,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Scaffold the GNOME Shell extension for Ubuntu 24.04.4 LTS
-- [ ] 04-02: Implement the backend-to-extension bridge and refresh polling model
-- [ ] 04-03: Build the initial top-bar menu, detail view, and refresh interactions
+- [x] 04-01: Scaffold the GNOME Shell extension for Ubuntu 24.04.4 LTS
+- [x] 04-02: Implement the backend-to-extension bridge and refresh polling model
+- [x] 04-03: Build the initial top-bar menu, detail view, and refresh interactions
 
 ### Phase 5: Delivery & Hardening
 **Goal**: Make the Ubuntu v1 installable, diagnosable, and maintainable beyond a local prototype
@@ -104,5 +104,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Backend Contract | 3/3 | Complete   | 2026-03-25 |
 | 2. Linux Config & Secrets | 3/3 | Complete | 2026-03-25 |
 | 3. First-Wave Providers | 3/3 | Complete | 2026-03-25 |
-| 4. Ubuntu Desktop Surface | 0/3 | Not started | - |
+| 4. Ubuntu Desktop Surface | 3/3 | Complete   | 2026-03-25 |
 | 5. Delivery & Hardening | 0/3 | Not started | - |

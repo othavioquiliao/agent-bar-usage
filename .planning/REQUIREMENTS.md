@@ -25,9 +25,9 @@
 
 ### Desktop Surface
 
-- [ ] **UI-01**: User can see enabled provider status from a GNOME-friendly top-bar, tray, or equivalent Ubuntu-native surface
-- [ ] **UI-02**: User can open a detailed menu showing provider usage state, reset windows, and last updated time
-- [ ] **UI-03**: User can trigger manual refresh and understand refresh failures from the desktop surface
+- [x] **UI-01**: User can see enabled provider status from a GNOME-friendly top-bar, tray, or equivalent Ubuntu-native surface
+- [x] **UI-02**: User can open a detailed menu showing provider usage state, reset windows, and last updated time
+- [x] **UI-03**: User can trigger manual refresh and understand refresh failures from the desktop surface
 
 ### Diagnostics & Delivery
 
@@ -74,9 +74,9 @@
 | COP-01 | Phase 3 | Complete |
 | CDX-01 | Phase 3 | Complete |
 | CLD-01 | Phase 3 | Complete |
-| UI-01 | Phase 4 | Pending |
-| UI-02 | Phase 4 | Pending |
-| UI-03 | Phase 4 | Pending |
+| UI-01 | Phase 4 | Complete |
+| UI-02 | Phase 4 | Complete |
+| UI-03 | Phase 4 | Complete |
 | OPS-01 | Phase 5 | Pending |
 | OPS-02 | Phase 5 | Pending |
 | OPS-03 | Phase 5 | Pending |
@@ -88,4 +88,4 @@
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after Phase 3 execution*
+*Last updated: 2026-03-25 after Phase 4 execution*
