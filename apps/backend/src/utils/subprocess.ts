@@ -28,6 +28,17 @@ export class SubprocessError extends Error {
   }
 }
 
+export function describeSubprocessFailure(error: SubprocessError): string {
+  const exitCode = error.result.exitCode ?? "unknown";
+  const stderr = error.result.stderr.trim();
+
+  if (stderr.length > 0) {
+    return `${error.result.command} failed with exit code ${exitCode}: ${stderr}`;
+  }
+
+  return `${error.result.command} failed with exit code ${exitCode}.`;
+}
+
 export async function runSubprocess(
   command: string,
   args: string[] = [],
