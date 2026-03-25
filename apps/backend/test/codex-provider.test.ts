@@ -3,9 +3,21 @@ import type { ProviderAdapterContext } from "../src/core/provider-adapter.js";
 import { createCodexCliAdapter } from "../src/providers/codex/codex-cli-adapter.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
 
-const { resolveCommandInPathMock } = vi.hoisted(() => ({
+const { runInteractiveCommandMock, resolveCommandInPathMock } = vi.hoisted(() => ({
+  runInteractiveCommandMock: vi.fn(),
   resolveCommandInPathMock: vi.fn(),
 }));
+
+vi.mock("../src/providers/shared/interactive-command.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/providers/shared/interactive-command.js")>(
+    "../src/providers/shared/interactive-command.js",
+  );
+
+  return {
+    ...actual,
+    runInteractiveCommand: runInteractiveCommandMock,
+  };
+});
 
 vi.mock("../src/utils/subprocess.js", async () => {
   const actual = await vi.importActual<typeof import("../src/utils/subprocess.js")>(
@@ -20,6 +32,7 @@ vi.mock("../src/utils/subprocess.js", async () => {
 
 describe("Codex CLI provider", () => {
   beforeEach(() => {
+    runInteractiveCommandMock.mockReset();
     resolveCommandInPathMock.mockReset();
     resolveCommandInPathMock.mockReturnValue(null);
   });
@@ -32,14 +45,15 @@ describe("Codex CLI provider", () => {
     resolveCommandInPathMock.mockReturnValue(null);
 
     const adapter = createCodexCliAdapter();
-    const snapshot = await adapter.fetch(createContext({ env: {}, runSubprocess: vi.fn() }));
+    const snapshot = await adapter.fetch(createContext({ env: {} }));
 
     expect(snapshot.status).toBe("error");
     expect(snapshot.error?.code).toBe("codex_cli_missing");
+    expect(runInteractiveCommandMock).not.toHaveBeenCalled();
   });
 
   it("maps parse failures to a structured provider error", async () => {
-    const runSubprocess = vi.fn().mockResolvedValue(createRunResult("hello world"));
+    runInteractiveCommandMock.mockResolvedValue(createRunResult("hello world"));
     resolveCommandInPathMock.mockImplementation((command: string) =>
       command === "codex" ? "/usr/bin/codex" : null,
     );
@@ -50,7 +64,6 @@ describe("Codex CLI provider", () => {
         env: {
           CODEX_CLI_PATH: "/usr/bin/codex",
         },
-        runSubprocess,
       }),
     );
 
@@ -60,7 +73,7 @@ describe("Codex CLI provider", () => {
   });
 
   it("maps update prompts to a structured provider error", async () => {
-    const runSubprocess = vi.fn().mockResolvedValue(
+    runInteractiveCommandMock.mockResolvedValue(
       createRunResult("Update available! Run bun install -g @openai/codex"),
     );
     resolveCommandInPathMock.mockImplementation((command: string) =>
@@ -73,7 +86,6 @@ describe("Codex CLI provider", () => {
         env: {
           CODEX_CLI_PATH: "/usr/bin/codex",
         },
-        runSubprocess,
       }),
     );
 
@@ -83,7 +95,7 @@ describe("Codex CLI provider", () => {
   });
 
   it("maps usage output into normalized quota fields", async () => {
-    const runSubprocess = vi.fn().mockResolvedValue(
+    runInteractiveCommandMock.mockResolvedValue(
       createRunResult(
         [
           "Credits: 42",
@@ -102,7 +114,6 @@ describe("Codex CLI provider", () => {
         env: {
           CODEX_CLI_PATH: "/usr/bin/codex",
         },
-        runSubprocess,
       }),
     );
 
@@ -120,11 +131,31 @@ describe("Codex CLI provider", () => {
     });
     expect(snapshot.diagnostics?.attempts[0]?.strategy).toBe("codex.cli");
   });
+
+  it("maps PtyUnavailableError to a non-retryable provider error", async () => {
+    const { PtyUnavailableError } = await import("../src/providers/shared/interactive-command.js");
+    runInteractiveCommandMock.mockRejectedValue(new PtyUnavailableError());
+    resolveCommandInPathMock.mockImplementation((command: string) =>
+      command === "codex" ? "/usr/bin/codex" : null,
+    );
+
+    const adapter = createCodexCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CODEX_CLI_PATH: "/usr/bin/codex",
+        },
+      }),
+    );
+
+    expect(snapshot.status).toBe("error");
+    expect(snapshot.error?.code).toBe("codex_pty_unavailable");
+    expect(snapshot.error?.retryable).toBe(false);
+  });
 });
 
 function createContext(options: {
   env: NodeJS.ProcessEnv;
-  runSubprocess: ProviderAdapterContext["runSubprocess"];
 }): ProviderAdapterContext {
   return {
     request: normalizeBackendRequest({
@@ -134,13 +165,15 @@ function createContext(options: {
     sourceMode: "cli",
     env: options.env,
     now: () => new Date("2026-03-25T15:00:00Z"),
-    runSubprocess: options.runSubprocess,
+    runSubprocess: async () => {
+      throw new Error("runSubprocess should not be called in Codex tests.");
+    },
   };
 }
 
 function createRunResult(stdout: string) {
   return {
-    command: "script",
+    command: "codex",
     args: [],
     exitCode: 0,
     stdout,
