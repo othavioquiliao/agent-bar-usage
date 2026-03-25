@@ -11,7 +11,7 @@ The roadmap turns the existing `CodexBar` knowledge into a Linux-native Ubuntu p
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Backend Contract** - Define and implement the Linux-facing backend contract and refresh flow (completed 2026-03-25)
-- [ ] **Phase 2: Linux Config & Secrets** - Persist backend settings and introduce Ubuntu-friendly secret handling
+- [x] **Phase 2: Linux Config & Secrets** - Persist backend settings and introduce Ubuntu-friendly secret handling (completed 2026-03-25)
 - [ ] **Phase 3: First-Wave Providers** - Deliver Copilot, Codex CLI, and Claude CLI adapters in the Node backend
 - [ ] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME Shell extension in GJS
 - [ ] **Phase 5: Delivery & Hardening** - Add diagnostics, installation guidance, packaging, and release-grade operational polish
@@ -44,9 +44,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Design the backend config model and persistence format
-- [ ] 02-02: Integrate libsecret or equivalent secret-store handling
-- [ ] 02-03: Wire config and secret resolution into backend provider contexts
+- [x] 02-01: Design the backend config model and persistence format
+- [x] 02-02: Integrate libsecret or equivalent secret-store handling
+- [x] 02-03: Wire config and secret resolution into backend provider contexts
 
 ### Phase 3: First-Wave Providers
 **Goal**: Ship the first Ubuntu-viable provider set in the Node backend with reliable fetch paths and clear failure behavior
@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Backend Contract | 3/3 | Complete   | 2026-03-25 |
-| 2. Linux Config & Secrets | 0/3 | Not started | - |
+| 2. Linux Config & Secrets | 3/3 | Complete | 2026-03-25 |
 | 3. First-Wave Providers | 0/3 | Not started | - |
 | 4. Ubuntu Desktop Surface | 0/3 | Not started | - |
 | 5. Delivery & Hardening | 0/3 | Not started | - |

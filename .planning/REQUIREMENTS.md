@@ -13,9 +13,9 @@
 
 ### Configuration & Secrets
 
-- [ ] **CONF-01**: User can enable or disable providers from a Linux config file
-- [ ] **CONF-02**: User can persist provider order and source-mode preferences on Ubuntu
-- [ ] **SECR-01**: User can store and retrieve provider credentials or session material through a Linux-appropriate secret store
+- [x] **CONF-01**: User can enable or disable providers from a Linux config file
+- [x] **CONF-02**: User can persist provider order and source-mode preferences on Ubuntu
+- [x] **SECR-01**: User can store and retrieve provider credentials or session material through a Linux-appropriate secret store
 
 ### Providers
 
@@ -68,9 +68,9 @@
 | BACK-01 | Phase 1 | Complete |
 | BACK-02 | Phase 1 | Complete |
 | BACK-03 | Phase 1 | Complete |
-| CONF-01 | Phase 2 | Pending |
-| CONF-02 | Phase 2 | Pending |
-| SECR-01 | Phase 2 | Pending |
+| CONF-01 | Phase 2 | Complete |
+| CONF-02 | Phase 2 | Complete |
+| SECR-01 | Phase 2 | Complete |
 | COP-01 | Phase 3 | Pending |
 | CDX-01 | Phase 3 | Pending |
 | CLD-01 | Phase 3 | Pending |
@@ -88,4 +88,4 @@
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after Phase 1 execution*
+*Last updated: 2026-03-25 after Phase 2 execution*

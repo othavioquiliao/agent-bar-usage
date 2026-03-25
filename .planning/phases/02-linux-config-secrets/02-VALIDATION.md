@@ -1,10 +1,11 @@
 ---
 phase: 2
 slug: linux-config-secrets
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: passed
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-25
+verified_at: 2026-03-25T15:09:00Z
 ---
 
 # Phase 2 — Validation Strategy
@@ -38,9 +39,9 @@ created: 2026-03-25
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 2-01-01 | 01 | 1 | CONF-01 | unit/integration | `pnpm --filter backend test -- config-loader` | ❌ W0 | ⬜ pending |
-| 2-02-01 | 02 | 1 | SECR-01 | unit/integration | `pnpm --filter backend test -- secret-store` | ❌ W0 | ⬜ pending |
-| 2-03-01 | 03 | 2 | CONF-02 | integration | `pnpm --filter backend test -- provider-context` | ❌ W0 | ⬜ pending |
+| 2-01-01 | 01 | 1 | CONF-01 | unit/integration | `pnpm --filter backend test -- config-loader` | ✅ W0 | ✅ green |
+| 2-02-01 | 02 | 1 | SECR-01 | unit/integration | `pnpm --filter backend test -- secret-store` | ✅ W0 | ✅ green |
+| 2-03-01 | 03 | 2 | CONF-02 | integration | `pnpm --filter backend test -- provider-context` | ✅ W0 | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,9 +49,9 @@ created: 2026-03-25
 
 ## Wave 0 Requirements
 
-- [ ] `apps/backend/test/config-loader.test.ts` — XDG path resolution, JSON parsing, and provider config validation coverage for `CONF-01`
-- [ ] `apps/backend/test/secret-store.test.ts` — `secret-tool` bridge plus env fallback behavior for `SECR-01`
-- [ ] `apps/backend/test/provider-context.test.ts` — precedence/order/source-mode/secret injection coverage for `CONF-02`
+- [x] `apps/backend/test/config-loader.test.ts` — XDG path resolution, JSON parsing, and provider config validation coverage for `CONF-01`
+- [x] `apps/backend/test/secret-store.test.ts` — `secret-tool` bridge plus env fallback behavior for `SECR-01`
+- [x] `apps/backend/test/provider-context.test.ts` — precedence/order/source-mode/secret injection coverage for `CONF-02`
 
 ---
 
@@ -65,11 +66,11 @@ created: 2026-03-25
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have automated verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved

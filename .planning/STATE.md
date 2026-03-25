@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 2 planned — ready for execution
-stopped_at: Completed plan-phase 2
-last_updated: "2026-03-25T15:12:00Z"
-last_activity: 2026-03-25 — Phase 2 planned (Linux config, XDG persistence, and secret-store integration)
+status: Phase 2 complete — ready for Phase 3 planning
+stopped_at: Completed execute-phase 2
+last_updated: "2026-03-25T15:09:00Z"
+last_activity: 2026-03-25 — Phase 2 executed and verified (Linux config + secret-store runtime complete)
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
 ---
 
 # Project State
@@ -20,33 +20,34 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 2 - Linux Config & Secrets
+**Current focus:** Phase 3 - First-Wave Providers
 
 ## Current Position
 
-Phase: 2 of 5 (Linux Config & Secrets)
+Phase: 3 of 5 (First-Wave Providers)
 Plan: 0 of 3 in current phase
-Status: Planned and ready to execute
-Last activity: 2026-03-25 — Phase 2 planned (Linux config, XDG persistence, and secret-store integration)
+Status: Ready to plan
+Last activity: 2026-03-25 — Phase 2 executed and verified (Linux config + secret-store runtime complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
 - Total plans completed: 0
-- Average duration: 0 min
-- Total execution time: 0.0 hours
+- Average duration: 35 min
+- Total execution time: 3.5 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 1. Backend Contract | 3 | 94 min | 31 min |
+| 2. Linux Config & Secrets | 3 | 114 min | 38 min |
 
 **Recent Trend:**
 
-- Last 5 plans: none yet
-- Trend: Stable
+- Last 5 plans: 5/5 complete
+- Trend: Improving
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - [Phase 2]: Use XDG config persistence with JSON for v1
 - [Phase 2]: Use `secret-tool` as the primary persistent Linux secret-store boundary
 - [Phase 2]: Keep env-based secret resolution as explicit fallback for development and CI
+- [Phase 2]: Runtime provider selection now honors config order/enablement by default
+- [Phase 2]: Secret resolution happens before adapter execution with provider-level error isolation
 
 ### Pending Todos
 
@@ -71,11 +74,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- `secret-tool` availability can vary across desktop and terminal contexts, so execution must keep failure handling explicit
+- Phase 3 will need stable provider auth/session handling while preserving Phase 2 isolation guarantees
 - Browser-cookie-based parity work remains intentionally deferred
 
 ## Session Continuity
 
-Last session: 2026-03-25T15:12:00Z
-Stopped at: Completed plan-phase 2
+Last session: 2026-03-25T15:09:00Z
+Stopped at: Completed execute-phase 2
 Resume file: .planning/ROADMAP.md
