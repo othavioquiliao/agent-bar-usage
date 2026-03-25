@@ -3,7 +3,6 @@ import {
   snapshotEnvelopeSchema,
   snapshotSchemaVersion,
   type ProviderSnapshot,
-  type ProviderSourceMode,
   type SnapshotEnvelope,
 } from "shared-contract";
 
@@ -13,14 +12,22 @@ import {
   createErrorSnapshot,
   createProviderError,
   createUnavailableSnapshot,
-  type ProviderAdapter,
 } from "./provider-adapter.js";
 import { ProviderRegistry } from "./provider-registry.js";
 import { runSubprocess } from "../utils/subprocess.js";
+import {
+  ProviderContextBuilder,
+  type ProviderExecutionContext,
+} from "./provider-context-builder.js";
+import type { BackendConfig } from "../config/config-schema.js";
+import { SecretResolver } from "../secrets/secret-store.js";
 
 export interface BackendCoordinatorOptions {
   registry: ProviderRegistry;
   cache?: SnapshotCache;
+  config?: BackendConfig;
+  secretResolver?: SecretResolver;
+  contextBuilder?: ProviderContextBuilder;
   env?: NodeJS.ProcessEnv;
   now?: () => Date;
 }
@@ -28,6 +35,7 @@ export interface BackendCoordinatorOptions {
 export class BackendCoordinator {
   readonly #registry: ProviderRegistry;
   readonly #cache: SnapshotCache;
+  readonly #contextBuilder: ProviderContextBuilder;
   readonly #env: NodeJS.ProcessEnv;
   readonly #now: () => Date;
 
@@ -36,11 +44,20 @@ export class BackendCoordinator {
     this.#cache = options.cache ?? new SnapshotCache();
     this.#env = options.env ?? process.env;
     this.#now = options.now ?? (() => new Date());
+    this.#contextBuilder =
+      options.contextBuilder ??
+      new ProviderContextBuilder({
+        registry: this.#registry,
+        config: options.config,
+        secretResolver: options.secretResolver,
+      });
   }
 
   async getSnapshot(request: BackendRequest): Promise<SnapshotEnvelope> {
-    const adapters = this.#registry.resolve(request.providers);
-    const providers = await Promise.all(adapters.map(async (adapter) => await this.#resolveSnapshot(adapter, request)));
+    const providerContexts = await this.#contextBuilder.build(request);
+    const providers = await Promise.all(
+      providerContexts.map(async (providerContext) => await this.#resolveSnapshot(providerContext, request)),
+    );
     const generatedAt =
       providers
         .map((snapshot) => snapshot.updated_at)
@@ -54,8 +71,12 @@ export class BackendCoordinator {
     });
   }
 
-  async #resolveSnapshot(adapter: ProviderAdapter, request: BackendRequest): Promise<ProviderSnapshot> {
-    const sourceMode = this.#resolveSourceMode(adapter, request);
+  async #resolveSnapshot(
+    providerContext: ProviderExecutionContext,
+    request: BackendRequest,
+  ): Promise<ProviderSnapshot> {
+    const adapter = providerContext.adapter;
+    const sourceMode = providerContext.sourceMode;
     const cacheKey = buildSnapshotCacheKey({
       providerId: adapter.id,
       sourceMode,
@@ -69,10 +90,31 @@ export class BackendCoordinator {
     }
 
     const updatedAt = this.#now().toISOString();
+
+    if (providerContext.secretError) {
+      return this.#cache.set(
+        cacheKey,
+        createErrorSnapshot(
+          adapter.id,
+          sourceMode,
+          updatedAt,
+          createProviderError(
+            providerContext.secretError.code,
+            providerContext.secretError.message,
+            providerContext.secretError.retryable,
+          ),
+        ),
+        request.ttlSeconds,
+      );
+    }
+
     const context = {
       request,
       providerId: adapter.id,
       sourceMode,
+      providerConfig: providerContext.providerConfig,
+      providerRuntime: providerContext.providerRuntime,
+      secrets: providerContext.secrets,
       env: this.#env,
       now: this.#now,
       runSubprocess,
@@ -102,14 +144,6 @@ export class BackendCoordinator {
     } catch (error) {
       return this.#cache.set(cacheKey, toErrorSnapshot(adapter.id, sourceMode, updatedAt, error), request.ttlSeconds);
     }
-  }
-
-  #resolveSourceMode(adapter: ProviderAdapter, request: BackendRequest): ProviderSourceMode {
-    if (request.sourceMode !== "auto") {
-      return request.sourceMode;
-    }
-
-    return adapter.defaultSourceMode ?? "auto";
   }
 }
 

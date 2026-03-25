@@ -46,7 +46,10 @@ export class ProviderContextBuilder {
       const adapter = this.#registry.getById(provider.id);
 
       if (!adapter) {
-        throw new Error(`Unknown provider in effective config: ${provider.id}`);
+        if (provider.explicit) {
+          throw new Error(`Unknown provider requested explicitly: ${provider.id}`);
+        }
+        continue;
       }
 
       const sourceMode = this.#resolveSourceMode(adapter.defaultSourceMode, provider.config, request);
@@ -70,7 +73,7 @@ export class ProviderContextBuilder {
 
   #resolveProviderOrder(
     request: BackendRequest,
-  ): Array<{ id: ProviderId; config: ProviderConfig | null }> {
+  ): Array<{ id: ProviderId; config: ProviderConfig | null; explicit: boolean }> {
     const byId = new Map<ProviderId, ProviderConfig>();
     for (const provider of this.#config.providers) {
       byId.set(provider.id, provider);
@@ -80,6 +83,7 @@ export class ProviderContextBuilder {
       return request.providers.map((id) => ({
         id,
         config: byId.get(id) ?? null,
+        explicit: true,
       }));
     }
 
@@ -88,6 +92,7 @@ export class ProviderContextBuilder {
       .map((provider) => ({
         id: provider.id,
         config: provider,
+        explicit: false,
       }));
   }
 

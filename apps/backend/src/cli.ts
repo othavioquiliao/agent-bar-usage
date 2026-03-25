@@ -9,11 +9,16 @@ import {
 
 import { SnapshotCache } from "./cache/snapshot-cache.js";
 import { formatConfigCommandError, registerConfigCommand } from "./commands/config-command.js";
+import { loadBackendConfig } from "./config/config-loader.js";
 import { normalizeBackendRequest } from "./config/backend-request.js";
 import { BackendCoordinator } from "./core/backend-coordinator.js";
+import { ProviderContextBuilder } from "./core/provider-context-builder.js";
 import type { ProviderAdapter } from "./core/provider-adapter.js";
 import { ProviderRegistry } from "./core/provider-registry.js";
 import { formatSnapshotAsText } from "./formatters/text-formatter.js";
+import { EnvSecretStore } from "./secrets/env-secret-store.js";
+import { SecretToolStore } from "./secrets/secret-tool-store.js";
+import { SecretResolver } from "./secrets/secret-store.js";
 import { serializeSnapshotEnvelope } from "./serializers/snapshot-serializer.js";
 
 const defaultSourceModes: Record<ProviderId, ProviderSourceMode> = {
@@ -114,8 +119,18 @@ export async function runUsageCommand(options: UsageCommandOptions = {}): Promis
     include_diagnostics: Boolean(options.diagnostics),
   });
 
+  const loadedConfig = await loadBackendConfig();
+  const registry = createProviderRegistry();
+  const secretResolver = new SecretResolver([new SecretToolStore(), new EnvSecretStore()]);
+  const contextBuilder = new ProviderContextBuilder({
+    registry,
+    config: loadedConfig.config,
+    secretResolver,
+  });
+
   const coordinator = new BackendCoordinator({
-    registry: createProviderRegistry(),
+    registry,
+    contextBuilder,
     cache: new SnapshotCache(),
   });
   const snapshot = await coordinator.getSnapshot(request);
