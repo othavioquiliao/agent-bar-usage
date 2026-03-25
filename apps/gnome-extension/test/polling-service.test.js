@@ -86,6 +86,39 @@ describe("polling service", () => {
     });
   });
 
+  it("logs structured error when snapshot fetch fails", async () => {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args.join(" "));
+
+    const scheduler = {
+      setInterval: vi.fn(() => 9),
+      clearInterval: vi.fn(),
+      now: () => new Date("2026-03-25T17:10:00.000Z"),
+    };
+    const fetchError = new Error("connection refused");
+    fetchError.argv = ["/usr/bin/agent-bar", "service", "refresh", "--json"];
+    fetchError.stderr = "ECONNREFUSED";
+    const backendClient = {
+      fetchUsageSnapshot: vi.fn(async () => {
+        throw fetchError;
+      }),
+    };
+    const states = [];
+    const service = createPollingService({
+      backendClient,
+      scheduler,
+      onStateChange: (state) => states.push(state),
+    });
+
+    await service.refreshNow();
+
+    expect(errors.some((e) => e.includes("[agent-bar]") && e.includes("connection refused"))).toBe(true);
+    expect(errors.some((e) => e.includes("[agent-bar]") && e.includes("ECONNREFUSED"))).toBe(true);
+
+    console.error = originalError;
+  });
+
   it("captures backend failures in state", async () => {
     const scheduler = {
       setInterval: vi.fn(() => 8),

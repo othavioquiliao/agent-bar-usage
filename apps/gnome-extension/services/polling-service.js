@@ -90,6 +90,14 @@ export function createPollingService({
           return undefined;
         }
 
+        console.error(`[agent-bar] Snapshot fetch failed: ${error?.message ?? error}`);
+        if (error?.argv) {
+          console.error(`[agent-bar]   command: ${error.argv.join(" ")}`);
+        }
+        if (error?.stderr) {
+          console.error(`[agent-bar]   stderr: ${error.stderr}`);
+        }
+
         emit(applySnapshotError(state, error));
       })
       .finally(() => {
