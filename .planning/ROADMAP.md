@@ -2,7 +2,7 @@
 
 ## Overview
 
-The roadmap turns the existing `CodexBar` backend knowledge into a Linux-native Ubuntu product in five phases. It starts by stabilizing a backend contract, then adds Linux configuration and secrets, implements the first-wave providers, delivers a GNOME-friendly desktop surface, and finishes with diagnostics, installation, and operational hardening.
+The roadmap turns the existing `CodexBar` knowledge into a Linux-native Ubuntu product in five phases. The implementation stack is now fixed as a Node.js/TypeScript backend plus a GNOME Shell extension in GJS. The roadmap starts by stabilizing a backend contract, then adds Linux configuration and secrets, implements the first-wave providers, delivers the GNOME desktop surface, and finishes with diagnostics, installation, and operational hardening.
 
 ## Phases
 
@@ -11,10 +11,10 @@ The roadmap turns the existing `CodexBar` backend knowledge into a Linux-native 
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [ ] **Phase 1: Backend Contract** - Define and implement the Linux-facing backend contract and refresh flow
-- [ ] **Phase 2: Linux Config & Secrets** - Persist provider settings and introduce Ubuntu-friendly secret handling
-- [ ] **Phase 3: First-Wave Providers** - Deliver Copilot, Codex CLI, and Claude CLI support on Ubuntu
-- [ ] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME-friendly top-bar or tray experience
-- [ ] **Phase 5: Delivery & Hardening** - Add diagnostics, installation guidance, and release-grade operational polish
+- [ ] **Phase 2: Linux Config & Secrets** - Persist backend settings and introduce Ubuntu-friendly secret handling
+- [ ] **Phase 3: First-Wave Providers** - Deliver Copilot, Codex CLI, and Claude CLI adapters in the Node backend
+- [ ] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME Shell extension in GJS
+- [ ] **Phase 5: Delivery & Hardening** - Add diagnostics, installation guidance, packaging, and release-grade operational polish
 
 ## Phase Details
 
@@ -29,12 +29,12 @@ The roadmap turns the existing `CodexBar` backend knowledge into a Linux-native 
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Define the Ubuntu snapshot schema and CLI/backend interface
-- [ ] 01-02: Reuse or mirror the `CodexBarCore` provider orchestration needed for Linux execution
-- [ ] 01-03: Implement refresh sequencing, JSON serialization, and baseline backend diagnostics
+- [ ] 01-01: Scaffold the Node/TypeScript backend workspace and shared snapshot contract
+- [ ] 01-02: Implement the provider adapter runtime, refresh coordinator, and cache layer
+- [ ] 01-03: Implement CLI output modes, diagnostics, and backend contract tests
 
 ### Phase 2: Linux Config & Secrets
-**Goal**: Introduce Ubuntu-native configuration and secret management without inheriting Apple-specific assumptions
+**Goal**: Introduce Ubuntu-native configuration and secret management for the Node backend without inheriting Apple-specific assumptions
 **Depends on**: Phase 1
 **Requirements**: [CONF-01, CONF-02, SECR-01]
 **Success Criteria** (what must be TRUE):
@@ -44,12 +44,12 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Design the Linux config model and persistence format
+- [ ] 02-01: Design the backend config model and persistence format
 - [ ] 02-02: Integrate libsecret or equivalent secret-store handling
-- [ ] 02-03: Wire config and secret resolution into provider execution contexts
+- [ ] 02-03: Wire config and secret resolution into backend provider contexts
 
 ### Phase 3: First-Wave Providers
-**Goal**: Ship the first Ubuntu-viable provider set with reliable fetch paths and clear failure behavior
+**Goal**: Ship the first Ubuntu-viable provider set in the Node backend with reliable fetch paths and clear failure behavior
 **Depends on**: Phase 2
 **Requirements**: [COP-01, CDX-01, CLD-01]
 **Success Criteria** (what must be TRUE):
@@ -65,7 +65,7 @@ Plans:
 - [ ] 03-03: Implement Claude CLI Linux flow plus provider-level failure isolation
 
 ### Phase 4: Ubuntu Desktop Surface
-**Goal**: Deliver the first Linux-native desktop surface that makes the backend useful in daily Ubuntu workflows
+**Goal**: Deliver the first Linux-native desktop surface as a GNOME Shell extension that makes the backend useful in daily Ubuntu workflows
 **Depends on**: Phase 3
 **Requirements**: [UI-01, UI-02, UI-03]
 **Success Criteria** (what must be TRUE):
@@ -75,9 +75,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Choose and scaffold the first Ubuntu shell surface
-- [ ] 04-02: Implement the backend-to-shell bridge and refresh polling model
-- [ ] 04-03: Build the initial provider detail and refresh interactions
+- [ ] 04-01: Scaffold the GNOME Shell extension for Ubuntu 24.04.4 LTS
+- [ ] 04-02: Implement the backend-to-extension bridge and refresh polling model
+- [ ] 04-03: Build the initial top-bar menu, detail view, and refresh interactions
 
 ### Phase 5: Delivery & Hardening
 **Goal**: Make the Ubuntu v1 installable, diagnosable, and maintainable beyond a local prototype
@@ -91,7 +91,7 @@ Plans:
 
 Plans:
 - [ ] 05-01: Add operational diagnostics and failure-reporting surfaces
-- [ ] 05-02: Write Ubuntu installation, setup, and troubleshooting docs
+- [ ] 05-02: Write Ubuntu installation, setup, and troubleshooting docs for the Node backend and GNOME extension
 - [ ] 05-03: Harden packaging, startup behavior, and end-to-end verification
 
 ## Progress

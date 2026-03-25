@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: planning
 stopped_at: Phase 1 planned
-last_updated: "2026-03-25T12:41:01Z"
-last_activity: 2026-03-25 — Phase 1 planned with 3 executable backend contract plans
+last_updated: "2026-03-25T13:52:13Z"
+last_activity: 2026-03-25 — Stack shifted to Node.js/TypeScript backend plus GJS GNOME extension and Phase 1 was replanned
 progress:
   total_phases: 5
   completed_phases: 0
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 Phase: 1 of 5 (Backend Contract)
 Plan: 3 planned, 0 completed in current phase
 Status: Planned
-Last activity: 2026-03-25 — Phase 1 planned with 3 executable backend contract plans
+Last activity: 2026-03-25 — Stack shifted to Node.js/TypeScript backend plus GJS GNOME extension and Phase 1 was replanned
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -59,6 +59,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - [Init]: Treat `CodexBar/` as a reference backend, not the Ubuntu shell
+- [Stack]: Rebuild the Ubuntu product without Swift
+- [Stack]: Use Node.js/TypeScript for the backend
+- [Stack]: Use a GNOME Shell extension in GJS for the frontend
 - [Init]: Prioritize Copilot, Codex CLI, and Claude CLI for v1
 - [Init]: Defer Cursor and browser-parity work until after the Linux contract is stable
 

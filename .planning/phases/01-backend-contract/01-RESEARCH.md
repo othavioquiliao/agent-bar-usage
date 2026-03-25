@@ -1,30 +1,28 @@
 # Phase 1: Backend Contract - Research
 
 **Researched:** 2026-03-25
-**Domain:** Linux-native backend contract design for a Swift-based multi-provider CLI/backend
+**Domain:** Linux-native backend contract design for a GNOME Shell extension backed by Node.js/TypeScript
 **Confidence:** HIGH
 
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
-- Phase 1 will be CLI-first and stateless at the contract boundary, using a command/bin interface as the canonical backend entrypoint.
-- The internal design must remain daemon-ready so a local service can be added later without redefining the public snapshot contract.
-- JSON and human-readable output are both first-class outputs of the backend contract.
-- JSON remains mandatory and stable for downstream UI integration even when text output is provided for humans.
-- The normalized snapshot should be "rich controlled": usage summary, `source`, `updated_at`, structured error state, reset window when available, and an optional diagnostics block.
-- Deep diagnostics should be nested and optional rather than always-on top-level payload noise.
-- Default reads may use a short-lived cache/TTL.
-- The contract must expose an explicit forced-refresh path that bypasses cache.
-
-### the agent's Discretion
-- Exact field names and JSON nesting, as long as dual-output and rich-controlled semantics are preserved
-- Exact TTL duration, provided it stays short and is documented
-- Exact human-readable output layout and verbosity defaults
+- The backend contract is CLI-first and stateless at the public boundary.
+- The internal design should remain daemon-ready.
+- The Ubuntu product must not use Swift in the new implementation.
+- The backend implementation stack is Node.js + TypeScript.
+- The frontend target is a GNOME Shell extension in GJS on Ubuntu 24.04.4 LTS.
+- JSON and human-readable output are both first-class outputs.
+- JSON remains the mandatory stable contract for the GNOME frontend.
+- The normalized snapshot should be rich but controlled: usage, `source`, `updated_at`, structured error, reset window when available, and optional diagnostics.
+- Diagnostics should stay nested and optional.
+- Default reads may use a short-lived cache.
+- The contract must expose forced refresh.
 
 ### Deferred Ideas (OUT OF SCOPE)
-- Linux secret storage choices
-- GNOME-facing UI and shell integration
+- Linux secret storage implementation
+- GNOME Shell extension UI code
 - Browser-dependent provider parity
 
 </user_constraints>
@@ -32,278 +30,137 @@
 <research_summary>
 ## Summary
 
-The strongest approach for this phase is to treat `CodexBarCLI` as the immediate execution shell and `CodexBarCore` as the reusable fetch engine, then add a thin Ubuntu-specific contract layer around them rather than inventing a new backend runtime. The existing code already proves four key things: cross-platform CLI execution is viable, provider orchestration is descriptor-driven, CLI-backed providers can be run through PTY/process helpers, and Linux web support is intentionally gated. That makes the contract question primarily a schema/caching/interface problem, not a provider-integration-from-scratch problem.
+The strongest approach for Phase 1 is to build a small Node.js/TypeScript monorepo with one backend app and one shared-contract package. The backend should own provider orchestration, cache policy, and formatting. The future GNOME extension should only consume the backend contract through CLI JSON. This preserves the useful behavior patterns from CodexBar without coupling the new product to Swift.
 
-For planning purposes, the standard approach is: keep the runtime stateless at the CLI boundary, normalize machine-readable output around a stable snapshot envelope, keep diagnostics nested and optional, and implement a small cache layer above provider fetch execution so repeated UI polling does not become repeated live fetches. This preserves future flexibility: a daemon can later serve the same schema, while the first shell can safely poll a CLI or a very thin backend wrapper.
+The reference repo still matters, but only as architecture input. The key ideas worth mirroring are:
 
-The biggest implementation risks are not in serialization itself but in where behavior boundaries are drawn. If the cache sits inside provider fetchers, later daemonization will be messy. If diagnostics are flattened into the main payload, every downstream UI becomes coupled to internal fetch plumbing. If text output becomes the implicit source of truth, the GNOME layer will later need brittle parsing. The planner should therefore isolate: contract types, cache/refresh policy, provider execution adapter, and output formatter.
+- provider registry plus per-provider adapters
+- explicit source modes such as `auto`, `cli`, `oauth`, `api`, and `web`
+- normalized fetch attempts and fallback metadata
+- separation between fetch runtime and presentation
 
-**Primary recommendation:** Build a stable JSON snapshot envelope above `ProviderDescriptor` execution, keep text output as a formatter over the same data model, and implement a short-TTL cache/force-refresh layer outside provider internals.
+The backend should therefore be divided into:
+
+- shared contract types and validation schemas
+- provider adapter interface and registry
+- refresh coordinator plus TTL cache
+- JSON serializer and text formatter over the same normalized model
+
+This keeps the CLI useful on its own, gives the GNOME extension a stable contract, and leaves room for a later daemon without redesigning the public API.
+
+**Primary recommendation:** Build a Node.js/TypeScript backend CLI around a shared contract package, keep diagnostics nested and opt-in, and mirror the CodexBar fetch/fallback ideas through provider adapters rather than through direct code reuse.
 </research_summary>
 
 <standard_stack>
 ## Standard Stack
 
-The established libraries/tools for this domain:
+The established tools for this implementation direction:
 
 ### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| Swift 6.2 | repo baseline | Core implementation language | Already established by `CodexBar`; avoids introducing a second runtime for the backend contract |
-| Swift Package Manager | repo baseline | Build/package structure | Already governs `CodexBarCore` and `CodexBarCLI` targets |
-| Commander | repo baseline | CLI command descriptors and parsing | Already used in `CodexBarCLI` and fits the CLI-first decision |
-| Swift Testing | repo baseline | Verification and regression tests | Already used in the nested repo and suitable for contract-level tests |
+| Tool | Role | Why it fits |
+|------|------|-------------|
+| Node.js 22 LTS | backend runtime | Mature CLI/process ecosystem and strong JSON/tooling support |
+| TypeScript | backend language | Strong typing for the normalized contract and provider adapters |
+| `pnpm` workspaces | repo layout | Clean split between backend app and shared contract package |
+| `commander` | CLI parsing | Straightforward command structure and help generation |
+| `zod` | runtime schema validation | Keeps the contract honest at runtime and in tests |
+| `vitest` | test runner | Fast and well suited for contract, cache, and formatter tests |
+
+### Frontend boundary
+| Tool | Role | Why it fits |
+|------|------|-------------|
+| GJS | GNOME extension runtime | Native GNOME Shell integration on Ubuntu 24.04.4 LTS |
+| `GLib` / `Gio` | subprocess and timers | Needed for backend invocation and polling in the extension |
+| `St` / `PanelMenu` / `PopupMenu` | top-bar UI | Standard GNOME Shell extension surface |
 
 ### Supporting
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `swift-log` / `CodexBarLog` | repo baseline | Structured logging | Use for refresh/caching/diagnostic boundaries rather than ad-hoc `print` debugging |
-| `TTYCommandRunner` / subprocess helpers | repo baseline | Interactive CLI execution for providers | Use for Codex/Claude-style CLI-backed fetch paths |
-| Existing provider descriptor registry | repo baseline | Provider metadata and fetch plan discovery | Use to avoid hardcoding provider-specific flow in the Ubuntu contract layer |
+| Tool | Role | When to use |
+|------|------|-------------|
+| `pino` | backend logging | Structured logs for provider failures and diagnostics |
+| `execa` or `node:child_process` | subprocess execution | CLI-backed providers such as Codex and Claude |
+| `tsx` | local TypeScript execution | Useful in dev before packaging compiled output |
 
-### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
-| Reusing Swift CLI/backend | Rewriting backend in JS/TS for GNOME affinity | Easier GNOME ecosystem integration, but duplicates provider engine logic and increases maintenance |
-| Commander-based CLI contract | New bespoke CLI parser | Lower dependency count, but loses alignment with the existing working CLI |
-| Thin cache layer above fetchers | Persistent daemon-only state immediately | Better long-lived efficiency later, but violates the chosen CLI-first contract boundary for this phase |
-
-**Installation:**
-```bash
-# Existing nested repo workflow
-cd CodexBar
-swift build
-swift test
-```
 </standard_stack>
 
 <architecture_patterns>
 ## Architecture Patterns
 
-### Recommended Project Structure
-```text
-CodexBar/Sources/
-├── CodexBarCore/                 # Provider engine and reusable runtime abstractions
-├── CodexBarCLI/                  # Existing CLI shell
-└── [Ubuntu contract additions]   # Normalized backend contract + cache layer if added in Swift
-```
+### Pattern 1: Shared Contract Package
+**What:** Keep request/response schema definitions in a dedicated package used by the backend.
+**Why:** Prevents contract drift and creates a stable import boundary for tests and future clients.
 
-### Pattern 1: Contract Layer Above Provider Execution
-**What:** Introduce a thin layer that converts provider fetch results into one normalized Ubuntu-facing snapshot envelope.
-**When to use:** Whenever provider payloads differ or future UIs need a machine-stable interface.
-**Example:**
-```swift
-struct UbuntuProviderSnapshot: Codable, Sendable {
-    let provider: String
-    let source: String
-    let updatedAt: Date
-    let status: String
-    let usage: UbuntuUsagePayload?
-    let resetWindow: UbuntuResetWindow?
-    let error: UbuntuProviderError?
-    let diagnostics: UbuntuDiagnostics?
-}
-```
+### Pattern 2: Thin GNOME Client
+**What:** The extension should spawn the backend, parse JSON, and render state without provider logic.
+**Why:** GNOME Shell code becomes much easier to debug and less sensitive to provider churn.
 
-### Pattern 2: Formatter Split
-**What:** Generate text output by formatting the normalized snapshot model instead of formatting provider results directly.
-**When to use:** When JSON and human-readable output are both first-class and must stay behaviorally aligned.
-**Example:**
-```swift
-let snapshot = UbuntuProviderSnapshot(...)
-if output.usesJSONOutput {
-    printJSON(snapshot)
-} else {
-    print(UbuntuTextFormatter.render(snapshot))
-}
-```
+### Pattern 3: Coordinator Above Adapters
+**What:** Put TTL, force-refresh, provider selection, and failure isolation in one backend coordinator.
+**Why:** Provider adapters stay focused on fetch behavior and mapping, not cache policy.
 
-### Pattern 3: Cache Outside Fetchers
-**What:** Apply TTL and force-refresh semantics in a coordinator above provider fetch strategies.
-**When to use:** When the public contract needs cheap repeated reads without contaminating provider internals.
-**Example:**
-```swift
-if !forceRefresh, let cached = cache.value(for: provider), !cached.isExpired(ttl: ttl) {
-    return cached.snapshot
-}
-let fresh = try await providerDescriptor.fetch(context: context)
-cache.store(provider, snapshot: mappedSnapshot)
-return mappedSnapshot
-```
+### Pattern 4: Formatter Split Over the Same Model
+**What:** Text output must render from the normalized snapshot envelope used for JSON.
+**Why:** JSON and text remain semantically aligned.
 
 ### Anti-Patterns to Avoid
-- **Embedding cache policy inside provider strategies:** makes future daemonization and consistency harder
-- **Using text output as the integration contract:** forces downstream Linux surfaces to parse presentation text
-- **Letting diagnostics leak into the main top-level payload by default:** makes simple UI consumers depend on internal fetch mechanics
+- Putting provider-specific logic in the GNOME extension
+- Hiding cache semantics inside each provider adapter
+- Treating CodexBar Swift modules as code dependencies
+- Letting text output become the real integration contract
+
 </architecture_patterns>
 
 <dont_hand_roll>
 ## Don't Hand-Roll
 
-Problems that look simple but have existing solutions:
-
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| Provider discovery | Ad-hoc provider switch statements in new Ubuntu code | Existing `ProviderDescriptorRegistry` | Registry already centralizes provider metadata and order |
-| CLI process orchestration | New custom PTY wrapper | Existing PTY/subprocess helpers in `CodexBarCore` | Interactive CLI handling already exists and is tricky to get right |
-| Output mode parsing | One-off `CommandLine.arguments` parsing | Existing Commander + CLI output preference pattern | Avoids divergence from current CLI behavior |
-| Fallback tracking | New parallel error bookkeeping | Existing fetch attempts/outcome structures | The core already models availability, failure, and fallback decisions |
+| Contract validation | Ad-hoc object checks | `zod` schemas in `packages/shared-contract` | Runtime validation plus type inference |
+| CLI parsing | Manual `process.argv` branching | `commander` | Cleaner help, flags, and subcommands |
+| Test harness | Custom shell-script assertions | `vitest` | Faster deterministic contract tests |
+| Provider registration | Free-form imports spread through commands | central `provider-registry.ts` | Keeps adapter composition explicit |
 
-**Key insight:** This phase should add a normalized contract boundary, not replace the core systems that already solve provider execution and CLI integration.
 </dont_hand_roll>
 
 <common_pitfalls>
 ## Common Pitfalls
 
-### Pitfall 1: Contract Drift Between JSON and Text
-**What goes wrong:** Text and JSON modes start representing different semantics or fields over time.
-**Why it happens:** Separate rendering paths evolve independently.
-**How to avoid:** Define one normalized snapshot model and render both modes from it.
-**Warning signs:** A field appears in JSON but cannot be surfaced in text without another provider fetch.
+### Pitfall 1: Extension does too much
+If the GNOME extension owns provider auth, fetch logic, retries, and formatting, it will become fragile fast.
 
-### Pitfall 2: Cache Semantics Hidden in Provider Logic
-**What goes wrong:** TTL behavior becomes provider-specific and impossible to reason about globally.
-**Why it happens:** Caching is introduced as a local optimization inside each fetch path.
-**How to avoid:** Keep TTL/force-refresh in a single backend coordinator layer.
-**Warning signs:** Different providers refresh on different rules without explicit contract documentation.
+### Pitfall 2: Contract types live only inside the backend app
+This makes tests and future clients rely on duplicated shapes.
 
-### Pitfall 3: Overstuffed Diagnostics
-**What goes wrong:** Every consumer must understand fetch attempts, timings, and fallback mechanics even when they only need current status.
-**Why it happens:** Internal debugging data is promoted to top-level contract status.
-**How to avoid:** Nest diagnostics in an optional block and document it as advanced/diagnostic-only.
-**Warning signs:** Early GNOME or shell consumers need to filter dozens of internal fields before rendering basic state.
+### Pitfall 3: Cache policy is hidden inside adapters
+Then refresh behavior becomes inconsistent and hard to debug.
+
+### Pitfall 4: Reference repo becomes implementation dependency
+That would reintroduce the Swift coupling the user explicitly rejected.
+
 </common_pitfalls>
-
-<code_examples>
-## Code Examples
-
-Verified patterns from the current codebase:
-
-### Existing dual-output preference parsing
-```swift
-// Source: CodexBar/Sources/CodexBarCLI/CLIOutputPreferences.swift
-struct CLIOutputPreferences {
-    let format: OutputFormat
-    let jsonOnly: Bool
-    let pretty: Bool
-
-    var usesJSONOutput: Bool {
-        self.jsonOnly || self.format == .json
-    }
-}
-```
-
-### Existing provider fetch pipeline boundary
-```swift
-// Source: CodexBar/Sources/CodexBarCore/Providers/ProviderFetchPlan.swift
-public struct ProviderFetchOutcome: @unchecked Sendable {
-    public let result: Result<ProviderFetchResult, Error>
-    public let attempts: [ProviderFetchAttempt]
-}
-```
-
-### Existing descriptor-driven execution
-```swift
-// Source: CodexBar/Sources/CodexBarCore/Providers/ProviderDescriptor.swift
-public func fetch(context: ProviderFetchContext) async throws -> ProviderFetchResult {
-    let outcome = await self.fetchOutcome(context: context)
-    return try outcome.result.get()
-}
-```
-</code_examples>
-
-<sota_updates>
-## State of the Art (2024-2025)
-
-For this phase, the most relevant current pattern shift is architectural rather than library-driven:
-
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| UI-specific backend assumptions | Contract-first backend shared across multiple frontends | Ongoing trend in local AI tooling | Makes daemon/CLI/UI layering much easier |
-| One-shot CLI output with no structured diagnostics | Machine-readable JSON envelopes with optional diagnostic detail | Common in modern local developer tooling | Better for automation and UI reuse |
-| Re-fetch on every poll | Short-lived cache plus explicit refresh semantics | Increasingly common in local status tools | Reduces provider/API churn and improves perceived responsiveness |
-
-**New tools/patterns to consider:**
-- Backend contract schemas that cleanly separate summary state from diagnostics
-- Explicit `--refresh` / `--no-cache` style semantics to preserve determinism during debugging
-
-**Deprecated/outdated:**
-- Treating terminal-friendly output as the only integration surface for higher-level tooling
-</sota_updates>
 
 <open_questions>
 ## Open Questions
 
-1. **Where should Ubuntu-specific contract types live?**
-   - What we know: They should sit near the CLI/backend boundary and not inside the macOS shell.
-   - What's unclear: Whether they should live in `CodexBarCore`, `CodexBarCLI`, or a new shared target.
-   - Recommendation: Resolve during planning based on write-scope clarity and whether the types are shell-agnostic.
+1. **Workspace manager**
+   - Recommendation: `pnpm` workspaces for backend app plus shared contract package.
 
-2. **How much diagnostic detail should be emitted by default in text mode?**
-   - What we know: Diagnostics must exist, but should be optional and not pollute the main payload.
-   - What's unclear: Whether text mode should suppress diagnostics by default or show a concise summary.
-   - Recommendation: Plan for concise text defaults and a verbose/debug path instead of always-on detail.
+2. **Subprocess wrapper**
+   - Recommendation: start with `node:child_process` or `execa`, whichever keeps interactive CLI handling simpler during implementation.
 
-3. **What exact TTL should count as “short-lived cache”?**
-   - What we know: Cache should reduce shell polling cost while still keeping output fresh enough for status display.
-   - What's unclear: The exact default TTL and whether it should vary by provider.
-   - Recommendation: Keep one simple short default in Phase 1 and defer per-provider tuning until real usage data exists.
+3. **Default TTL**
+   - Recommendation: `30` seconds as the first documented default, then tune later with real usage.
+
+4. **Extension authoring language**
+   - Recommendation: plain GJS JavaScript in v1. Avoid adding a frontend TypeScript build step unless it clearly pays for itself.
+
 </open_questions>
 
 ## Validation Architecture
 
 Phase 1 should validate three layers:
-- contract shape: JSON envelope and field stability
-- backend behavior: cache hit vs forced refresh semantics
-- integration boundary: provider execution can still surface structured fallback/error data through the contract
 
-Tests should prioritize deterministic contract checks over live provider calls. The fastest useful validation path is Linux-safe unit/integration coverage around mapping, cache policy, and formatter behavior, with smoke verification of the CLI contract in CI.
+- contract shape: schema version, provider snapshots, error shape, diagnostics shape
+- backend behavior: cache hit versus force refresh
+- output alignment: JSON and text represent the same provider state
 
-<sources>
-## Sources
-
-### Primary (HIGH confidence)
-- `CodexBar/Sources/CodexBarCLI/CLIEntry.swift` - CLI command structure and dispatch
-- `CodexBar/Sources/CodexBarCLI/CLIUsageCommand.swift` - provider execution and output flow
-- `CodexBar/Sources/CodexBarCLI/CLIOutputPreferences.swift` - JSON/text preference behavior
-- `CodexBar/Sources/CodexBarCore/Providers/ProviderDescriptor.swift` - descriptor registry and fetch boundary
-- `CodexBar/Sources/CodexBarCore/Providers/ProviderFetchPlan.swift` - fetch outcome and fallback structures
-- `CodexBar/Sources/CodexBarCore/Host/PTY/TTYCommandRunner.swift` - CLI-backed provider execution infrastructure
-- `CodexBar/.github/workflows/ci.yml` - Linux build/test expectations in CI
-- `ubuntu-extension-analysis/codexbar-project-analysis.md` - reusable-vs-macOS shell analysis
-- `ubuntu-extension-analysis/provider-analysis.md` - provider portability guidance
-- `ubuntu-extension-analysis/ubuntu-extension-direction.md` - Ubuntu-first architecture direction
-
-### Secondary (MEDIUM confidence)
-- `.planning/codebase/ARCHITECTURE.md` - synthesized architectural map from local inspection
-- `.planning/codebase/STACK.md` - synthesized stack/runtime map from local inspection
-- `.planning/codebase/STRUCTURE.md` - synthesized structural map from local inspection
-
-### Tertiary (LOW confidence - needs validation)
-- None. This phase research is grounded in local code and project artifacts rather than external ecosystem claims.
-</sources>
-
-<metadata>
-## Metadata
-
-**Research scope:**
-- Core technology: Swift CLI/backend contract on Linux
-- Ecosystem: existing `CodexBarCore` + `CodexBarCLI` reuse
-- Patterns: descriptor-driven execution, dual-output contract, cache/refresh boundary
-- Pitfalls: contract drift, cache placement, diagnostic overexposure
-
-**Confidence breakdown:**
-- Standard stack: HIGH - directly inherited from the existing codebase
-- Architecture: HIGH - backed by current code structure and existing analysis docs
-- Pitfalls: HIGH - derived from the current architecture and phase decisions
-- Code examples: HIGH - copied from local primary sources
-
-**Research date:** 2026-03-25
-**Valid until:** 2026-04-24
-</metadata>
-
----
-
-*Phase: 01-backend-contract*
-*Research completed: 2026-03-25*
-*Ready for planning: yes*
+Tests should prioritize deterministic contract checks over live provider calls. The first useful validation setup is a Vitest suite around request parsing, snapshot mapping, cache behavior, and formatter parity.

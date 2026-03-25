@@ -13,7 +13,13 @@ read_when:
 CodexBar is a strong backend reference and a weak desktop-port candidate.
 
 That means the Ubuntu effort should not aim to recreate the macOS app structure one-to-one.
-It should instead extract or mirror the reusable backend ideas and attach them to a Linux-native shell.
+It should instead mirror the reusable backend ideas and attach them to a Linux-native shell.
+
+The implementation stack is now fixed as:
+
+- Node.js + TypeScript for the backend
+- GNOME Shell extension in GJS for the Ubuntu desktop surface
+- JSON over a local CLI boundary as the contract between them
 
 ## 2. What should be reused conceptually
 
@@ -57,10 +63,10 @@ This is the most pragmatic path.
 Architecture:
 
 1. backend executable
-   - reuse or mirror the `CodexBarCLI` behavior
+   - mirror the `CodexBarCLI` behavior in Node.js/TypeScript
    - expose JSON output per provider
 2. Linux desktop surface
-   - GNOME Shell extension, AppIndicator, or Waybar module
+   - GNOME Shell extension in GJS
    - poll backend JSON on an interval
 3. optional settings app
    - separate config/editor UI
@@ -113,20 +119,20 @@ Strong secondary options:
 
 If the primary audience is standard Ubuntu desktop users:
 
-- build a small backend service or CLI
-- build a GNOME Shell extension on top of it
+- build a small Node.js/TypeScript backend service or CLI
+- build a GNOME Shell extension in GJS on top of it
 
 If the first goal is fastest delivery:
 
-- start with a CLI plus Waybar/AppIndicator integration
-- add GNOME Shell UX later
+- start with a CLI-first backend contract
+- add the GNOME Shell extension immediately after the backend contract is stable
 
 ## 6. Suggested implementation phases
 
 ### Phase 1: backend baseline
 
 - define Ubuntu-side snapshot schema
-- reuse or mirror the CodexBar provider descriptor pattern
+- mirror the CodexBar provider descriptor pattern in TypeScript
 - implement JSON output for:
   - Copilot
   - Codex CLI
@@ -143,7 +149,7 @@ If the first goal is fastest delivery:
 
 ### Phase 3: first desktop surface
 
-- implement GNOME Shell extension or AppIndicator
+- implement GNOME Shell extension in GJS
 - show:
   - provider status
   - percent remaining/used
@@ -190,8 +196,8 @@ Build the Ubuntu product around the backend ideas, not around the macOS app shap
 
 The most defensible v1 is:
 
-- backend/CLI engine
-- GNOME-oriented shell
+- Node.js/TypeScript backend/CLI engine
+- GJS GNOME Shell extension
 - first-wave providers:
   - Copilot
   - Codex via CLI

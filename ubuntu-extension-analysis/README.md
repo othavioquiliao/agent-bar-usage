@@ -23,6 +23,8 @@ Analysis date: 2026-03-25
 - `ubuntu-extension-direction.md`
   - Recommended direction for building an Ubuntu extension from this codebase knowledge, including reuse strategy and
     implementation phases.
+- `gjs-node-v1-architecture.md`
+  - Concrete v1 architecture for the chosen stack: Node.js/TypeScript backend plus GNOME Shell extension in GJS.
 
 ## Core takeaway
 
@@ -32,4 +34,4 @@ CodexBar is already split in a useful way:
 - `Sources/CodexBarCLI` already reuses the same backend on Linux.
 - `Sources/CodexBar` is highly macOS-specific and should be treated as a reference UI, not as a portable shell.
 
-That makes CodexBar a strong backend reference for Ubuntu, but not a direct desktop-port candidate.
+That makes CodexBar a strong reference for Ubuntu, but not a direct code-reuse or desktop-port candidate.
