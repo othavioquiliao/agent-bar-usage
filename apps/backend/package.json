@@ -11,7 +11,7 @@
   "dependencies": {
     "commander": "^14.0.2",
     "shared-contract": "workspace:*",
-    "zod": "^4.1.11"
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",
