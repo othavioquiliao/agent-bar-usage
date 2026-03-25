@@ -3,6 +3,7 @@ import type { ProviderId, ProviderSnapshot } from "shared-contract";
 
 import { SnapshotCache } from "../src/cache/snapshot-cache.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
+import type { BackendConfig } from "../src/config/config-schema.js";
 import { BackendCoordinator } from "../src/core/backend-coordinator.js";
 import type { ProviderAdapter } from "../src/core/provider-adapter.js";
 import { ProviderRegistry } from "../src/core/provider-registry.js";
@@ -20,6 +21,7 @@ describe("BackendCoordinator cache refresh behavior", () => {
     const coordinator = new BackendCoordinator({
       registry: new ProviderRegistry([codex.adapter]),
       cache: new SnapshotCache(),
+      config: createBackendConfig(["codex"]),
     });
     const request = normalizeBackendRequest({
       providers: ["codex"],
@@ -53,6 +55,7 @@ describe("BackendCoordinator cache refresh behavior", () => {
     const coordinator = new BackendCoordinator({
       registry: new ProviderRegistry([codex.adapter, claude.adapter]),
       cache: new SnapshotCache(),
+      config: createBackendConfig(["codex", "claude"]),
     });
     const request = normalizeBackendRequest({
       ttl_seconds: 30,
@@ -127,5 +130,19 @@ function createSnapshot(input: {
     },
     reset_window: null,
     error: null,
+  };
+}
+
+function createBackendConfig(providerOrder: ProviderId[]): BackendConfig {
+  return {
+    schemaVersion: 1,
+    defaults: {
+      ttlSeconds: 30,
+    },
+    providers: providerOrder.map((providerId) => ({
+      id: providerId,
+      enabled: true,
+      sourceMode: "cli",
+    })),
   };
 }
