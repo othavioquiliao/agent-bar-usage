@@ -1,13 +1,8 @@
 {
   "name": "agent-bar-usage",
   "private": true,
+  "packageManager": "pnpm@10.17.1",
   "scripts": {
-    "test": "pnpm --filter backend test"
-  },
-  "devDependencies": {
-    "@types/node": "^22.13.10",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.8"
+    "test:backend": "pnpm --filter backend test"
   }
 }

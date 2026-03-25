@@ -2,20 +2,22 @@ import { z } from "zod";
 
 export const providerIdSchema = z.enum(["copilot", "codex", "claude"]);
 
-export const sourceModeSchema = z.enum(["auto", "cli", "oauth", "api", "web"]);
+export type ProviderId = z.infer<typeof providerIdSchema>;
 
-export const DEFAULT_TTL_SECONDS = 30;
+export const providerSourceModeSchema = z.enum(["auto", "cli", "oauth", "api", "web"]);
+
+export type ProviderSourceMode = z.infer<typeof providerSourceModeSchema>;
 
 export const backendUsageRequestSchema = z
   .object({
-    providers: z.array(providerIdSchema).min(1),
-    source_mode_override: sourceModeSchema,
-    force_refresh: z.boolean(),
-    include_diagnostics: z.boolean(),
-    ttl_seconds: z.number().int().min(0)
+  providers: z.array(providerIdSchema).optional().default([]),
+  source_mode_override: providerSourceModeSchema.optional().default("auto"),
+  force_refresh: z.boolean().optional().default(false),
+  include_diagnostics: z.boolean().optional().default(false),
+  ttl_seconds: z.coerce.number().int().positive().optional().default(30),
   })
   .strict();
 
-export type ProviderId = z.infer<typeof providerIdSchema>;
-export type SourceMode = z.infer<typeof sourceModeSchema>;
-export type BackendUsageRequest = z.infer<typeof backendUsageRequestSchema>;
+export const refreshRequestSchema = backendUsageRequestSchema;
+
+export type RefreshRequest = z.infer<typeof refreshRequestSchema>;

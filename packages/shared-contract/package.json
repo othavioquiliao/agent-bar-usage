@@ -1,14 +1,9 @@
 {
   "name": "shared-contract",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.0.0",
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./request": "./src/request.ts",
-    "./snapshot": "./src/snapshot.ts"
-  },
+  "exports": "./src/index.ts",
   "dependencies": {
-    "zod": "^3.24.2"
+    "zod": "^3.25.67"
   }
 }
