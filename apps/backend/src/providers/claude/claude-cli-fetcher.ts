@@ -7,7 +7,7 @@ import {
   type ProviderAdapterContext,
 } from "../../core/provider-adapter.js";
 import { resolveCommandInPath } from "../../utils/subprocess.js";
-import { normalizeLineEndings, runInteractiveCommand, stripAnsi } from "../shared/interactive-command.js";
+import { normalizeLineEndings, PtyUnavailableError, runInteractiveCommand, stripAnsi } from "../shared/interactive-command.js";
 import { ClaudeCliParseError, mapClaudeUsageToSnapshot, parseClaudeUsage } from "./claude-cli-parser.js";
 
 const DEFAULT_SOURCE: ProviderSourceMode = "cli";
@@ -54,6 +54,15 @@ export async function fetchClaudeUsage(context: ProviderAdapterContext): Promise
 
     return buildSnapshotFromText(context, source, updatedAt, result.stdout, startedAt, "claude.cli");
   } catch (error) {
+    if (error instanceof PtyUnavailableError) {
+      return createErrorSnapshot(
+        context.providerId,
+        source,
+        updatedAt,
+        createProviderError("claude_pty_unavailable", error.message, false),
+      );
+    }
+
     if (error instanceof ClaudeCliParseError) {
       return createErrorSnapshot(
         context.providerId,
