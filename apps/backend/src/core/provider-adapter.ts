@@ -6,12 +6,27 @@ import type {
 } from "shared-contract";
 
 import type { BackendRequest } from "../config/backend-request.js";
+import type { ProviderConfig } from "../config/config-schema.js";
+import type { SecretStoreId } from "../secrets/secret-reference.js";
 import type { runSubprocess } from "../utils/subprocess.js";
+
+export interface ProviderRuntimeMetadata {
+  enabled: boolean;
+  preferredSourceMode: ProviderSourceMode;
+}
+
+export interface ResolvedProviderSecrets {
+  primary: string | null;
+  store: SecretStoreId | null;
+}
 
 export interface ProviderAdapterContext {
   request: BackendRequest;
   providerId: ProviderId;
   sourceMode: ProviderSourceMode;
+  providerConfig?: ProviderConfig | null;
+  providerRuntime?: ProviderRuntimeMetadata;
+  secrets?: ResolvedProviderSecrets;
   env: NodeJS.ProcessEnv;
   now: () => Date;
   runSubprocess: typeof runSubprocess;
