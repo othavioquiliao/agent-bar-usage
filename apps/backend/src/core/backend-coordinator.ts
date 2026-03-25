@@ -120,7 +120,25 @@ export class BackendCoordinator {
       runSubprocess,
     };
 
-    const isAvailable = await adapter.isAvailable(context);
+    let isAvailable = false;
+    try {
+      isAvailable = await adapter.isAvailable(context);
+    } catch (error) {
+      return this.#cache.set(
+        cacheKey,
+        createErrorSnapshot(
+          adapter.id,
+          sourceMode,
+          updatedAt,
+          createProviderError(
+            "provider_availability_failed",
+            error instanceof Error ? error.message : "Provider availability check failed.",
+            true,
+          ),
+        ),
+        request.ttlSeconds,
+      );
+    }
 
     if (!isAvailable) {
       return this.#cache.set(
