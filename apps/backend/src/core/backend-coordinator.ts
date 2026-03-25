@@ -41,10 +41,11 @@ export class BackendCoordinator {
   async getSnapshot(request: BackendRequest): Promise<SnapshotEnvelope> {
     const adapters = this.#registry.resolve(request.providers);
     const providers = await Promise.all(adapters.map(async (adapter) => await this.#resolveSnapshot(adapter, request)));
-    const generatedAt = providers.reduce(
-      (latest, snapshot) => (snapshot.updated_at > latest ? snapshot.updated_at : latest),
-      this.#now().toISOString(),
-    );
+    const generatedAt =
+      providers
+        .map((snapshot) => snapshot.updated_at)
+        .sort()
+        .at(-1) ?? this.#now().toISOString();
 
     return snapshotEnvelopeSchema.parse({
       schema_version: snapshotSchemaVersion,
