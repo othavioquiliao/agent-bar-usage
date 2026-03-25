@@ -15,7 +15,7 @@ The roadmap turns the existing `CodexBar` knowledge into a Linux-native Ubuntu p
 - [x] **Phase 3: First-Wave Providers** - Deliver Copilot, Codex CLI, and Claude CLI adapters in the Node backend (completed 2026-03-25)
 - [x] **Phase 4: Ubuntu Desktop Surface** - Expose provider state through a GNOME Shell extension in GJS (completed 2026-03-25)
 - [x] **Phase 5: Delivery & Hardening** - Add diagnostics, installation guidance, packaging, and release-grade operational polish (completed 2026-03-25)
-- [ ] **Phase 6: Provider Reliability** - Make all 3 providers work reliably from systemd service with minimal user friction (planned 2026-03-25)
+- [x] **Phase 6: Provider Reliability** - Make all 3 providers work reliably from systemd service with minimal user friction (planned 2026-03-25) (completed 2026-03-25)
 
 ## Phase Details
 

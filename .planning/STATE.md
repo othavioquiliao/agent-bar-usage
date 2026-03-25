@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 06-01-PLAN.md (node-pty PTY infrastructure)
-last_updated: "2026-03-25T22:35:07.974Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 06-02-PLAN.md (auth command + install env + doctor)
+last_updated: "2026-03-25T22:41:12.581Z"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -49,6 +49,7 @@ Plan: 2 of 2
 - Trend: Improving
 
 | Phase 06-provider-reliability P01 | 10 | 5 tasks | 8 files |
+| Phase 06 P02 | 3 | 9 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 4]: The GNOME surface consumes normalized snapshot view models instead of reaching into subprocess or backend concerns.
 - [Phase 06-provider-reliability]: node-pty replaces script -qec: creates real kernel PTY via forkpty(), works from systemd with no controlling terminal
 - [Phase 06-provider-reliability]: PtyUnavailableError is non-retryable: surfaces clear build instructions when native addon compilation fails
+- [Phase 06-provider-reliability]: GitHub Device Flow: same flow as gh auth login — user gets a code, opens browser, authorizes, done
+- [Phase 06-provider-reliability]: systemd-env check is warn (not error): service can still work via env var fallbacks
+- [Phase 06-provider-reliability]: storeSecretViaSecretTool separate from SecretToolStore: write surface isolated from read path
 
 ### Pending Todos
 
@@ -87,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T22:35:07.972Z
-Stopped at: Completed 06-01-PLAN.md (node-pty PTY infrastructure)
+Last session: 2026-03-25T22:41:12.579Z
+Stopped at: Completed 06-02-PLAN.md (auth command + install env + doctor)
 Resume file: None
