@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-25T18:33:57.727Z"
+status: Ready to execute
+stopped_at: Completed 06-01-PLAN.md (node-pty PTY infrastructure)
+last_updated: "2026-03-25T22:35:07.974Z"
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 15
-  completed_plans: 12
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 5 — delivery-hardening
+**Current focus:** Phase 06 — provider-reliability
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 06 (provider-reliability) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -47,6 +47,8 @@ Plan: Not started
 
 - Last 5 plans: 5/5 complete
 - Trend: Improving
+
+| Phase 06-provider-reliability P01 | 10 | 5 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -71,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 3]: Provider isolation behavior is explicitly validated and kept envelope-safe
 - [Phase 4]: Manual refresh is gated while a refresh is in flight so repeated clicks do not overlap backend requests.
 - [Phase 4]: The GNOME surface consumes normalized snapshot view models instead of reaching into subprocess or backend concerns.
+- [Phase 06-provider-reliability]: node-pty replaces script -qec: creates real kernel PTY via forkpty(), works from systemd with no controlling terminal
+- [Phase 06-provider-reliability]: PtyUnavailableError is non-retryable: surfaces clear build instructions when native addon compilation fails
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:24:58.376Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-delivery-hardening/05-CONTEXT.md
+Last session: 2026-03-25T22:35:07.972Z
+Stopped at: Completed 06-01-PLAN.md (node-pty PTY infrastructure)
+Resume file: None
