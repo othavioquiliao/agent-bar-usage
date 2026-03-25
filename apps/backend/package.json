@@ -1,0 +1,21 @@
+{
+  "name": "backend",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agent-bar": "src/cli.ts"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "commander": "^14.0.2",
+    "shared-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
