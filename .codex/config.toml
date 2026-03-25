@@ -1,6 +1,6 @@
 [features]
 codex_hooks = true
-
+suppress_unstable_features_warning = true
 # GSD Agent Configuration — managed by get-shit-done installer
 # GSD codex_hooks ownership: section
 
