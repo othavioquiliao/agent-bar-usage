@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { backendUsageRequestSchema, snapshotEnvelopeSchema } from "shared-contract";
+import type { ProviderAdapter } from "../src/core/provider-adapter.js";
+import { ProviderRegistry } from "../src/core/provider-registry.js";
 import { runUsageCommand } from "../src/cli.js";
 
 describe("backend contract", () => {
@@ -11,6 +13,8 @@ describe("backend contract", () => {
       pretty: false,
       refresh: false,
       diagnostics: true,
+    }, {
+      createProviderRegistry: createTestProviderRegistry,
     });
 
     const payload = snapshotEnvelopeSchema.parse(JSON.parse(output));
@@ -48,3 +52,43 @@ describe("backend contract", () => {
     ).toThrow();
   });
 });
+
+function createTestProviderRegistry(): ProviderRegistry {
+  return new ProviderRegistry([createProvider("codex", 35), createProvider("claude", 60)]);
+}
+
+function createProvider(providerId: ProviderAdapter["id"], used: number): ProviderAdapter {
+  return {
+    id: providerId,
+    defaultSourceMode: "cli",
+    async isAvailable() {
+      return true;
+    },
+    async fetch(context) {
+      return {
+        provider: providerId,
+        status: "ok",
+        source: context.sourceMode,
+        updated_at: context.now().toISOString(),
+        usage: {
+          kind: "quota",
+          used,
+          limit: 100,
+          percent_used: used,
+        },
+        reset_window: null,
+        error: null,
+        diagnostics: {
+          attempts: [
+            {
+              strategy: `${providerId}.fixture`,
+              available: true,
+              duration_ms: 1,
+              error: null,
+            },
+          ],
+        },
+      };
+    },
+  };
+}
