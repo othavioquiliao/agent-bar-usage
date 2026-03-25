@@ -59,22 +59,38 @@ describe("diagnostics prerequisites", () => {
         {
           id: "secret-tool",
           status: "ok",
+          suggested_command: "sudo apt install libsecret-tools",
         },
         {
           id: "codex-cli",
           status: "ok",
+          suggested_command: "npm install -g @openai/codex",
         },
         {
           id: "claude-cli",
           status: "ok",
+          suggested_command: "npm install -g @anthropic-ai/claude-code",
         },
         {
           id: "copilot-token",
           status: "ok",
+          suggested_command: "agent-bar auth copilot",
         },
         {
           id: "service-runtime",
           status: "warn",
+        },
+        {
+          id: "node-pty",
+          // node-pty is compiled in this project, so it should be ok
+          status: "ok",
+          suggested_command: "sudo apt install build-essential python3 && pnpm install",
+        },
+        {
+          id: "systemd-env",
+          // env override file does not exist in the test environment
+          status: "warn",
+          suggested_command: "pnpm install:ubuntu",
         },
       ],
     });

@@ -7,6 +7,8 @@ export const diagnosticsCheckIdSchema = z.enum([
   "claude-cli",
   "copilot-token",
   "service-runtime",
+  "node-pty",
+  "systemd-env",
 ]);
 
 export type DiagnosticsCheckId = z.infer<typeof diagnosticsCheckIdSchema>;

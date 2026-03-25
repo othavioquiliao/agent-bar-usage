@@ -1,4 +1,5 @@
 import { access } from "node:fs/promises";
+import path from "node:path";
 
 import type { DiagnosticsCheck, DiagnosticsReport } from "shared-contract";
 
@@ -19,11 +20,13 @@ export interface PrerequisiteChecksOptions {
 
 const checks: Array<Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">> = [
   { id: "config", label: "Config", suggested_command: "agent-bar config validate" },
-  { id: "secret-tool", label: "secret-tool", suggested_command: "which secret-tool" },
-  { id: "codex-cli", label: "Codex CLI", suggested_command: "codex --version" },
-  { id: "claude-cli", label: "Claude CLI", suggested_command: "claude --version" },
-  { id: "copilot-token", label: "Copilot token", suggested_command: "agent-bar config validate" },
+  { id: "secret-tool", label: "secret-tool", suggested_command: "sudo apt install libsecret-tools" },
+  { id: "codex-cli", label: "Codex CLI", suggested_command: "npm install -g @openai/codex" },
+  { id: "claude-cli", label: "Claude CLI", suggested_command: "npm install -g @anthropic-ai/claude-code" },
+  { id: "copilot-token", label: "Copilot token", suggested_command: "agent-bar auth copilot" },
   { id: "service-runtime", label: "Service runtime", suggested_command: "agent-bar service status --json" },
+  { id: "node-pty", label: "node-pty", suggested_command: "sudo apt install build-essential python3 && pnpm install" },
+  { id: "systemd-env", label: "Systemd env", suggested_command: "pnpm install:ubuntu" },
 ];
 
 function makeCheck(check: DiagnosticsCheck): DiagnosticsCheck {
@@ -166,6 +169,35 @@ export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions 
             socket_path: serviceSocketPath,
             last_error: serviceStatus?.last_error ?? null,
           },
+        ),
+  );
+
+  // node-pty check: dynamic import to detect native module compilation failures
+  try {
+    await import("node-pty");
+    reportChecks.push(okCheck(checks[6], "node-pty native module is available."));
+  } catch {
+    reportChecks.push(
+      errorCheck(
+        checks[6],
+        "node-pty native module is not compiled. Codex and Claude providers require it.",
+      ),
+    );
+  }
+
+  // systemd-env check: verify the install script wrote the environment override
+  const overridePath = path.join(
+    options.homeDir ?? process.env.HOME ?? "",
+    ".config/systemd/user/agent-bar.service.d/env.conf",
+  );
+  const overrideExists = await doesFileExist(overridePath, options.fileExists);
+  reportChecks.push(
+    overrideExists
+      ? okCheck(checks[7], "Systemd environment override is configured.", { path: overridePath })
+      : warnCheck(
+          checks[7],
+          "Systemd environment override is missing. The service may not find CLI tools or tokens.",
+          { path: overridePath },
         ),
   );
 
