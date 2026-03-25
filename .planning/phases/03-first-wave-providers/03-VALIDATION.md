@@ -1,9 +1,9 @@
 ---
 phase: 3
 slug: first-wave-providers
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: passed
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-25
 ---
 
@@ -38,10 +38,10 @@ created: 2026-03-25
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 3-01-01 | 01 | 1 | COP-01 | unit/integration | `pnpm --filter backend test -- copilot-provider` | ❌ W0 | ⬜ pending |
-| 3-02-01 | 02 | 1 | CDX-01 | unit/integration | `pnpm --filter backend test -- codex-provider` | ❌ W0 | ⬜ pending |
-| 3-03-01 | 03 | 2 | CLD-01 | unit/integration | `pnpm --filter backend test -- claude-provider` | ❌ W0 | ⬜ pending |
-| 3-03-02 | 03 | 2 | CLD-01 | integration | `pnpm --filter backend test -- provider-isolation` | ❌ W0 | ⬜ pending |
+| 3-01-01 | 01 | 1 | COP-01 | unit/integration | `pnpm --filter backend test -- copilot-provider` | ✅ W0 | ✅ green |
+| 3-02-01 | 02 | 1 | CDX-01 | unit/integration | `pnpm --filter backend test -- codex-provider` | ✅ W0 | ✅ green |
+| 3-03-01 | 03 | 2 | CLD-01 | unit/integration | `pnpm --filter backend test -- claude-provider` | ✅ W0 | ✅ green |
+| 3-03-02 | 03 | 2 | CLD-01 | integration | `pnpm --filter backend test -- provider-isolation` | ✅ W0 | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -49,10 +49,10 @@ created: 2026-03-25
 
 ## Wave 0 Requirements
 
-- [ ] `apps/backend/test/copilot-provider.test.ts` — API token flow and snapshot mapping coverage for `COP-01`
-- [ ] `apps/backend/test/codex-provider.test.ts` — CLI parse/failure mapping coverage for `CDX-01`
-- [ ] `apps/backend/test/claude-provider.test.ts` — CLI parse/failure mapping coverage for `CLD-01`
-- [ ] `apps/backend/test/provider-isolation.test.ts` — one-provider-failure isolation coverage
+- [x] `apps/backend/test/copilot-provider.test.ts` — API token flow and snapshot mapping coverage for `COP-01`
+- [x] `apps/backend/test/codex-provider.test.ts` — CLI parse/failure mapping coverage for `CDX-01`
+- [x] `apps/backend/test/claude-provider.test.ts` — CLI parse/failure mapping coverage for `CLD-01`
+- [x] `apps/backend/test/provider-isolation.test.ts` — one-provider-failure isolation coverage
 
 ---
 
@@ -67,11 +67,11 @@ created: 2026-03-25
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 90s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have automated verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 90s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** passed

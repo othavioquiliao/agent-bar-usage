@@ -19,9 +19,9 @@
 
 ### Providers
 
-- [ ] **COP-01**: User can view GitHub Copilot usage on Ubuntu through an API/device-flow-capable path
-- [ ] **CDX-01**: User can view Codex usage on Ubuntu through a CLI-backed path
-- [ ] **CLD-01**: User can view Claude usage on Ubuntu through a CLI-backed path
+- [x] **COP-01**: User can view GitHub Copilot usage on Ubuntu through an API/device-flow-capable path
+- [x] **CDX-01**: User can view Codex usage on Ubuntu through a CLI-backed path
+- [x] **CLD-01**: User can view Claude usage on Ubuntu through a CLI-backed path
 
 ### Desktop Surface
 
@@ -71,9 +71,9 @@
 | CONF-01 | Phase 2 | Complete |
 | CONF-02 | Phase 2 | Complete |
 | SECR-01 | Phase 2 | Complete |
-| COP-01 | Phase 3 | Pending |
-| CDX-01 | Phase 3 | Pending |
-| CLD-01 | Phase 3 | Pending |
+| COP-01 | Phase 3 | Complete |
+| CDX-01 | Phase 3 | Complete |
+| CLD-01 | Phase 3 | Complete |
 | UI-01 | Phase 4 | Pending |
 | UI-02 | Phase 4 | Pending |
 | UI-03 | Phase 4 | Pending |
@@ -88,4 +88,4 @@
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after Phase 2 execution*
+*Last updated: 2026-03-25 after Phase 3 execution*
