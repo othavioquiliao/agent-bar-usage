@@ -1,164 +1,378 @@
-# agent-bar usage
+# Agent Bar Ubuntu
 
-agent-bar usage is the Ubuntu-facing runtime for the Agent Bar project. It combines a Node.js/TypeScript backend, a local service process, and a GNOME Shell extension so Ubuntu users can inspect provider usage and diagnose prerequisites from a Linux-native surface.
-
-This repository is organized for Ubuntu 24.04.4 LTS first. It is not a macOS port. The backend, service, and diagnostics flow are built specifically around Linux conventions such as user systemd, `secret-tool`, and GNOME integration.
+Linux-native desktop tool that surfaces AI provider usage (Copilot, Codex CLI, Claude CLI) for Ubuntu users through a GNOME Shell extension backed by a local Node.js service.
 
 ## What You Get
 
-- A backend CLI that can fetch provider usage snapshots.
-- A local service mode that exposes snapshot and status calls over a Unix socket.
+- A GNOME Shell topbar indicator showing provider status at a glance.
+- A backend CLI (`agent-bar`) that fetches usage snapshots, runs diagnostics, and manages a local service.
+- A local Unix socket service that keeps snapshots cached for instant reads.
 - A `doctor` command that reports missing prerequisites and runtime health.
-- A GNOME Shell extension that prefers the local backend service when available.
-- Ubuntu install, verification, troubleshooting, and debugging scripts.
 
 ## Repository Layout
 
-- `apps/backend` contains the Node.js/TypeScript backend, service runtime, and tests.
-- `apps/gnome-extension` contains the GNOME Shell extension and its view-model logic.
-- `packages/shared-contract` contains the schema shared between backend and frontend.
-- `scripts/` contains Ubuntu install and verification helpers.
-- `docs/` contains install, troubleshooting, and debugging guides.
-- `packaging/` contains the systemd user unit used by the Ubuntu install path.
+```
+apps/backend/           Node.js/TypeScript backend, CLI, and service runtime
+apps/gnome-extension/   GNOME Shell 46 extension (indicator, menu, polling)
+packages/shared-contract/  Zod schemas shared between backend and extension
+scripts/                Install and verification helpers
+packaging/              systemd unit and tmpfiles.d config
+docs/                   Install, troubleshooting, and debugging guides
+```
 
 ## Requirements
 
-- Ubuntu 24.04.4 LTS or a comparable GNOME-based Linux desktop.
-- `node` on `PATH`.
-- `pnpm` on `PATH`.
-- `systemd --user` available for your desktop session.
-- `secret-tool` installed if you want the credential-backed provider path to work cleanly.
-
-## Onboarding
-
-If you are new to the repo, start here:
-
-1. Read this README end to end.
-2. Run `pnpm install` at the repository root.
-3. Build the backend with `pnpm build:backend`.
-4. Install the Ubuntu service wrapper with `pnpm install:ubuntu`.
-5. Verify the install with `pnpm verify:ubuntu`.
-6. Run `agent-bar doctor --json` if anything looks wrong.
-
-The installation flow is intentionally local and explicit. It does not depend on a package registry or a cloud install step.
+| Dependency | Version | Notes |
+|---|---|---|
+| Ubuntu | 24.04+ | GNOME-based desktop with Wayland or X11 |
+| GNOME Shell | 46 | Required for the extension |
+| Node.js | 20+ | LTS recommended |
+| pnpm | 10+ | Pinned to 10.17.1 in `package.json` |
+| systemd --user | any | Standard on Ubuntu desktop |
+| secret-tool | optional | Install `libsecret-tools` for credential-backed providers |
 
 ## Quick Start
 
 ```bash
+# 1. Clone and install dependencies
+git clone <repo-url> && cd agent-bar-usage
 pnpm install
-pnpm build:backend
+
+# 2. Build and install everything
 pnpm install:ubuntu
+
+# 3. Verify
 agent-bar doctor --json
 agent-bar service status --json
-agent-bar service snapshot --json
+
+# 4. Restart GNOME Shell to load the extension
+#    Wayland: log out and log back in
+#    X11:     Alt+F2 -> r -> Enter
 ```
 
-## Installation
+After login, the Agent Bar indicator appears in the GNOME topbar.
 
-The Ubuntu install path is documented in [docs/ubuntu-install.md](docs/ubuntu-install.md). The short version is:
+## Step-by-Step Installation
 
-- Build the backend bundle.
-- Install the launcher wrapper to `~/.local/bin/agent-bar`.
-- Install the user systemd unit to `~/.config/systemd/user/agent-bar.service`.
-- Enable and start the user service.
-
-The install script is `scripts/install-ubuntu.sh`. It also builds the backend before wiring the wrapper and service unit.
-
-## Verification
-
-Use the verification script after installation:
+### 1. Install system prerequisites
 
 ```bash
+# Node.js (via nvm or your preferred method)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+nvm install --lts
+
+# pnpm
+corepack enable && corepack prepare pnpm@10.17.1 --activate
+
+# Optional: secret-tool for credential-backed providers
+sudo apt install libsecret-tools
+```
+
+### 2. Clone and install
+
+```bash
+git clone <repo-url>
+cd agent-bar-usage
+pnpm install
+```
+
+If pnpm prompts to approve builds (e.g., esbuild), select the packages and confirm.
+
+### 3. Build and install
+
+```bash
+pnpm install:ubuntu
+```
+
+This single command:
+- Builds `shared-contract` and `backend` packages
+- Creates the CLI wrapper at `~/.local/bin/agent-bar`
+- Installs the systemd user service (`agent-bar.service`)
+- Protects the runtime socket directory from tmpfiles cleanup
+- Copies the GNOME extension to `~/.local/share/gnome-shell/extensions/`
+- Enables the extension
+
+### 4. Restart GNOME Shell
+
+The GNOME extension only loads on session start (Wayland limitation).
+
+```bash
+# Log out and log back in
+```
+
+### 5. Verify
+
+```bash
+# Quick check
+agent-bar doctor --json
+
+# Full contract verification
 pnpm verify:ubuntu
 ```
 
-It checks:
+## CLI Reference
 
-- `agent-bar` is on `PATH`.
-- `agent-bar.service` is active in the user session.
-- `agent-bar doctor --json` returns a valid diagnostics report.
-- `agent-bar service status --json` returns a valid service status payload.
-- `agent-bar service snapshot --json` returns a valid snapshot envelope.
+### `agent-bar usage`
 
-## Common Commands
+Fetch provider usage snapshots directly (bypasses the service).
 
-- `pnpm build:backend` builds the backend into `apps/backend/dist`.
-- `pnpm --filter backend test` runs the backend test suite.
-- `pnpm --filter gnome-extension test` runs the GNOME extension test suite.
-- `pnpm install:ubuntu` installs the Ubuntu service wrapper and systemd unit.
-- `pnpm verify:ubuntu` validates the install and runtime contract.
-- `agent-bar usage --json` fetches a usage snapshot through the backend CLI.
-- `agent-bar usage --json --diagnostics` includes provider diagnostics in the output.
-- `agent-bar doctor --json` checks prerequisites, config, and runtime health.
-- `agent-bar service run` starts the local service in the foreground.
-- `agent-bar service status --json` reports the current service state.
-- `agent-bar service snapshot --json` fetches a snapshot from the service.
-- `agent-bar service refresh --json` forces a fresh snapshot from the service.
+```bash
+agent-bar usage                          # Text output
+agent-bar usage --json                   # JSON output
+agent-bar usage --json --diagnostics     # Include provider diagnostics
+agent-bar usage --provider copilot       # Single provider
+agent-bar usage --json --refresh         # Force fresh data
+```
 
-## Diagnostics
+### `agent-bar doctor`
 
-The `doctor` command is the fastest way to debug setup problems. It reports:
+Check prerequisites, configuration, and runtime health.
 
-- Whether the backend config file exists.
-- Whether `secret-tool` is on `PATH`.
-- Whether `codex` is on `PATH`.
-- Whether `claude` is on `PATH`.
-- Whether a Copilot token source is configured.
-- Whether the local backend service is running.
+```bash
+agent-bar doctor                         # Text output
+agent-bar doctor --json                  # JSON output (machine-readable)
+```
 
-If the GNOME extension encounters a backend issue, it now surfaces a diagnostics summary and suggests `agent-bar doctor --json` as the next command.
+Reports on: config file, secret-tool, codex CLI, claude CLI, copilot token, service runtime.
 
-## Service Model
+### `agent-bar config`
 
-The backend supports both direct CLI usage and a local Unix socket service.
+Inspect and validate backend configuration.
 
-- The socket path is resolved from `XDG_RUNTIME_DIR` when available.
-- The service exposes `status`, `snapshot`, and `refresh` requests.
-- The GNOME extension prefers the service path when `agent-bar` is installed on `PATH`.
-- The CLI still works as a fallback when the service is unavailable.
+```bash
+agent-bar config validate                # Check config file
+```
 
-## Troubleshooting
+Config file location: `~/.config/agent-bar/config.json`
 
-- Use [docs/ubuntu-troubleshooting.md](docs/ubuntu-troubleshooting.md) for install and runtime issues.
-- Use [docs/ubuntu-debugging.md](docs/ubuntu-debugging.md) for logs and foreground service debugging.
-- Run `systemctl --user status agent-bar.service` if the service does not start.
-- Run `journalctl --user -u agent-bar.service -f` to follow service logs.
-- Run `agent-bar doctor --json` before changing anything else.
+### `agent-bar service`
+
+Manage the local Unix socket service.
+
+```bash
+agent-bar service run                    # Start in foreground (for debugging)
+agent-bar service status --json          # Check service state
+agent-bar service snapshot --json        # Get cached snapshot (instant)
+agent-bar service refresh --json         # Force fresh snapshot
+```
+
+The service listens on `$XDG_RUNTIME_DIR/agent-bar/service.sock` (typically `/run/user/1000/agent-bar/service.sock`).
+
+### systemd management
+
+```bash
+systemctl --user status agent-bar.service      # Check service
+systemctl --user restart agent-bar.service     # Restart (recreates socket)
+systemctl --user stop agent-bar.service        # Stop
+journalctl --user -u agent-bar.service -f      # Follow logs
+```
+
+## Provider Setup
+
+The backend fetches usage data from three providers. Each needs its own setup.
+
+### Copilot
+
+Requires a GitHub token accessible to the service. Set one of these environment variables in the systemd unit or shell profile:
+
+```bash
+# Option A: environment variable
+export GITHUB_TOKEN=ghp_your_token_here
+
+# Option B: add to systemd service override
+systemctl --user edit agent-bar.service
+# Add under [Service]:
+#   Environment=GITHUB_TOKEN=ghp_your_token_here
+# Then: systemctl --user restart agent-bar.service
+```
+
+Token lookup order: `COPILOT_API_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `COPILOT_TOKEN`.
+
+### Codex CLI
+
+Requires `codex` on PATH and authenticated:
+
+```bash
+codex login
+codex --version   # Confirm it works
+```
+
+### Claude CLI
+
+Requires `claude` on PATH and authenticated:
+
+```bash
+claude --version   # Confirm it works
+```
+
+> **Known limitation:** Codex and Claude providers currently use interactive CLI wrapping via the `script` command, which can be unreliable when the backend runs as a systemd service (no TTY). Provider errors like `codex_cli_failed` or `claude_cli_failed` are expected in the current version. API-based fetchers are planned.
 
 ## Development
 
-- Backend code lives in `apps/backend`.
-- GNOME extension code lives in `apps/gnome-extension`.
-- Shared schemas live in `packages/shared-contract`.
-- The backend build output is generated into `apps/backend/dist`.
+### Project structure
 
-Typical local development flow:
+| Path | Language | Purpose |
+|---|---|---|
+| `apps/backend/src/` | TypeScript | CLI, service, providers, diagnostics |
+| `apps/gnome-extension/` | JavaScript (GJS) | GNOME Shell extension |
+| `packages/shared-contract/src/` | TypeScript | Zod schemas (shared types) |
+| `scripts/` | Bash | Install and verify helpers |
+| `packaging/` | Config | systemd unit, tmpfiles.d |
 
-1. Edit code.
-2. Run `pnpm --filter backend test`.
-3. Run `pnpm --filter gnome-extension test`.
-4. Run `pnpm build:backend` if you changed backend runtime code.
-5. Re-run `pnpm verify:ubuntu` if you changed install or service behavior.
-
-## Testing
+### Build commands
 
 ```bash
-pnpm --filter backend test
-pnpm --filter gnome-extension test
-pnpm build:backend
+pnpm build:backend          # Build shared-contract + backend
+pnpm build:shared           # Build shared-contract only
+```
+
+The build chain: `shared-contract` compiles first (backend depends on it). Both use `tsconfig.build.json` which overrides the base `noEmit: true` for type-checking-only configs.
+
+### Test commands
+
+```bash
+pnpm test:backend           # Backend test suite (vitest)
+pnpm test:gnome             # GNOME extension test suite (vitest)
+```
+
+### Development workflow
+
+```bash
+# 1. Edit code
+# 2. Run tests
+pnpm test:backend
+pnpm test:gnome
+
+# 3. Rebuild and reinstall if you changed runtime code
+pnpm install:ubuntu
+
+# 4. Restart GNOME Shell to pick up extension changes (Wayland: logout/login)
+
+# 5. Verify everything works
 pnpm verify:ubuntu
 ```
 
-The backend suite covers the contract, diagnostics, and service runtime. The GNOME suite covers backend invocation resolution, state transitions, and view-model rendering.
+### GNOME extension development
+
+The extension runs inside the GNOME Shell process (GJS, not Node.js). Key differences from Node.js:
+
+- Imports use GI bindings: `import GObject from "gi://GObject"`, `import St from "gi://St"`
+- GNOME Shell UI modules: `import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js"`
+- Classes extending GObject subclasses MUST use `GObject.registerClass()` with `_init()` / `super._init()`
+- No `require()`, no `node_modules` — pure ESM with GJS module system
+- Test in isolation with `vitest` (mocks GJS APIs), then test live by installing and restarting GNOME Shell
+
+Extension files are plain `.js` (no build step). Changes are picked up on GNOME Shell restart.
+
+### Adding a new provider
+
+1. Create `apps/backend/src/providers/<name>/` with adapter, fetcher, and parser files
+2. Register the provider ID in `packages/shared-contract/src/request.ts` (`providerIdSchema`)
+3. Wire the adapter into the backend coordinator
+4. Run tests: `pnpm test:backend`
+5. Rebuild and verify: `pnpm install:ubuntu && pnpm verify:ubuntu`
+
+## Troubleshooting
+
+### Extension shows "Backend error"
+
+```bash
+# Check service is running with a live socket
+systemctl --user status agent-bar.service
+ls /run/user/1000/agent-bar/service.sock
+
+# If socket is missing, restart the service
+systemctl --user restart agent-bar.service
+
+# Test the snapshot path
+time agent-bar service snapshot --json
+# Should complete in < 1 second (cached) or ~22 seconds (first fetch)
+```
+
+### Extension shows provider errors (not "Backend error")
+
+This means the backend is reachable but individual providers are failing. Run diagnostics:
+
+```bash
+agent-bar doctor --json
+```
+
+Common causes:
+- **copilot_token_missing**: No `GITHUB_TOKEN` set. See Provider Setup above.
+- **codex_cli_failed / claude_cli_failed**: Interactive CLI wrapping issue. Known limitation.
+- **secret-tool missing**: `sudo apt install libsecret-tools`
+
+### Service won't start
+
+```bash
+journalctl --user -u agent-bar.service --no-pager | tail -20
+# Common: "Cannot find module" -> rebuild with pnpm install:ubuntu
+```
+
+### Extension doesn't appear after login
+
+```bash
+gnome-extensions info agent-bar-ubuntu@othavio.dev
+# State should be ACTIVE
+
+# If ERROR: check GNOME Shell logs
+journalctl --user -b | grep "agent-bar" | tail -10
+
+# Reinstall extension
+pnpm install:ubuntu
+# Then logout/login again
+```
+
+### Socket keeps disappearing
+
+```bash
+# Ensure tmpfiles protection is installed
+cat ~/.config/user-tmpfiles.d/agent-bar.conf
+# Should contain: d %t/agent-bar 0775 - - -
+
+# If missing, reinstall
+pnpm install:ubuntu
+```
+
+## Debugging
+
+### Follow logs in real time
+
+```bash
+# Service logs
+journalctl --user -u agent-bar.service -f
+
+# GNOME Shell logs (extension errors)
+journalctl --user -b | grep "agent-bar"
+```
+
+### Run service in foreground
+
+```bash
+systemctl --user stop agent-bar.service
+agent-bar service run
+# Ctrl+C to stop, then re-enable:
+systemctl --user start agent-bar.service
+```
+
+### Test the full data flow
+
+```bash
+# 1. Service status
+agent-bar service status --json
+
+# 2. Cached snapshot (should be instant)
+time agent-bar service snapshot --json
+
+# 3. Fresh snapshot (triggers provider fetches)
+time agent-bar service refresh --json
+
+# 4. Direct CLI (bypasses service)
+agent-bar usage --json --diagnostics
+```
 
 ## Additional Docs
 
-- [Ubuntu install](docs/ubuntu-install.md)
-- [Ubuntu troubleshooting](docs/ubuntu-troubleshooting.md)
-- [Ubuntu debugging](docs/ubuntu-debugging.md)
-
-## Notes
-
-- This repository is currently optimized for Ubuntu delivery, not general-purpose packaging.
-- The local service is part of the supported path, not an implementation detail.
-- The shared contract is what keeps the backend CLI, service mode, and GNOME extension aligned.
+- [Ubuntu install guide](docs/ubuntu-install.md)
+- [Troubleshooting](docs/ubuntu-troubleshooting.md)
+- [Debugging](docs/ubuntu-debugging.md)
