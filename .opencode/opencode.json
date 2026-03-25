@@ -1,0 +1,10 @@
+{
+  "permission": {
+    "read": {
+      "/home/othavio/Work/agent-bar-usage/.opencode/get-shit-done/*": "allow"
+    },
+    "external_directory": {
+      "/home/othavio/Work/agent-bar-usage/.opencode/get-shit-done/*": "allow"
+    }
+  }
+}
