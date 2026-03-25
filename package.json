@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.17.1",
   "scripts": {
-    "build:backend": "pnpm --filter backend build",
+    "build:shared": "pnpm --filter shared-contract build",
+    "build:backend": "pnpm run build:shared && pnpm --filter backend build",
     "test:backend": "pnpm --filter backend test",
     "test:gnome": "pnpm --filter gnome-extension test",
     "install:ubuntu": "bash scripts/install-ubuntu.sh",

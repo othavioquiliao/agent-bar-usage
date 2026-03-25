@@ -72,7 +72,9 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
   const socketDir = path.dirname(socketPath);
   let lastError: string | null = null;
   let lastSnapshotAt: string | null = null;
+  let lastSnapshot: SnapshotEnvelope | null = null;
   let server: net.Server | null = null;
+  const now = options.now ?? (() => new Date());
 
   const status = (): ServiceStatusPayload => ({
     mode: "service",
@@ -91,20 +93,31 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
             type: "status",
             status: status(),
           };
-        case "refresh":
         case "snapshot": {
+          if (lastSnapshot) {
+            return { ok: true, type: "snapshot", snapshot: lastSnapshot, status: status() };
+          }
+          const emptyEnvelope: SnapshotEnvelope = {
+            schema_version: "1" as const,
+            generated_at: now().toISOString(),
+            providers: [],
+          };
+          return { ok: true, type: "snapshot", snapshot: emptyEnvelope, status: status() };
+        }
+        case "refresh": {
           const requestOptions = {
             ...(payload.request ?? {}),
             json: true,
             diagnostics: true,
-            refresh: payload.type === "refresh" || Boolean(payload.request?.refresh),
+            refresh: true,
           };
           const snapshot = await (options.createSnapshot ?? createUsageSnapshot)(requestOptions);
           lastError = null;
+          lastSnapshot = snapshot;
           lastSnapshotAt = snapshot.generated_at;
           return {
             ok: true,
-            type: payload.type,
+            type: "refresh",
             snapshot,
             status: status(),
           };
@@ -167,6 +180,23 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
         server?.once("error", reject);
         server?.listen(socketPath, resolve);
       });
+
+      // Warm the cache so the first snapshot request is instant.
+      Promise.resolve(
+        (options.createSnapshot ?? createUsageSnapshot)({
+          json: true,
+          diagnostics: true,
+          refresh: true,
+        }),
+      )
+        .then((snapshot: SnapshotEnvelope) => {
+          lastSnapshot = snapshot;
+          lastSnapshotAt = snapshot.generated_at;
+          lastError = null;
+        })
+        .catch((error: unknown) => {
+          lastError = error instanceof Error ? error.message : "Warmup fetch failed.";
+        });
     },
     async stop() {
       if (!server) {

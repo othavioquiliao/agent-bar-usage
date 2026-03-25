@@ -1,13 +1,16 @@
+import GObject from "gi://GObject";
 import St from "gi://St";
-import { PanelMenu } from "resource:///org/gnome/shell/ui/panelMenu.js";
+import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 
 import { createInitialState } from "../state/extension-state.js";
 import { buildIndicatorSummaryViewModel } from "../utils/view-model.js";
 import { rebuildMenu } from "./menu-builder.js";
 
-export class Indicator extends PanelMenu.Button {
-  constructor(extension, { state = createInitialState(), onRefreshNow = null } = {}) {
-    super(0.0, extension.metadata.name, false);
+export const Indicator = GObject.registerClass(
+{ GTypeName: "AgentBarUbuntuIndicator" },
+class Indicator extends PanelMenu.Button {
+  _init(extension, { state = createInitialState(), onRefreshNow = null } = {}) {
+    super._init(0.0, extension.metadata.name, false);
 
     this._extension = extension;
     this._state = state;
@@ -61,4 +64,4 @@ export class Indicator extends PanelMenu.Button {
     this.menu?.removeAll();
     super.destroy();
   }
-}
+});

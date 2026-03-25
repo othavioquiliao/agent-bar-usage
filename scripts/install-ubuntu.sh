@@ -8,6 +8,9 @@ install_dir="${HOME}/.local/bin"
 systemd_dir="${HOME}/.config/systemd/user"
 wrapper_path="${install_dir}/agent-bar"
 unit_path="${systemd_dir}/agent-bar.service"
+gnome_ext_src="$repo_root/apps/gnome-extension"
+gnome_ext_uuid="agent-bar-ubuntu@othavio.dev"
+gnome_ext_dir="${HOME}/.local/share/gnome-shell/extensions/${gnome_ext_uuid}"
 
 if [[ -z "${node_binary}" ]]; then
   node_binary="$(command -v node || true)"
@@ -36,8 +39,31 @@ chmod +x "$wrapper_path"
 
 cp "$repo_root/packaging/systemd/user/agent-bar.service" "$unit_path"
 
+# Protect the runtime socket directory from tmpfiles-clean.
+tmpfiles_user_dir="${HOME}/.config/user-tmpfiles.d"
+mkdir -p "$tmpfiles_user_dir"
+cp "$repo_root/packaging/tmpfiles.d/agent-bar.conf" "$tmpfiles_user_dir/agent-bar.conf"
+systemd-tmpfiles --user --create "$tmpfiles_user_dir/agent-bar.conf" 2>/dev/null || true
+
 systemctl --user daemon-reload
-systemctl --user enable --now agent-bar.service
+systemctl --user enable agent-bar.service
+systemctl --user restart agent-bar.service
 
 echo "Installed agent-bar to $wrapper_path"
 echo "Enabled agent-bar.service in the user systemd session"
+
+# --- GNOME Shell extension ---
+mkdir -p "$gnome_ext_dir"
+
+# Copy extension source files (excluding tests, node_modules, and dev configs)
+for item in extension.js metadata.json panel services state utils; do
+  if [[ -e "$gnome_ext_src/$item" ]]; then
+    cp -r "$gnome_ext_src/$item" "$gnome_ext_dir/"
+  fi
+done
+
+# Enable the extension (--quiet avoids error if already enabled)
+gnome-extensions enable "$gnome_ext_uuid" 2>/dev/null || true
+
+echo "Installed GNOME extension to $gnome_ext_dir"
+echo "Note: you may need to restart GNOME Shell (log out/in) for the extension to appear."
