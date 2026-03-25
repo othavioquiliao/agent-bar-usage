@@ -9,6 +9,7 @@ import {
 
 import { SnapshotCache } from "./cache/snapshot-cache.js";
 import { formatConfigCommandError, registerConfigCommand } from "./commands/config-command.js";
+import { registerDoctorCommand } from "./commands/diagnostics-command.js";
 import { loadBackendConfig } from "./config/config-loader.js";
 import { normalizeBackendRequest } from "./config/backend-request.js";
 import { BackendCoordinator } from "./core/backend-coordinator.js";
@@ -123,6 +124,7 @@ program
   });
 
 registerConfigCommand(program);
+registerDoctorCommand(program);
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   program.parseAsync(process.argv).catch((error: unknown) => {
