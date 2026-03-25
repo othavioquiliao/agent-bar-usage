@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 2 complete — ready for Phase 3 planning
-stopped_at: Completed execute-phase 2
-last_updated: "2026-03-25T15:09:00Z"
-last_activity: 2026-03-25 — Phase 2 executed and verified (Linux config + secret-store runtime complete)
+status: Phase 3 planned — ready for execution
+stopped_at: Completed plan-phase 3
+last_updated: "2026-03-25T15:14:00Z"
+last_activity: 2026-03-25 — Phase 3 planned (first-wave providers with isolation-focused validation)
 progress:
   total_phases: 5
   completed_phases: 2
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 Phase: 3 of 5 (First-Wave Providers)
 Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-25 — Phase 2 executed and verified (Linux config + secret-store runtime complete)
+Status: Planned and ready to execute
+Last activity: 2026-03-25 — Phase 3 planned (first-wave providers with isolation-focused validation)
 
 ## Performance Metrics
 
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - [Phase 2]: Keep env-based secret resolution as explicit fallback for development and CI
 - [Phase 2]: Runtime provider selection now honors config order/enablement by default
 - [Phase 2]: Secret resolution happens before adapter execution with provider-level error isolation
+- [Phase 3]: Copilot path is planned as API-token adapter
+- [Phase 3]: Codex and Claude paths are planned as CLI-backed adapters
+- [Phase 3]: Provider isolation behavior is explicitly a test-gated deliverable
 
 ### Pending Todos
 
@@ -74,11 +77,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 3 will need stable provider auth/session handling while preserving Phase 2 isolation guarantees
+- Provider token/session prerequisites may vary per machine and must map to structured provider-level failures
 - Browser-cookie-based parity work remains intentionally deferred
 
 ## Session Continuity
 
-Last session: 2026-03-25T15:09:00Z
-Stopped at: Completed execute-phase 2
+Last session: 2026-03-25T15:14:00Z
+Stopped at: Completed plan-phase 3
 Resume file: .planning/ROADMAP.md
