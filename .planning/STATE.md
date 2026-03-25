@@ -2,15 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 4 planned — ready for execution
-stopped_at: Completed plan-phase 4
-last_updated: "2026-03-25T16:13:00Z"
-last_activity: 2026-03-25 — Phase 4 planned (GNOME extension scaffold, bridge, and top-bar UI)
+status: Ready to plan
+stopped_at: Phase 5 context gathered
+last_updated: "2026-03-25T17:24:58.378Z"
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 15
-  completed_plans: 9
+  completed_phases: 4
+  total_plans: 12
+  completed_plans: 12
 ---
 
 # Project State
@@ -20,22 +19,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 4 - Ubuntu Desktop Surface
+**Current focus:** Phase 5 — Delivery & Hardening
 
 ## Current Position
 
-Phase: 4 of 5 (Ubuntu Desktop Surface)
-Plan: 0 of 3 in current phase
-Status: Planned and ready to execute
-Last activity: 2026-03-25 — Phase 4 planned (GNOME extension scaffold, bridge, and top-bar UI)
+Phase: 5
+Plan: Not started
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 9
-- Average duration: 27 min
-- Total execution time: 4.1 hours
+- Total plans completed: 12
+- Average duration: 24 min
+- Total execution time: 4.8 hours
 
 **By Phase:**
 
@@ -44,6 +41,7 @@ Last activity: 2026-03-25 — Phase 4 planned (GNOME extension scaffold, bridge,
 | 1. Backend Contract | 3 | 94 min | 31 min |
 | 2. Linux Config & Secrets | 3 | 114 min | 38 min |
 | 3. First-Wave Providers | 3 | 39 min | 13 min |
+| 4. Ubuntu Desktop Surface | 3 | 43 min | 14 min |
 
 **Recent Trend:**
 
@@ -71,6 +69,8 @@ Recent decisions affecting current work:
 - [Phase 3]: Copilot path is an API-token adapter with env-first token resolution
 - [Phase 3]: Codex and Claude paths are CLI-backed adapters with structured failure mapping
 - [Phase 3]: Provider isolation behavior is explicitly validated and kept envelope-safe
+- [Phase 4]: Manual refresh is gated while a refresh is in flight so repeated clicks do not overlap backend requests.
+- [Phase 4]: The GNOME surface consumes normalized snapshot view models instead of reaching into subprocess or backend concerns.
 
 ### Pending Todos
 
@@ -83,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T16:13:00Z
-Stopped at: Completed plan-phase 4
-Resume file: .planning/ROADMAP.md
+Last session: 2026-03-25T17:24:58.376Z
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-delivery-hardening/05-CONTEXT.md
