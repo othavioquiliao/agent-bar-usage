@@ -13,19 +13,12 @@ import { loadBackendConfig } from "./config/config-loader.js";
 import { normalizeBackendRequest } from "./config/backend-request.js";
 import { BackendCoordinator } from "./core/backend-coordinator.js";
 import { ProviderContextBuilder } from "./core/provider-context-builder.js";
-import type { ProviderAdapter } from "./core/provider-adapter.js";
-import { ProviderRegistry } from "./core/provider-registry.js";
+import { createProviderRegistry as createDefaultProviderRegistry } from "./core/provider-registry-factory.js";
 import { formatSnapshotAsText } from "./formatters/text-formatter.js";
 import { EnvSecretStore } from "./secrets/env-secret-store.js";
 import { SecretToolStore } from "./secrets/secret-tool-store.js";
 import { SecretResolver } from "./secrets/secret-store.js";
 import { serializeSnapshotEnvelope } from "./serializers/snapshot-serializer.js";
-
-const defaultSourceModes: Record<ProviderId, ProviderSourceMode> = {
-  copilot: "api",
-  codex: "cli",
-  claude: "cli",
-};
 
 function parseProviderId(value: string): ProviderId {
   const parsed = providerIdSchema.safeParse(value);
@@ -37,60 +30,16 @@ function parseProviderId(value: string): ProviderId {
   return parsed.data;
 }
 
-function createMockAdapter(providerId: ProviderId): ProviderAdapter {
-  return {
-    id: providerId,
-    defaultSourceMode: defaultSourceModes[providerId],
-    async isAvailable() {
-      return true;
-    },
-    async fetch(context) {
-      const now = context.now().toISOString();
-      return {
-        provider: providerId,
-        status: "ok",
-        source: context.sourceMode,
-        updated_at: now,
-        usage: {
-          kind: "quota",
-          used: 42,
-          limit: 100,
-          percent_used: 42,
-        },
-        reset_window: {
-          resets_at: new Date(Date.parse(now) + 60 * 60 * 1000).toISOString(),
-          label: "hourly",
-        },
-        error: null,
-        diagnostics: {
-          attempts: [
-            {
-              strategy: `${providerId}-${context.sourceMode}`,
-              available: true,
-              duration_ms: 12,
-              error: null,
-            },
-          ],
-        },
-      };
-    },
-  };
-}
-
-function createProviderRegistry(): ProviderRegistry {
-  return new ProviderRegistry([
-    createMockAdapter("copilot"),
-    createMockAdapter("codex"),
-    createMockAdapter("claude"),
-  ]);
-}
-
 export interface UsageCommandOptions {
   provider?: ProviderId | ProviderId[];
   json?: boolean;
   pretty?: boolean;
   refresh?: boolean;
   diagnostics?: boolean;
+}
+
+export interface UsageCommandDependencies {
+  createProviderRegistry?: typeof createDefaultProviderRegistry;
 }
 
 function normalizeProviders(provider: UsageCommandOptions["provider"]): ProviderId[] | undefined {
@@ -112,7 +61,10 @@ function withDiagnostics(snapshot: ProviderSnapshot): ProviderSnapshot {
   };
 }
 
-export async function runUsageCommand(options: UsageCommandOptions = {}): Promise<string> {
+export async function runUsageCommand(
+  options: UsageCommandOptions = {},
+  dependencies: UsageCommandDependencies = {},
+): Promise<string> {
   const request = normalizeBackendRequest({
     providers: normalizeProviders(options.provider),
     force_refresh: Boolean(options.refresh),
@@ -120,7 +72,7 @@ export async function runUsageCommand(options: UsageCommandOptions = {}): Promis
   });
 
   const loadedConfig = await loadBackendConfig();
-  const registry = createProviderRegistry();
+  const registry = dependencies.createProviderRegistry?.() ?? createDefaultProviderRegistry();
   const secretResolver = new SecretResolver([new SecretToolStore(), new EnvSecretStore()]);
   const contextBuilder = new ProviderContextBuilder({
     registry,
