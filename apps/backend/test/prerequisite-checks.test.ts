@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { diagnosticsReportSchema } from "shared-contract";
 
 import { buildDiagnosticsReport } from "../src/core/prerequisite-checks.js";
-import { formatDoctorReportAsText, runDoctorCommand } from "../src/commands/diagnostics-command.js";
+import { runDoctorCommand } from "../src/commands/diagnostics-command.js";
+import { formatDoctorAsText } from "../src/formatters/doctor-text-formatter.js";
 
 describe("diagnostics prerequisites", () => {
   it("reports the status of config, CLI tools, tokens, and the service runtime", async () => {
@@ -121,13 +122,13 @@ describe("diagnostics prerequisites", () => {
       },
     );
 
-    expect(text).toContain("Agent Bar Diagnostics");
-    expect(text).toContain("ERROR secret-tool: secret-tool is missing from PATH.");
-    expect(text).toContain("Suggested command: which secret-tool");
+    expect(text).toContain("Agent Bar Doctor");
+    expect(text).toContain("[FAIL] secret-tool: secret-tool is missing from PATH.");
+    expect(text).toContain("-> which secret-tool");
   });
 
   it("formats reports as plain text for shell use", () => {
-    const text = formatDoctorReportAsText({
+    const text = formatDoctorAsText({
       generated_at: "2026-03-25T17:00:00.000Z",
       runtime_mode: "service",
       checks: [
@@ -144,9 +145,9 @@ describe("diagnostics prerequisites", () => {
       ],
     });
 
-    expect(text).toContain("Runtime mode: service");
-    expect(text).toContain("OK    Service runtime: Backend service is running at /tmp/agent-bar/service.sock.");
-    expect(text).toContain("Suggested command: agent-bar service status --json");
-    expect(text).toContain('"socket_path":"/tmp/agent-bar/service.sock"');
+    expect(text).toContain("Mode: service");
+    expect(text).toContain("[ok] Service runtime: Backend service is running at /tmp/agent-bar/service.sock.");
+    // ok checks should not show suggested command
+    expect(text).not.toContain("->");
   });
 });
