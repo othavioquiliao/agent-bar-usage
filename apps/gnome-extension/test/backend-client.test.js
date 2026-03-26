@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createBackendClient } from "../services/backend-client.js";
-import { resolveBackendInvocation } from "../utils/backend-command.js";
+import { resolveBackendInvocation, resolveRepoRoot } from "../utils/backend-command.js";
+
+describe("resolveRepoRoot", () => {
+  it("resolves repo root from a file:// URI without using URL global", () => {
+    // file is at repo/apps/gnome-extension/utils/backend-command.js
+    // walk up 3 dirs from the file: remove filename → utils/ → gnome-extension/ → apps/ = repo root
+    const root = resolveRepoRoot("file:///home/user/projects/agent-bar/apps/gnome-extension/utils/backend-command.js");
+    expect(root).toBe("/home/user/projects/agent-bar");
+  });
+
+  it("handles percent-encoded paths", () => {
+    const root = resolveRepoRoot("file:///home/user/my%20projects/agent-bar/apps/gnome-extension/utils/backend-command.js");
+    expect(root).toBe("/home/user/my projects/agent-bar");
+  });
+});
 
 describe("backend command resolution", () => {
   it("prefers agent-bar from PATH and appends force refresh when requested", () => {

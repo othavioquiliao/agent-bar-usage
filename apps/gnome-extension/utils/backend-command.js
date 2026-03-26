@@ -9,7 +9,16 @@ function joinPath(...parts) {
 }
 
 export function resolveRepoRoot(baseUrl = import.meta.url) {
-  return normalizePath(decodeURIComponent(new URL("../../..", baseUrl).pathname));
+  // GJS (GNOME Shell) does not have the URL global.
+  // import.meta.url is a file:// URI — strip the scheme and walk up directories.
+  let filePath = baseUrl.startsWith("file://") ? baseUrl.slice(7) : baseUrl;
+  filePath = decodeURIComponent(filePath);
+  // Remove filename first, then walk up 3 dirs: utils/ → gnome-extension/ → apps/ → repo root
+  for (let i = 0; i < 4; i++) {
+    const lastSlash = filePath.lastIndexOf("/");
+    if (lastSlash > 0) filePath = filePath.slice(0, lastSlash);
+  }
+  return normalizePath(filePath);
 }
 
 export function buildBackendUsageArgs({ provider = null, forceRefresh = false } = {}) {
