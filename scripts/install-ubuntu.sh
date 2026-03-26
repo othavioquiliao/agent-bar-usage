@@ -12,20 +12,31 @@ gnome_ext_src="$repo_root/apps/gnome-extension"
 gnome_ext_uuid="agent-bar-ubuntu@othavio.dev"
 gnome_ext_dir="${HOME}/.local/share/gnome-shell/extensions/${gnome_ext_uuid}"
 
+fail() {
+  echo "$1" >&2
+  exit 1
+}
+
 if [[ -z "${node_binary}" ]]; then
   node_binary="$(command -v node || true)"
 fi
 
 if [[ -z "${node_binary}" ]]; then
-  echo "node is required to run agent-bar." >&2
-  exit 1
+  fail "node is required to run agent-bar."
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  fail "pnpm is required to install agent-bar. Install pnpm first, then run \`pnpm install\` and \`pnpm install:ubuntu\` again."
+fi
+
+if [[ ! -d "$repo_root/node_modules" || ! -x "$repo_root/node_modules/.bin/tsc" ]]; then
+  fail "Workspace dependencies are missing. Run \`pnpm install\` in $repo_root before running \`pnpm install:ubuntu\`."
 fi
 
 pnpm --dir "$repo_root" build:backend
 
 if [[ ! -f "$backend_entry" ]]; then
-  echo "Backend build output not found at $backend_entry." >&2
-  exit 1
+  fail "Backend build output not found at $backend_entry."
 fi
 
 mkdir -p "$install_dir" "$systemd_dir"
