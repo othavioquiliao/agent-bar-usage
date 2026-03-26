@@ -45,6 +45,33 @@ mkdir -p "$tmpfiles_user_dir"
 cp "$repo_root/packaging/tmpfiles.d/agent-bar.conf" "$tmpfiles_user_dir/agent-bar.conf"
 systemd-tmpfiles --user --create "$tmpfiles_user_dir/agent-bar.conf" 2>/dev/null || true
 
+# Capture the interactive shell environment so the user service can resolve CLIs and secrets.
+override_dir="${systemd_dir}/agent-bar.service.d"
+override_path="${override_dir}/env.conf"
+mkdir -p "$override_dir"
+
+env_vars_to_capture=(
+  PATH
+  GITHUB_TOKEN
+  GH_TOKEN
+  COPILOT_TOKEN
+  COPILOT_API_TOKEN
+  ANTHROPIC_API_KEY
+  DBUS_SESSION_BUS_ADDRESS
+)
+
+{
+  echo "[Service]"
+  for var_name in "${env_vars_to_capture[@]}"; do
+    var_value="${!var_name:-}"
+    if [[ -n "$var_value" ]]; then
+      echo "Environment=${var_name}=${var_value}"
+    fi
+  done
+} > "$override_path"
+
+echo "Wrote systemd environment override to $override_path"
+
 systemctl --user daemon-reload
 systemctl --user enable agent-bar.service
 systemctl --user restart agent-bar.service
