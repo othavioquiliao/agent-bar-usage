@@ -11,7 +11,7 @@ Agent Bar Ubuntu now has an archived `v1.0` baseline and one planned follow-up m
 
 ## Active Phases
 
-- [ ] **Phase 6: Provider Reliability** - Make all 3 providers work reliably from systemd service with minimal user friction (planned 2026-03-26)
+- [ ] **Phase 6: Provider Reliability** - Make all 3 providers work reliably from systemd service with minimal user friction (in progress 2026-03-26)
 - [x] **Phase 7: GNOME Extension UI Redesign** - Improve glanceability with qbar provider icons, compact progress bars, and less menu text (completed 2026-03-26)
 
 ### Phase 6: Provider Reliability
@@ -21,7 +21,7 @@ Agent Bar Ubuntu now has an archived `v1.0` baseline and one planned follow-up m
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: Replace the `script` PTY wrapper with `node-pty` for Codex and Claude service-mode usage
+- [x] 06-01: Replace the `script` PTY wrapper with `node-pty` for Codex and Claude service-mode usage
 - [ ] 06-02: Add Copilot auth flow, service environment capture, and actionable doctor guidance
 
 ## Progress
@@ -29,7 +29,7 @@ Plans:
 | Scope | Plans Complete | Status | Updated |
 |-------|----------------|--------|---------|
 | v1.0 Agent Bar Ubuntu | 12/15 archived | Archived with accepted gaps | 2026-03-26 |
-| 6. Provider Reliability | 0/2 | Planned | 2026-03-26 |
+| 6. Provider Reliability | 1/2 | In Progress | 2026-03-26 |
 | 7. GNOME Extension UI Redesign | 3/3 | Complete | 2026-03-26 |
 
 ### Phase 7: Redesign GNOME extension UI for glanceability, qbar provider icons, and compact progress bars

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Provider Reliability
-status: Ready to execute
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-03-26T16:39:07.000Z"
+status: Executing Phase 06
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-03-26T16:55:35.295Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,21 +19,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 6 — Provider Reliability
+**Current focus:** Phase 06 — provider-reliability
 
 ## Current Position
 
-Phase: 06 (provider-reliability) — PLANNED
-Plan: 1 of 2 not started
+Phase: 06 (provider-reliability) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 12
+- Total plans completed: 13
 - Archived milestone: v1.0 (12/15 plans closed, 3 accepted gaps)
-- Average duration: 24 min
-- Total execution time: 4.8 hours
+- Average duration: 23 min
+- Total execution time: 4.9 hours
 
 **By Phase:**
 
@@ -52,6 +52,7 @@ Plan: 1 of 2 not started
 | Phase 07 P01 | 4 | 3 tasks | 7 files |
 | Phase 07 P02 | 2 min | 2 tasks | 4 files |
 | Phase 07 P03 | 10 min | 3 tasks | 7 files |
+| Phase 06 P01 | 6 min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,8 @@ Recent decisions affecting current work:
 - [Phase 07]: Keep each provider row to identity, status, quota/progress, and one short secondary line while moving actionable command text to Details.
 - [Phase 07]: Keep the panel indicator aggregate-only with one icon and one short label instead of adding per-provider strips.
 - [Phase 07]: Treat the resumed human checkpoint response approved as the required live GNOME Shell sign-off for Task 3.
+- [Phase 06]: Use node-pty as the single PTY execution path for service-mode Codex and Claude fetchers.
+- [Phase 06]: Keep the shared PTY runner aligned with SubprocessError semantics so existing provider error mapping continues to work.
 
 ### Roadmap Evolution
 
@@ -97,12 +100,13 @@ None yet.
 
 ### Blockers/Concerns
 
-- Copilot, Codex CLI, and Claude CLI are not yet reliable from the installed systemd service path
+- Copilot auth and installed environment capture still block full provider reliability from the systemd service path
+- Live service verification still depends on local provider configuration and tokens being present on each machine
 - Provider token/session prerequisites may vary per machine and must map to structured provider-level failures
 - Browser-cookie-based parity work remains intentionally deferred
 
 ## Session Continuity
 
-Last session: 2026-03-26T16:39:07.000Z
-Stopped at: Completed 07-03-PLAN.md
+Last session: 2026-03-26T16:55:35.295Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
