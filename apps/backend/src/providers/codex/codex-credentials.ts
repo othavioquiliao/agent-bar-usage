@@ -28,8 +28,22 @@ export async function readCodexCredentials(
   if (!parsed || typeof parsed !== "object") return null;
 
   const record = parsed as Record<string, unknown>;
-  const accessToken = record.token ?? record.access_token ?? record.api_key;
-  if (typeof accessToken !== "string" || !accessToken) return null;
 
-  return { accessToken };
+  // Codex CLI uses auth_mode "chatgpt" with tokens.id_token or tokens.access_token
+  const tokens = record.tokens;
+  if (tokens && typeof tokens === "object") {
+    const t = tokens as Record<string, unknown>;
+    const token = t.id_token ?? t.access_token;
+    if (typeof token === "string" && token) {
+      return { accessToken: token };
+    }
+  }
+
+  // Fallback: direct API key fields
+  const accessToken = record.OPENAI_API_KEY ?? record.token ?? record.access_token ?? record.api_key;
+  if (typeof accessToken === "string" && accessToken) {
+    return { accessToken };
+  }
+
+  return null;
 }
