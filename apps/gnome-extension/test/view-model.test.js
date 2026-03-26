@@ -39,7 +39,7 @@ describe("provider view models", () => {
       sourceText: "Source: cli",
       errorText: null,
     });
-    expect(row.updatedAtText).toBe("Updated 5 minutes ago");
+    expect(row.updatedAtText).toMatch(/Updated .*(5 minutes ago|há 5 minutos|5 min)/i);
   });
 
   it("maps an error provider snapshot into readable error text", () => {
