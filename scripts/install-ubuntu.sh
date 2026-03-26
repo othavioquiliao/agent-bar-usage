@@ -29,8 +29,13 @@ if ! command -v pnpm >/dev/null 2>&1; then
   fail "pnpm is required to install agent-bar. Install pnpm first, then run \`pnpm install\` and \`pnpm install:ubuntu\` again."
 fi
 
-if [[ ! -d "$repo_root/node_modules" || ! -x "$repo_root/node_modules/.bin/tsc" ]]; then
-  fail "Workspace dependencies are missing. Run \`pnpm install\` in $repo_root before running \`pnpm install:ubuntu\`."
+# Always bootstrap workspace dependencies before building/installing.
+# This keeps `pnpm install:ubuntu` usable after a fresh clone or a `git pull`
+# that added new dependencies.
+if [[ -f "$repo_root/pnpm-lock.yaml" ]]; then
+  pnpm --dir "$repo_root" install --frozen-lockfile
+else
+  pnpm --dir "$repo_root" install
 fi
 
 pnpm --dir "$repo_root" build:backend

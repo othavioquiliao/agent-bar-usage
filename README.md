@@ -57,16 +57,13 @@ After login, the Agent Bar indicator appears in the GNOME topbar.
 Se a pessoa **já tinha o Agent Bar instalado**, estava numa versão anterior, e **acabou de rodar `git pull`** para trazer esta versão atual, o caminho mais simples é este:
 
 ```bash
-# 1. Atualize as dependências do workspace
-pnpm install
-
-# 2. Reinstale a versão atual no sistema
+# 1. Reinstale a versão atual no sistema
 pnpm install:ubuntu
 
-# 3. Reinicie o serviço do usuário
+# 2. Reinicie o serviço do usuário
 systemctl --user restart agent-bar.service
 
-# 4. Faça a checagem básica
+# 3. Faça a checagem básica
 agent-bar doctor --json
 agent-bar service status --json
 agent-bar service snapshot --json
@@ -75,7 +72,7 @@ agent-bar service snapshot --json
 Passo a passo amigável:
 
 1. **Não precisa desinstalar a versão antiga antes.**  
-   O `pnpm install:ubuntu` já recompila o backend, reinstala o wrapper `agent-bar`, atualiza o serviço systemd e copia a extensão GNOME atual.
+   O `pnpm install:ubuntu` agora já instala/atualiza as dependências do workspace, recompila o backend, reinstala o wrapper `agent-bar`, atualiza o serviço systemd e copia a extensão GNOME atual.
 
 2. **Se você usa GNOME em Wayland, faça logout/login depois do install.**  
    Isso garante que a extensão carregue a versão nova. Em X11, pode usar `Alt+F2`, digitar `r`, e pressionar Enter.
@@ -139,7 +136,7 @@ Passo a passo amigável:
    pnpm verify:ubuntu
    ```
 
-Resumo prático: para quem já estava com uma versão antiga instalada, o fluxo quase sempre é **`git pull` -> `pnpm install` -> `pnpm install:ubuntu` -> reiniciar sessão GNOME -> `doctor`/`service status`/`service snapshot`**.
+Resumo prático: para quem já estava com uma versão antiga instalada, o fluxo quase sempre é **`git pull` -> `pnpm install:ubuntu` -> reiniciar sessão GNOME -> `doctor`/`service status`/`service snapshot`**.
 
 ## Step-by-Step Installation
 

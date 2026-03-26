@@ -78,7 +78,6 @@ pnpm verify:ubuntu
 After pulling new changes:
 
 ```bash
-pnpm install
 pnpm install:ubuntu
 # Then logout/login to reload the extension
 ```
