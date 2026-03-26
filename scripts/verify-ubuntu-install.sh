@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+gnome_ext_dir="${HOME}/.local/share/gnome-shell/extensions/agent-bar-ubuntu@othavio.dev"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -25,6 +26,21 @@ if command -v agent-bar >/dev/null 2>&1; then
   step_ok "agent-bar encontrado no PATH."
 else
   step_fail "agent-bar nao esta no PATH."
+  errors=$((errors + 1))
+fi
+
+# --- extension UI assets ---
+if [[ -f "$gnome_ext_dir/stylesheet.css" ]]; then
+  step_ok "stylesheet da extensao encontrado."
+else
+  step_fail "stylesheet da extensao nao encontrado em $gnome_ext_dir."
+  errors=$((errors + 1))
+fi
+
+if [[ -f "$gnome_ext_dir/assets/providers/codex.svg" && -f "$gnome_ext_dir/assets/providers/claude.svg" && -f "$gnome_ext_dir/assets/providers/copilot.svg" ]]; then
+  step_ok "assets visuais da topbar encontrados."
+else
+  step_fail "assets visuais da topbar nao foram instalados corretamente."
   errors=$((errors + 1))
 fi
 

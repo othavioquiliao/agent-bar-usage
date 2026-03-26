@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: v1.0 milestone complete
-stopped_at: Completed 06-02-PLAN.md (auth command + install env + doctor)
-last_updated: "2026-03-25T22:50:25.436Z"
+stopped_at: Implemented One Dark Pro topbar refresh with 3-provider mini-strip
+last_updated: "2026-03-25T22:59:14-03:00"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 06 — provider-reliability
+**Current focus:** Post-v1.0 UI polish — One Dark Pro GNOME topbar refresh
 
 ## Current Position
 
-Phase: 06
-Plan: Not started
+Phase: Post-v1.0 follow-up
+Plan: UI refresh implemented locally
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Recent decisions affecting current work:
 - [Phase 06-provider-reliability]: GitHub Device Flow: same flow as gh auth login — user gets a code, opens browser, authorizes, done
 - [Phase 06-provider-reliability]: systemd-env check is warn (not error): service can still work via env var fallbacks
 - [Phase 06-provider-reliability]: storeSecretViaSecretTool separate from SecretToolStore: write surface isolated from read path
+- [UI refresh]: GNOME topbar now uses a fixed Codex/Claude/Copilot mini-strip with centered icon + percentage readouts and a One Dark Pro-inspired palette
 
 ### Pending Todos
 
@@ -92,5 +93,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-25T22:41:12.579Z
-Stopped at: Completed 06-02-PLAN.md (auth command + install env + doctor)
+Stopped at: Implemented One Dark Pro topbar refresh with provider assets and installer updates
 Resume file: None

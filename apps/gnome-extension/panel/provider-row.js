@@ -18,7 +18,9 @@ function formatRowLines(viewModel) {
 export function createProviderRow(viewModel) {
   const row = new PopupMenu.PopupMenuItem(formatRowLines(viewModel));
   row.sensitive = false;
-  row.add_style_class_name(`agent-bar-ubuntu-provider-row agent-bar-ubuntu-provider-row--${viewModel.status}`);
+  row.add_style_class_name("agent-bar-ubuntu-provider-row");
+  row.add_style_class_name(`agent-bar-ubuntu-provider-row--${viewModel.status}`);
+  row.add_style_class_name(`agent-bar-ubuntu-provider-row--${viewModel.providerId}`);
 
   if (row.label?.clutter_text) {
     row.label.clutter_text.line_wrap = true;

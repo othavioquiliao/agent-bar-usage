@@ -15,6 +15,7 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 - Backend: Node.js/TypeScript, running as a systemd user service
 - Providers: Copilot (GitHub API + Device Flow auth), Codex CLI, Claude CLI — all working from systemd via node-pty PTY
 - Frontend: GNOME Shell extension (GJS), top-bar indicator, details view, manual refresh
+- Frontend polish: One Dark Pro-inspired top-bar refresh with a centered 3-provider mini-strip and provider-specific visual assets
 - Config: XDG persistence + GNOME Keyring via `secret-tool`
 - Auth: `agent-bar auth copilot` — GitHub Device Flow OAuth, token stored in Keyring
 - Doctor: 8 prerequisite checks with actionable fix commands
@@ -60,6 +61,8 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 
 The product proved that the CLI-first backend architecture (Node.js + systemd) combined with a GNOME Shell extension in GJS is a viable Ubuntu-native stack. The `node-pty` approach for PTY allocation in headless systemd services is the key enabler for Codex and Claude CLI providers. The Device Flow OAuth pattern is the right path for Copilot — no browser cookie hacks needed.
 
+The current branch also proves that the GNOME surface can support a denser, theme-driven top bar without changing backend semantics: a fixed Codex/Claude/Copilot strip with percentage readouts, custom provider visuals, and a One Dark Pro-inspired palette.
+
 Next milestone should focus on: registering a real OAuth App, production hardening, and potentially expanding provider or surface coverage.
 
 ## Constraints
@@ -84,6 +87,7 @@ Next milestone should focus on: registering a real OAuth App, production hardeni
 | Use node-pty instead of `script -qec` for PTY allocation | `script` fails in systemd services (no controlling terminal); node-pty calls forkpty() directly | ✓ Good |
 | GitHub Device Flow OAuth for Copilot | No browser cookie dependency; same flow as `gh auth login`; works from any environment | ✓ Good |
 | Capture env vars in systemd override at install time | Service inherits user PATH, tokens, and DBUS_SESSION_BUS_ADDRESS without manual configuration | ✓ Good |
+| Use a fixed 3-provider mini-strip in the GNOME top bar for fast usage visibility | User preference favors at-a-glance percentages over an aggregated label; backend contract already exposes enough data | ✓ Good |
 | Register real GitHub OAuth App before public release | Placeholder client_id is acceptable for development but required before shipping | — Pending |
 
 ## Evolution
@@ -103,4 +107,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-25 after v1.0 milestone completion*
+*Last updated: 2026-03-25 after the GNOME top-bar UI refresh*

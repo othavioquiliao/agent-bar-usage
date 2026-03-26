@@ -1,5 +1,19 @@
 import { formatLastUpdatedText, formatTimestampLabel } from "./time.js";
 
+export const INDICATOR_PROVIDER_ORDER = ["codex", "claude", "copilot"];
+
+const INDICATOR_PROVIDER_META = {
+  codex: {
+    title: "Codex",
+  },
+  claude: {
+    title: "Claude",
+  },
+  copilot: {
+    title: "Copilot",
+  },
+};
+
 function formatProviderTitle(providerId) {
   if (!providerId) {
     return "Provider";
@@ -34,6 +48,19 @@ function formatUsageText(usage) {
   const percentText = percent === null ? "" : ` (${percent}%)`;
 
   return `Usage: ${used} / ${limit}${percentText}`;
+}
+
+function formatUsagePercentText(usage) {
+  if (!usage || usage.kind !== "quota") {
+    return "--%";
+  }
+
+  const percent = usage.percent_used;
+  if (typeof percent !== "number" || !Number.isFinite(percent)) {
+    return "--%";
+  }
+
+  return `${Math.round(percent)}%`;
 }
 
 function formatResetWindowText(resetWindow) {
@@ -101,6 +128,7 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
   const status = providerSnapshot?.status ?? "unknown";
   const statusText = formatStatusText(status);
   const usageText = formatUsageText(providerSnapshot?.usage ?? null);
+  const usagePercentText = formatUsagePercentText(providerSnapshot?.usage ?? null);
   const resetText = formatResetWindowText(providerSnapshot?.reset_window ?? null);
   const updatedAtText = providerSnapshot?.updated_at
     ? formatTimestampLabel(providerSnapshot.updated_at, { prefix: "Updated", now })
@@ -116,6 +144,7 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
     status,
     statusText,
     usageText,
+    usagePercentText,
     resetText,
     updatedAtText,
     errorText,
@@ -125,6 +154,37 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
     hasError: Boolean(errorText),
     hasUsage: Boolean(providerSnapshot?.usage),
     isUnavailable: status === "unavailable",
+  };
+}
+
+function buildIndicatorProviderViewModel(providerId, providerSnapshot, state, { now = new Date() } = {}) {
+  const meta = INDICATOR_PROVIDER_META[providerId] ?? {
+    title: formatProviderTitle(providerId),
+  };
+  const usagePercentText = formatUsagePercentText(providerSnapshot?.usage ?? null);
+  const status = providerSnapshot?.status
+    ?? (state.lastError ? "error" : state.isLoading ? "loading" : "idle");
+  const statusText = providerSnapshot?.status
+    ? formatStatusText(providerSnapshot.status)
+    : state.lastError
+      ? "Backend error"
+      : state.isLoading
+        ? "Refreshing"
+        : "Waiting for data";
+  const updatedAtText = providerSnapshot?.updated_at
+    ? formatTimestampLabel(providerSnapshot.updated_at, { prefix: "Updated", now })
+    : null;
+
+  return {
+    providerId,
+    title: meta.title,
+    usagePercentText,
+    status,
+    statusText,
+    updatedAtText,
+    isMissingUsage: usagePercentText === "--%",
+    isLoading: state.isLoading,
+    isStale: Boolean(state.lastError),
   };
 }
 
@@ -183,32 +243,32 @@ export function buildSnapshotViewModel(state = {}, { now = new Date() } = {}) {
 
 export function buildIndicatorSummaryViewModel(state = {}, { now = new Date() } = {}) {
   const snapshot = buildSnapshotViewModel(state, { now });
-  let iconName = "dialog-information-symbolic";
-  let labelText = snapshot.hasProviders
-    ? `${snapshot.providerCount} provider${snapshot.providerCount === 1 ? "" : "s"}`
-    : "No data";
+  const providerSnapshots = Array.isArray(state.snapshotEnvelope?.providers) ? state.snapshotEnvelope.providers : [];
+  const providerSnapshotsById = new Map(providerSnapshots.map((providerSnapshot) => [providerSnapshot.provider, providerSnapshot]));
+  const providerItems = INDICATOR_PROVIDER_ORDER.map((providerId) =>
+    buildIndicatorProviderViewModel(providerId, providerSnapshotsById.get(providerId) ?? null, state, { now }),
+  );
+  let panelStatus = "idle";
 
-  if (state.isLoading) {
-    iconName = "view-refresh-symbolic";
-    labelText = "Refreshing";
-  } else if (state.lastError) {
-    iconName = "dialog-error-symbolic";
-    labelText = "Backend error";
+  if (state.lastError) {
+    panelStatus = "error";
+  } else if (state.isLoading) {
+    panelStatus = "loading";
   } else if (snapshot.errorCount > 0) {
-    iconName = "dialog-warning-symbolic";
-    labelText = `${snapshot.errorCount} error${snapshot.errorCount === 1 ? "" : "s"}`;
+    panelStatus = "warning";
   } else if (snapshot.hasProviders) {
-    iconName = "emblem-ok-symbolic";
-    labelText = `${snapshot.providerCount} provider${snapshot.providerCount === 1 ? "" : "s"}`;
+    panelStatus = "ready";
   }
 
   return {
-    iconName,
-    labelText,
+    providerItems,
+    panelStatus,
     statusText: snapshot.lastUpdatedText ?? snapshot.summaryBody,
     providerCount: snapshot.providerCount,
     errorCount: snapshot.errorCount,
     hasProviders: snapshot.hasProviders,
     lastUpdatedText: snapshot.lastUpdatedText,
+    hasGlobalError: Boolean(state.lastError),
+    isLoading: Boolean(state.isLoading),
   };
 }

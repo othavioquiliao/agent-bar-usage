@@ -35,6 +35,7 @@ describe("provider view models", () => {
       title: "Codex",
       statusText: "Healthy",
       usageText: "Usage: 10 / 100 (10%)",
+      usagePercentText: "10%",
       resetText: "Reset: Tomorrow",
       sourceText: "Source: cli",
       errorText: null,
@@ -66,6 +67,7 @@ describe("provider view models", () => {
       title: "Claude",
       statusText: "Error",
       usageText: "Usage unavailable",
+      usagePercentText: "--%",
       errorText: "adapter exploded",
       sourceText: "Source: cli",
       diagnosticsSummaryText: "Diagnostics: adapter exploded",
@@ -187,6 +189,7 @@ describe("provider view models", () => {
       title: "Copilot",
       statusText: "Unavailable",
       usageText: "Usage unavailable",
+      usagePercentText: "--%",
       errorText: null,
     });
   });
@@ -225,8 +228,13 @@ describe("snapshot view models", () => {
     );
 
     expect(summary).toMatchObject({
-      iconName: "view-refresh-symbolic",
-      labelText: "Refreshing",
+      panelStatus: "loading",
+      hasProviders: false,
+      providerItems: [
+        expect.objectContaining({ providerId: "codex", usagePercentText: "--%", status: "loading" }),
+        expect.objectContaining({ providerId: "claude", usagePercentText: "--%", status: "loading" }),
+        expect.objectContaining({ providerId: "copilot", usagePercentText: "--%", status: "loading" }),
+      ],
     });
   });
 
@@ -245,5 +253,82 @@ describe("snapshot view models", () => {
 
     expect(snapshot.diagnosticsSummaryText).toBe("Backend error: backend unavailable");
     expect(snapshot.suggestedCommandText).toBe("Suggested command: agent-bar doctor --json");
+  });
+
+  it("builds a fixed three-provider topbar view model with usage percentages", () => {
+    const summary = buildIndicatorSummaryViewModel(
+      {
+        isLoading: false,
+        lastError: null,
+        lastUpdatedText: "Last updated just now",
+        snapshotEnvelope: {
+          schema_version: "1",
+          generated_at: "2026-03-25T17:10:00.000Z",
+          providers: [
+            {
+              provider: "copilot",
+              status: "ok",
+              usage: { kind: "quota", used: 42, limit: 100, percent_used: 42 },
+              updated_at: "2026-03-25T17:10:00.000Z",
+              error: null,
+            },
+            {
+              provider: "codex",
+              status: "ok",
+              usage: { kind: "quota", used: 10, limit: 100, percent_used: 10 },
+              updated_at: "2026-03-25T17:10:00.000Z",
+              error: null,
+            },
+          ],
+        },
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(summary.panelStatus).toBe("ready");
+    expect(summary.providerItems).toEqual([
+      expect.objectContaining({ providerId: "codex", usagePercentText: "10%", status: "ok" }),
+      expect.objectContaining({ providerId: "claude", usagePercentText: "--%", status: "idle" }),
+      expect.objectContaining({ providerId: "copilot", usagePercentText: "42%", status: "ok" }),
+    ]);
+  });
+
+  it("marks topbar providers as stale when a backend error happens after data loads", () => {
+    const summary = buildIndicatorSummaryViewModel(
+      {
+        isLoading: false,
+        lastError: "backend unavailable",
+        lastUpdatedText: "Last updated 1 minute ago",
+        snapshotEnvelope: {
+          schema_version: "1",
+          generated_at: "2026-03-25T17:09:00.000Z",
+          providers: [
+            {
+              provider: "claude",
+              status: "degraded",
+              usage: { kind: "quota", used: 91, limit: 100, percent_used: 91 },
+              updated_at: "2026-03-25T17:09:00.000Z",
+              error: null,
+            },
+          ],
+        },
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(summary).toMatchObject({
+      panelStatus: "error",
+      hasGlobalError: true,
+    });
+    expect(summary.providerItems[1]).toMatchObject({
+      providerId: "claude",
+      usagePercentText: "91%",
+      status: "degraded",
+      isStale: true,
+    });
   });
 });

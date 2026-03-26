@@ -2,6 +2,6 @@
   "uuid": "agent-bar-ubuntu@othavio.dev",
   "name": "Agent Bar Ubuntu",
   "description": "GNOME Shell surface for Ubuntu usage snapshots",
-  "version": 1,
+  "version": 2,
   "shell-version": ["46"]
 }
