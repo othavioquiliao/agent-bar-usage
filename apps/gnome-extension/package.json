@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run --config vitest.config.ts"
+    "test": "node ./scripts/run-vitest.mjs"
   },
   "devDependencies": {
     "vitest": "^3.2.4"
