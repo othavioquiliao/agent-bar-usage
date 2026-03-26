@@ -1,4 +1,5 @@
 import { access } from "node:fs/promises";
+import path from "node:path";
 
 import type { DiagnosticsCheck, DiagnosticsReport } from "shared-contract";
 
@@ -15,14 +16,21 @@ export interface PrerequisiteChecksOptions {
   fileExists?: (filePath: string) => Promise<boolean>;
   readTextFile?: (filePath: string) => Promise<string>;
   resolveCommandInPathFn?: (command: string, env?: NodeJS.ProcessEnv) => string | null;
+  importModuleFn?: (moduleId: string) => Promise<unknown>;
 }
 
 const checks: Array<Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">> = [
   { id: "config", label: "Config", suggested_command: "agent-bar config validate" },
-  { id: "secret-tool", label: "secret-tool", suggested_command: "which secret-tool" },
-  { id: "codex-cli", label: "Codex CLI", suggested_command: "codex --version" },
-  { id: "claude-cli", label: "Claude CLI", suggested_command: "claude --version" },
-  { id: "copilot-token", label: "Copilot token", suggested_command: "agent-bar config validate" },
+  { id: "secret-tool", label: "secret-tool", suggested_command: "sudo apt install libsecret-tools" },
+  { id: "codex-cli", label: "Codex CLI", suggested_command: "npm install -g @openai/codex" },
+  { id: "claude-cli", label: "Claude CLI", suggested_command: "npm install -g @anthropic-ai/claude-code" },
+  {
+    id: "node-pty",
+    label: "node-pty",
+    suggested_command: "sudo apt install build-essential python3 && pnpm install",
+  },
+  { id: "copilot-token", label: "Copilot token", suggested_command: "agent-bar auth copilot" },
+  { id: "systemd-env", label: "Systemd env", suggested_command: "pnpm install:ubuntu" },
   { id: "service-runtime", label: "Service runtime", suggested_command: "agent-bar service status --json" },
 ];
 
@@ -83,7 +91,7 @@ async function doesFileExist(filePath: string, fileExists?: (filePath: string) =
 }
 
 function hasConfiguredCopilotToken(config: Awaited<ReturnType<typeof loadBackendConfig>>["config"], env: NodeJS.ProcessEnv): boolean {
-  const envSources = ["COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"];
+  const envSources = ["COPILOT_API_TOKEN", "COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"];
   if (envSources.some((name) => Boolean(env[name]?.trim()))) {
     return true;
   }
@@ -94,6 +102,7 @@ function hasConfiguredCopilotToken(config: Awaited<ReturnType<typeof loadBackend
 
 export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions = {}): Promise<DiagnosticsReport> {
   const env = options.env ?? process.env;
+  const homeDir = options.homeDir ?? env.HOME ?? "";
   const configPath = resolveBackendConfigPath({ env, homeDir: options.homeDir });
   const loadedConfig = await loadBackendConfig({
     env,
@@ -104,6 +113,10 @@ export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions 
   const serviceSocketPath = resolveServiceSocketPath({ env, homeDir: options.homeDir });
   const serviceStatus = await probeServiceStatus(serviceSocketPath);
   const resolveCommand = options.resolveCommandInPathFn ?? resolveCommandInPath;
+  const systemdEnvOverridePath = path.join(
+    homeDir,
+    ".config/systemd/user/agent-bar.service.d/env.conf",
+  );
 
   const reportChecks: DiagnosticsCheck[] = [];
   reportChecks.push(
@@ -132,27 +145,45 @@ export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions 
   }
 
   reportChecks.push(
+    await buildNodePtyCheck(checks[4], options.importModuleFn),
+  );
+
+  reportChecks.push(
     hasConfiguredCopilotToken(loadedConfig.config, env)
       ? okCheck(
-          checks[4],
+          checks[5],
           "Copilot token source is configured.",
           {
-            env_sources: ["COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"],
+            env_sources: ["COPILOT_API_TOKEN", "COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"],
           },
         )
       : warnCheck(
-          checks[4],
+          checks[5],
           "Copilot token source is not configured.",
           {
-            env_sources: ["COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"],
+            env_sources: ["COPILOT_API_TOKEN", "COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"],
           },
+        ),
+  );
+
+  reportChecks.push(
+    await doesFileExist(systemdEnvOverridePath, options.fileExists)
+      ? okCheck(
+          checks[6],
+          "Systemd environment override is configured.",
+          { path: systemdEnvOverridePath, exists: true },
+        )
+      : warnCheck(
+          checks[6],
+          "Systemd environment override is missing. The service may not find CLI tools or tokens.",
+          { path: systemdEnvOverridePath, exists: false },
         ),
   );
 
   reportChecks.push(
     serviceStatus?.running
       ? okCheck(
-          checks[5],
+          checks[7],
           `Backend service is running at ${serviceSocketPath}.`,
           {
             socket_path: serviceSocketPath,
@@ -160,7 +191,7 @@ export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions 
           },
         )
       : warnCheck(
-          checks[5],
+          checks[7],
           `Backend service is not running at ${serviceSocketPath}.`,
           {
             socket_path: serviceSocketPath,
@@ -176,3 +207,22 @@ export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions 
   };
 }
 
+async function buildNodePtyCheck(
+  base: Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">,
+  importModuleFn?: (moduleId: string) => Promise<unknown>,
+): Promise<DiagnosticsCheck> {
+  try {
+    await (importModuleFn ? importModuleFn("node-pty") : import("node-pty"));
+
+    return okCheck(base, "node-pty native module is available.");
+  } catch (error) {
+    return errorCheck(
+      base,
+      "node-pty native module is not compiled. Codex and Claude providers require it.",
+      {
+        module: "node-pty",
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
+  }
+}

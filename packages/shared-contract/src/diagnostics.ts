@@ -5,7 +5,9 @@ export const diagnosticsCheckIdSchema = z.enum([
   "secret-tool",
   "codex-cli",
   "claude-cli",
+  "node-pty",
   "copilot-token",
+  "systemd-env",
   "service-runtime",
 ]);
 
