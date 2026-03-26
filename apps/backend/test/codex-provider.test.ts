@@ -1,11 +1,24 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProviderAdapterContext } from "../src/core/provider-adapter.js";
 import { createCodexCliAdapter } from "../src/providers/codex/codex-cli-adapter.js";
+import { PtyUnavailableError } from "../src/providers/shared/interactive-command.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
 
-const { resolveCommandInPathMock } = vi.hoisted(() => ({
+const { resolveCommandInPathMock, runInteractiveCommandMock } = vi.hoisted(() => ({
   resolveCommandInPathMock: vi.fn(),
+  runInteractiveCommandMock: vi.fn(),
 }));
+
+vi.mock("../src/providers/shared/interactive-command.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/providers/shared/interactive-command.js")>(
+    "../src/providers/shared/interactive-command.js",
+  );
+
+  return {
+    ...actual,
+    runInteractiveCommand: runInteractiveCommandMock,
+  };
+});
 
 vi.mock("../src/utils/subprocess.js", async () => {
   const actual = await vi.importActual<typeof import("../src/utils/subprocess.js")>(
@@ -21,6 +34,7 @@ vi.mock("../src/utils/subprocess.js", async () => {
 describe("Codex CLI provider", () => {
   beforeEach(() => {
     resolveCommandInPathMock.mockReset();
+    runInteractiveCommandMock.mockReset();
     resolveCommandInPathMock.mockReturnValue(null);
   });
 
@@ -39,7 +53,7 @@ describe("Codex CLI provider", () => {
   });
 
   it("maps parse failures to a structured provider error", async () => {
-    const runSubprocess = vi.fn().mockResolvedValue(createRunResult("hello world"));
+    runInteractiveCommandMock.mockResolvedValue(createRunResult("hello world"));
     resolveCommandInPathMock.mockImplementation((command: string) =>
       command === "codex" ? "/usr/bin/codex" : null,
     );
@@ -50,7 +64,7 @@ describe("Codex CLI provider", () => {
         env: {
           CODEX_CLI_PATH: "/usr/bin/codex",
         },
-        runSubprocess,
+        runSubprocess: vi.fn(),
       }),
     );
 
@@ -60,7 +74,7 @@ describe("Codex CLI provider", () => {
   });
 
   it("maps update prompts to a structured provider error", async () => {
-    const runSubprocess = vi.fn().mockResolvedValue(
+    runInteractiveCommandMock.mockResolvedValue(
       createRunResult("Update available! Run bun install -g @openai/codex"),
     );
     resolveCommandInPathMock.mockImplementation((command: string) =>
@@ -73,7 +87,7 @@ describe("Codex CLI provider", () => {
         env: {
           CODEX_CLI_PATH: "/usr/bin/codex",
         },
-        runSubprocess,
+        runSubprocess: vi.fn(),
       }),
     );
 
@@ -83,7 +97,7 @@ describe("Codex CLI provider", () => {
   });
 
   it("maps usage output into normalized quota fields", async () => {
-    const runSubprocess = vi.fn().mockResolvedValue(
+    runInteractiveCommandMock.mockResolvedValue(
       createRunResult(
         [
           "Credits: 42",
@@ -102,7 +116,7 @@ describe("Codex CLI provider", () => {
         env: {
           CODEX_CLI_PATH: "/usr/bin/codex",
         },
-        runSubprocess,
+        runSubprocess: vi.fn(),
       }),
     );
 
@@ -119,6 +133,38 @@ describe("Codex CLI provider", () => {
       label: "5h limit",
     });
     expect(snapshot.diagnostics?.attempts[0]?.strategy).toBe("codex.cli");
+    expect(runInteractiveCommandMock).toHaveBeenCalledWith(
+      "/usr/bin/codex",
+      ["-s", "read-only", "-a", "untrusted"],
+      {
+        env: {
+          CODEX_CLI_PATH: "/usr/bin/codex",
+        },
+        timeoutMs: 12_000,
+        input: "/status\n",
+      },
+    );
+  });
+
+  it("maps PTY availability failures to a structured provider error", async () => {
+    runInteractiveCommandMock.mockRejectedValue(new PtyUnavailableError());
+    resolveCommandInPathMock.mockImplementation((command: string) =>
+      command === "codex" ? "/usr/bin/codex" : null,
+    );
+
+    const adapter = createCodexCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CODEX_CLI_PATH: "/usr/bin/codex",
+        },
+        runSubprocess: vi.fn(),
+      }),
+    );
+
+    expect(snapshot.status).toBe("error");
+    expect(snapshot.error?.code).toBe("codex_pty_unavailable");
+    expect(snapshot.error?.retryable).toBe(false);
   });
 });
 

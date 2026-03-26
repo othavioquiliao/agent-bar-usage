@@ -7,7 +7,12 @@ import {
   type ProviderAdapterContext,
 } from "../../core/provider-adapter.js";
 import { describeSubprocessFailure, resolveCommandInPath, SubprocessError } from "../../utils/subprocess.js";
-import { normalizeLineEndings, stripAnsi } from "../shared/interactive-command.js";
+import {
+  normalizeLineEndings,
+  PtyUnavailableError,
+  runInteractiveCommand,
+  stripAnsi,
+} from "../shared/interactive-command.js";
 import { CodexCliParseError, mapCodexUsageToSnapshot, parseCodexUsage } from "./codex-cli-parser.js";
 
 const DEFAULT_SOURCE: ProviderSourceMode = "cli";
@@ -46,8 +51,12 @@ export async function fetchCodexUsage(context: ProviderAdapterContext): Promise<
   const startedAt = Date.now();
 
   try {
-    const result = await runCodexInteractive(context, binary, ["-s", "read-only", "-a", "untrusted"]);
-    const output = `${result.stdout}\n${result.stderr}`.trim();
+    const result = await runInteractiveCommand(binary, ["-s", "read-only", "-a", "untrusted"], {
+      env: context.env,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      input: "/status\n",
+    });
+    const output = result.stdout.trim();
 
     return buildSnapshotFromText(context, source, updatedAt, output, startedAt, "codex.cli");
   } catch (error) {
@@ -61,6 +70,15 @@ export async function fetchCodexUsage(context: ProviderAdapterContext): Promise<
           error.message,
           error.code === "codex_parse_failed",
         ),
+      );
+    }
+
+    if (error instanceof PtyUnavailableError) {
+      return createErrorSnapshot(
+        context.providerId,
+        source,
+        updatedAt,
+        createProviderError("codex_pty_unavailable", error.message, false),
       );
     }
 
@@ -218,32 +236,4 @@ function normalizeSourceMode(
   defaultMode: ProviderSourceMode,
 ): ProviderSourceMode {
   return sourceMode === "auto" ? defaultMode : sourceMode;
-}
-
-async function runCodexInteractive(context: ProviderAdapterContext, binary: string, args: string[]) {
-  const script = resolveCommandInPath("script", context.env);
-  const options = {
-    env: context.env,
-    timeoutMs: REQUEST_TIMEOUT_MS,
-    input: "/status\n",
-  };
-
-  if (script) {
-    const scriptCommand = buildScriptCommand(binary, args);
-    return await context.runSubprocess(script, ["-qec", scriptCommand, "/dev/null"], options);
-  }
-
-  return await context.runSubprocess(binary, args, options);
-}
-
-function buildScriptCommand(command: string, args: string[]): string {
-  return [command, ...args].map(shellQuote).join(" ");
-}
-
-function shellQuote(value: string): string {
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
-    return value;
-  }
-
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
