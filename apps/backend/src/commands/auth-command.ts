@@ -21,6 +21,8 @@ import { requestDeviceCode, pollForAccessToken } from "../auth/github-device-flo
 import { storeSecretViaSecretTool } from "../auth/secret-tool-writer.js";
 import { ensureCopilotSecretRef } from "../auth/config-writer.js";
 import { runSubprocess } from "../utils/subprocess.js";
+import { readClaudeCredentials } from "../providers/claude/claude-credentials.js";
+import { readCodexCredentials } from "../providers/codex/codex-credentials.js";
 
 /** GitHub OAuth App client ID for Agent Bar. Override with --client-id for testing. */
 const DEFAULT_CLIENT_ID = "Ov23liWCdSLUEPTXJz4c";
@@ -127,6 +129,70 @@ export function registerAuthCommand(program: Command): void {
         process.exitCode = 1;
       }
     });
+
+  auth
+    .command("claude")
+    .description("Validate Claude CLI authentication.")
+    .action(async () => {
+      try {
+        await runAuthClaudeCommand();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`\nError: ${message}\n`);
+        process.exitCode = 1;
+      }
+    });
+
+  auth
+    .command("codex")
+    .description("Validate Codex CLI authentication.")
+    .action(async () => {
+      try {
+        await runAuthCodexCommand();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`\nError: ${message}\n`);
+        process.exitCode = 1;
+      }
+    });
+}
+
+export interface AuthClaudeCommandDependencies {
+  readCredentials?: typeof readClaudeCredentials;
+}
+
+export async function runAuthClaudeCommand(
+  dependencies: AuthClaudeCommandDependencies = {},
+): Promise<void> {
+  const read = dependencies.readCredentials ?? readClaudeCredentials;
+  const credentials = await read();
+
+  if (!credentials) {
+    process.stderr.write("Claude credentials not found.\n  -> Run: claude auth login\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  process.stdout.write("Claude: authenticated (token found in ~/.claude/.credentials.json)\n");
+}
+
+export interface AuthCodexCommandDependencies {
+  readCredentials?: typeof readCodexCredentials;
+}
+
+export async function runAuthCodexCommand(
+  dependencies: AuthCodexCommandDependencies = {},
+): Promise<void> {
+  const read = dependencies.readCredentials ?? readCodexCredentials;
+  const credentials = await read();
+
+  if (!credentials) {
+    process.stderr.write("Codex credentials not found.\n  -> Run: codex auth login\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  process.stdout.write("Codex: authenticated (token found in ~/.codex/auth.json)\n");
 }
 
 function defaultOpenBrowser(url: string): void {
