@@ -2,8 +2,8 @@
 phase: 7
 slug: redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-26
 ---
 
@@ -38,7 +38,8 @@ created: 2026-03-26
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 7-01-01 | 01 | 1 | UI redesign summary contract | unit | `pnpm --filter gnome-extension exec vitest run test/view-model.test.js --config vitest.config.ts` | ✅ | ⬜ pending |
+| 7-01-01 | 01 | 0 | UI redesign summary contract | unit | `pnpm --filter gnome-extension exec vitest run test/view-model.test.js --config vitest.config.ts` | ✅ | ⬜ pending |
+| 7-01-03 | 01 | 0 | Install payload and GNOME smoke prerequisites | script/preflight | `bash scripts/verify-gnome-wave0.sh` | ✅ planned | ⬜ pending |
 | 7-02-01 | 02 | 1 | Compact provider row view model and progress semantics | unit | `pnpm --filter gnome-extension exec vitest run test/view-model.test.js --config vitest.config.ts` | ✅ | ⬜ pending |
 | 7-02-02 | 02 | 1 | Refresh remains single-flight while loading | unit | `pnpm --filter gnome-extension exec vitest run test/polling-service.test.js --config vitest.config.ts` | ✅ | ⬜ pending |
 | 7-03-01 | 03 | 2 | Packaged stylesheet and assets ship in install flow | integration/script | `bash scripts/install-ubuntu.sh` on a GNOME host, then inspect ~/.local/share/gnome-shell/extensions/agent-bar-ubuntu@othavio.dev/` | ❌ W0 | ⬜ pending |
