@@ -95,6 +95,27 @@ Passo a passo amigável:
 
    Isso salva o token no GNOME Keyring e atualiza a configuração do backend.
 
+   De onde vem esse `client id`:
+
+   - Se o projeto/time já te passou um `GitHub OAuth client id`, use esse valor.
+   - Se ninguém te passou um, ele vem de um **GitHub OAuth App** criado em:
+     `GitHub -> Settings -> Developer settings -> OAuth Apps`
+   - Lá você cria um app novo e usa o campo **Client ID**.
+
+   Resumo:
+
+   ```bash
+   agent-bar auth copilot --client-id SEU_CLIENT_ID_AQUI
+   ```
+
+   Se você **não tiver** esse `client id`, essa etapa do Copilot não vai funcionar ainda. Nesse caso, você ainda pode testar o resto da atualização normalmente com:
+
+   ```bash
+   agent-bar doctor --json
+   agent-bar service status --json
+   agent-bar service snapshot --json
+   ```
+
 5. **Se você quiser testar Codex e Claude, confirme primeiro que os CLIs ainda funcionam no seu sistema.**
 
    ```bash
