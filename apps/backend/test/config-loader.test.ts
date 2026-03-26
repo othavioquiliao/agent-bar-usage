@@ -82,6 +82,63 @@ describe("backend config loader", () => {
     expect(loaded.config.providers[0]?.enabled).toBe(false);
   });
 
+  it("defaults enabled to true and sourceMode to auto when omitted", async () => {
+    const loaded = await loadBackendConfig({
+      explicitPath: "/tmp/agent-bar.defaults.json",
+      fileExists: async () => true,
+      readTextFile: async () =>
+        JSON.stringify({
+          providers: [
+            {
+              id: "claude",
+            },
+          ],
+        }),
+    });
+
+    expect(loaded.config.providers[0]?.enabled).toBe(true);
+    expect(loaded.config.providers[0]?.sourceMode).toBe("auto");
+  });
+
+  it("loads config with provider enabled/source defaults from missing file", async () => {
+    const loaded = await loadBackendConfig({
+      env: { XDG_CONFIG_HOME: "/tmp/defaults-check" },
+      fileExists: async () => false,
+    });
+
+    expect(loaded.config.providers).toHaveLength(3);
+
+    for (const provider of loaded.config.providers) {
+      expect(provider.enabled).toBe(true);
+      expect(typeof provider.sourceMode).toBe("string");
+      expect(["auto", "api", "cli", "oauth"].includes(provider.sourceMode)).toBe(true);
+    }
+
+    expect(loaded.config.providers.find((p) => p.id === "claude")?.enabled).toBe(true);
+    expect(loaded.config.providers.find((p) => p.id === "claude")?.sourceMode).toBe("cli");
+  });
+
+  it("respects enabled: false to disable a provider", async () => {
+    const loaded = await loadBackendConfig({
+      explicitPath: "/tmp/agent-bar.disabled.json",
+      fileExists: async () => true,
+      readTextFile: async () =>
+        JSON.stringify({
+          providers: [
+            { id: "copilot", enabled: false },
+            { id: "claude", enabled: true, sourceMode: "cli" },
+          ],
+        }),
+    });
+
+    const copilot = loaded.config.providers.find((p) => p.id === "copilot");
+    const claude = loaded.config.providers.find((p) => p.id === "claude");
+
+    expect(copilot?.enabled).toBe(false);
+    expect(claude?.enabled).toBe(true);
+    expect(claude?.sourceMode).toBe("cli");
+  });
+
   it("rejects malformed JSON files", async () => {
     await expect(
       loadBackendConfig({
