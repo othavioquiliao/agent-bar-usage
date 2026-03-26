@@ -2,6 +2,7 @@
 import { Command, InvalidArgumentError } from "commander";
 import { providerIdSchema, type ProviderId } from "shared-contract";
 
+import { registerAuthCommand } from "./commands/auth-command.js";
 import { formatConfigCommandError, registerConfigCommand } from "./commands/config-command.js";
 import { registerDoctorCommand } from "./commands/diagnostics-command.js";
 import { registerServiceCommand } from "./commands/service-command.js";
@@ -72,6 +73,7 @@ program
   });
 
 registerConfigCommand(program);
+registerAuthCommand(program);
 registerDoctorCommand(program);
 registerServiceCommand(program);
 
