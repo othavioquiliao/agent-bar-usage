@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Milestone complete
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-25T18:33:57.727Z"
+milestone: v1.1
+milestone_name: provider reliability
+status: Planning next milestone
+stopped_at: v1.0 archived with accepted gaps
+last_updated: "2026-03-26T14:46:32.760Z"
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 15
+  total_phases: 6
+  completed_phases: 5
+  total_plans: 17
   completed_plans: 12
 ---
 
@@ -16,21 +16,22 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25)
+See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 5 — delivery-hardening
+**Current focus:** Phase 6 — provider-reliability
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 6
+Plan: Planning complete, execution not started
 
 ## Performance Metrics
 
 **Velocity:**
 
 - Total plans completed: 12
+- Archived milestone: v1.0 (12/15 plans closed, 3 accepted gaps)
 - Average duration: 24 min
 - Total execution time: 4.8 hours
 
@@ -71,6 +72,9 @@ Recent decisions affecting current work:
 - [Phase 3]: Provider isolation behavior is explicitly validated and kept envelope-safe
 - [Phase 4]: Manual refresh is gated while a refresh is in flight so repeated clicks do not overlap backend requests.
 - [Phase 4]: The GNOME surface consumes normalized snapshot view models instead of reaching into subprocess or backend concerns.
+- [Milestone]: `v1.0` was archived with accepted `OPS-01`/`OPS-02`/`OPS-03` gaps at user request
+- [Phase 6]: Replace the `script` PTY wrapper with `node-pty` for service-mode Codex and Claude usage
+- [Phase 6]: Add GitHub Device Flow auth plus environment capture for Copilot and installed systemd setups
 
 ### Pending Todos
 
@@ -78,11 +82,12 @@ None yet.
 
 ### Blockers/Concerns
 
+- Copilot, Codex CLI, and Claude CLI are not yet reliable from the installed systemd service path
 - Provider token/session prerequisites may vary per machine and must map to structured provider-level failures
 - Browser-cookie-based parity work remains intentionally deferred
 
 ## Session Continuity
 
 Last session: 2026-03-25T17:24:58.376Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-delivery-hardening/05-CONTEXT.md
+Stopped at: v1.0 archived with accepted gaps
+Resume file: .planning/phases/06-provider-reliability/HANDOFF.md
