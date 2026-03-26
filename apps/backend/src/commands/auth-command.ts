@@ -34,7 +34,23 @@ const COPILOT_SCOPE = "copilot";
 
 export interface AuthCommandOptions {
   clientId?: string;
+  token?: string;
 }
+
+export const COPILOT_SETUP_GUIDE = `  Como configurar o Copilot manualmente:
+
+  1. Abra https://github.com/settings/tokens?type=beta
+  2. Clique "Generate new token"
+  3. De um nome (ex: "agent-bar"), selecione expiration, e crie
+  4. Copie o token e rode:
+
+     agent-bar auth copilot --token ghp_SEU_TOKEN
+
+  5. Verifique:
+
+     agent-bar doctor
+
+`;
 
 export interface AuthCommandDependencies {
   fetchFn?: typeof fetch;
@@ -68,9 +84,44 @@ export async function runAuthCopilotCommand(
   const waitForEnter = dependencies.waitForEnter ?? defaultWaitForEnter;
   const restart = dependencies.restartService ?? defaultRestartService;
 
+  // If --token provided, skip Device Flow entirely and store directly
+  if (options.token) {
+    process.stdout.write("\n  Storing token in GNOME Keyring...\n");
+    await store(COPILOT_SERVICE, COPILOT_ACCOUNT, options.token, COPILOT_LABEL);
+
+    process.stdout.write("  Updating config...\n");
+    const configPath = resolveConfig();
+    await ensureRef(configPath, {
+      store: "secret-tool",
+      service: COPILOT_SERVICE,
+      account: COPILOT_ACCOUNT,
+    });
+
+    process.stdout.write("  Restarting agent-bar service...\n");
+    await restart();
+
+    process.stdout.write("\n\u2713 Authenticated!\n");
+    process.stdout.write(
+      `  Token stored in GNOME Keyring (service=${COPILOT_SERVICE}, account=${COPILOT_ACCOUNT}).\n`,
+    );
+    process.stdout.write(`  Config updated at ${configPath}.\n`);
+    process.stdout.write("  Service restarted.\n\n");
+    process.stdout.write('  Run "agent-bar doctor --json" to verify.\n\n');
+    return;
+  }
+
   process.stdout.write("\n  Requesting device code from GitHub...\n\n");
 
-  const deviceCode = await requestDeviceCode(clientId, COPILOT_SCOPE, fetchFn);
+  let deviceCode;
+  try {
+    deviceCode = await requestDeviceCode(clientId, COPILOT_SCOPE, fetchFn);
+  } catch (deviceError: unknown) {
+    const msg = deviceError instanceof Error ? deviceError.message : String(deviceError);
+    process.stderr.write(`\n  Device Flow falhou: ${msg}\n\n`);
+    process.stderr.write(COPILOT_SETUP_GUIDE);
+    process.exitCode = 1;
+    return;
+  }
 
   process.stdout.write(`! Copy this code: ${deviceCode.user_code}\n`);
   process.stdout.write(`  Then open:      ${deviceCode.verification_uri}\n`);
@@ -120,6 +171,7 @@ export function registerAuthCommand(program: Command): void {
     .command("copilot")
     .description("Authenticate with GitHub Copilot using Device Flow OAuth.")
     .option("--client-id <id>", "GitHub OAuth App client ID (overrides built-in default)")
+    .option("--token <token>", "Store a GitHub token directly (skip Device Flow)")
     .action(async (options: AuthCommandOptions) => {
       try {
         await runAuthCopilotCommand(options);

@@ -282,21 +282,26 @@ fi
 echo ""
 
 # Check for Copilot token
-copilot_token="${COPILOT_TOKEN:-${COPILOT_API_TOKEN:-}}"
-if [[ -z "$copilot_token" ]]; then
-  step_warn "Token do Copilot nao detectado."
-  echo ""
-  echo "  Para configurar o provider Copilot, defina uma das variaveis:"
-  echo ""
-  echo "    export COPILOT_TOKEN=ghp_..."
-  echo "    export COPILOT_API_TOKEN=ghp_..."
-  echo ""
-  echo "  Em seguida, reinstale para capturar a variavel no systemd:"
-  echo ""
-  echo "    pnpm install:ubuntu"
-  echo ""
+if secret-tool lookup service agent-bar account copilot 2>/dev/null | grep -q .; then
+  step_ok "Token do Copilot configurado no GNOME Keyring."
+elif [[ -n "${COPILOT_TOKEN:-${COPILOT_API_TOKEN:-}}" ]]; then
+  step_ok "Token do Copilot detectado via variavel de ambiente."
 else
-  step_ok "Token do Copilot detectado."
+  step_warn "Token do Copilot nao configurado."
+  echo ""
+  echo "  Como configurar o Copilot:"
+  echo ""
+  echo "  1. Abra https://github.com/settings/tokens?type=beta"
+  echo "  2. Clique 'Generate new token'"
+  echo "  3. De um nome (ex: 'agent-bar'), selecione expiration, e crie"
+  echo "  4. Copie o token e rode:"
+  echo ""
+  echo "     agent-bar auth copilot --token ghp_SEU_TOKEN"
+  echo ""
+  echo "  5. Verifique:"
+  echo ""
+  echo "     agent-bar doctor"
+  echo ""
 fi
 
 echo ""

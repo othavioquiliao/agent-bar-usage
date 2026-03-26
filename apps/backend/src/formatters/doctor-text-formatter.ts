@@ -19,6 +19,14 @@ export function formatDoctorAsText(report: DiagnosticsReport): string {
     if (check.status !== "ok" && check.suggested_command) {
       lines.push(`       -> ${check.suggested_command}`);
     }
+    if (check.id === "copilot-token" && check.status !== "ok") {
+      lines.push("");
+      lines.push("       Como configurar:");
+      lines.push("       1. Abra https://github.com/settings/tokens?type=beta");
+      lines.push("       2. Crie um token pessoal");
+      lines.push("       3. Rode: agent-bar auth copilot --token ghp_SEU_TOKEN");
+      lines.push("");
+    }
   }
 
   lines.push("");

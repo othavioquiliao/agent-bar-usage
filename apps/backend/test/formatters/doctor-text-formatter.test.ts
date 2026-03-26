@@ -76,6 +76,44 @@ describe("formatDoctorAsText", () => {
     expect(result).toContain("Agent Bar Doctor");
   });
 
+  it("shows setup guide for copilot-token warn check", () => {
+    const result = formatDoctorAsText({
+      generated_at: "2026-01-01T00:00:00Z",
+      runtime_mode: "cli",
+      checks: [
+        {
+          id: "copilot-token",
+          label: "Copilot token",
+          status: "warn",
+          message: "Not configured",
+          suggested_command: "agent-bar auth copilot",
+        },
+      ],
+    });
+
+    expect(result).toContain("Como configurar:");
+    expect(result).toContain("https://github.com/settings/tokens?type=beta");
+    expect(result).toContain("agent-bar auth copilot --token ghp_SEU_TOKEN");
+  });
+
+  it("does not show setup guide for copilot-token ok check", () => {
+    const result = formatDoctorAsText({
+      generated_at: "2026-01-01T00:00:00Z",
+      runtime_mode: "cli",
+      checks: [
+        {
+          id: "copilot-token",
+          label: "Copilot token",
+          status: "ok",
+          message: "Configured",
+          suggested_command: "agent-bar auth copilot",
+        },
+      ],
+    });
+
+    expect(result).not.toContain("Como configurar:");
+  });
+
   it("formats multiple checks", () => {
     const result = formatDoctorAsText({
       generated_at: "2026-01-01T00:00:00Z",
