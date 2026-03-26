@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: provider reliability
+milestone_name: Provider Reliability
 status: Planning next milestone
-stopped_at: v1.0 archived with accepted gaps
-last_updated: "2026-03-26T14:46:32.760Z"
+stopped_at: Phase 7 context gathered
+last_updated: "2026-03-26T15:12:14.108Z"
 progress:
-  total_phases: 6
-  completed_phases: 5
-  total_plans: 17
-  completed_plans: 12
+  total_phases: 2
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 0
 ---
 
 # Project State
@@ -76,6 +76,10 @@ Recent decisions affecting current work:
 - [Phase 6]: Replace the `script` PTY wrapper with `node-pty` for service-mode Codex and Claude usage
 - [Phase 6]: Add GitHub Device Flow auth plus environment capture for Copilot and installed systemd setups
 
+### Roadmap Evolution
+
+- Phase 7 added: Redesign GNOME extension UI for glanceability, qbar provider icons, and compact progress bars
+
 ### Pending Todos
 
 None yet.
@@ -88,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:24:58.376Z
-Stopped at: v1.0 archived with accepted gaps
-Resume file: .planning/phases/06-provider-reliability/HANDOFF.md
+Last session: 2026-03-26T15:12:14.106Z
+Stopped at: Phase 7 context gathered
+Resume file: .planning/phases/07-redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars/07-CONTEXT.md
