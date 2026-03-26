@@ -56,7 +56,7 @@ echo "Enabled agent-bar.service in the user systemd session"
 mkdir -p "$gnome_ext_dir"
 
 # Copy extension source files (excluding tests, node_modules, and dev configs)
-for item in extension.js metadata.json panel services state utils; do
+for item in extension.js metadata.json stylesheet.css assets panel services state utils; do
   if [[ -e "$gnome_ext_src/$item" ]]; then
     cp -r "$gnome_ext_src/$item" "$gnome_ext_dir/"
   fi
