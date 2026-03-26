@@ -12,7 +12,7 @@ Agent Bar Ubuntu now has an archived `v1.0` baseline and one planned follow-up m
 ## Active Phases
 
 - [ ] **Phase 6: Provider Reliability** - Make all 3 providers work reliably from systemd service with minimal user friction (planned 2026-03-26)
-- [ ] **Phase 7: GNOME Extension UI Redesign** - Improve glanceability with qbar provider icons, compact progress bars, and less menu text (planned 2026-03-26)
+- [x] **Phase 7: GNOME Extension UI Redesign** - Improve glanceability with qbar provider icons, compact progress bars, and less menu text (completed 2026-03-26)
 
 ### Phase 6: Provider Reliability
 **Goal**: Make all three providers work reliably for any user with minimal friction, both from the CLI and from the systemd background service
@@ -30,7 +30,7 @@ Plans:
 |-------|----------------|--------|---------|
 | v1.0 Agent Bar Ubuntu | 12/15 archived | Archived with accepted gaps | 2026-03-26 |
 | 6. Provider Reliability | 0/2 | Planned | 2026-03-26 |
-| 7. GNOME Extension UI Redesign | 2/3 | In Progress | 2026-03-26 |
+| 7. GNOME Extension UI Redesign | 3/3 | Complete | 2026-03-26 |
 
 ### Phase 7: Redesign GNOME extension UI for glanceability, qbar provider icons, and compact progress bars
 
@@ -42,4 +42,4 @@ Plans:
 Plans:
 - [x] 07-01-PLAN.md — package stylesheet, provider icons, and extension install/runtime asset wiring
 - [x] 07-02-PLAN.md — redefine and test the compact indicator/provider-row view-model contract
-- [ ] 07-03-PLAN.md — render the redesigned indicator/menu UI and pause for GNOME Shell verification
+- [x] 07-03-PLAN.md — render the redesigned indicator/menu UI and pause for GNOME Shell verification
