@@ -30,6 +30,10 @@ class Indicator extends PanelMenu.Button {
       text: "",
       style_class: "agent-bar-ubuntu-indicator__label",
     });
+    if (this._label.clutter_text) {
+      this._label.clutter_text.single_line_mode = true;
+      this._label.clutter_text.line_wrap = false;
+    }
 
     this._box.add_child(this._icon);
     this._box.add_child(this._label);
