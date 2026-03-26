@@ -66,4 +66,4 @@ Expected:
 ## Notes
 
 - The code changes and automated tests support the Phase 6 goal, but the final provider-reliability claim still depends on real-machine verification with actual CLI sessions, secrets, and a GitHub OAuth client id.
-- Phase completion should wait for an explicit human approval or a defect list from the Ubuntu host verification.
+- The user explicitly approved phase completion on 2026-03-26 from an Arch machine without running the Ubuntu-host checklist, so the phase can advance while the HUMAN-UAT file remains as pending follow-up evidence.

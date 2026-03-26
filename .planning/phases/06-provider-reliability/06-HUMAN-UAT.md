@@ -3,12 +3,12 @@ status: partial
 phase: 06-provider-reliability
 source: [06-VERIFICATION.md]
 started: 2026-03-26T17:02:16Z
-updated: 2026-03-26T17:02:16Z
+updated: 2026-03-26T17:04:54Z
 ---
 
 ## Current Test
 
-awaiting human testing
+user approved continuation without running the Ubuntu-host checklist from this Arch machine
 
 ## Tests
 
@@ -34,3 +34,5 @@ skipped: 0
 blocked: 0
 
 ## Gaps
+
+- 2026-03-26: Manual Ubuntu-host verification was waived by explicit user approval. Keep this file open as follow-up evidence until someone runs the checklist on a real target machine.
