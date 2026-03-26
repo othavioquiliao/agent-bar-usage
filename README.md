@@ -74,6 +74,8 @@ Passo a passo amigável:
 1. **Não precisa desinstalar a versão antiga antes.**  
    O `pnpm install:ubuntu` agora já instala/atualiza as dependências do workspace, recompila o backend, reinstala o wrapper `agent-bar`, atualiza o serviço systemd e copia a extensão GNOME atual.
 
+   Se durante o install aparecer `sh: 1: tsc: not found` ou `Local package.json exists, but node_modules missing`, isso indica um checkout quebrado do workspace. A versão atual do repo restaura o `pnpm-workspace.yaml`; confirme que esse arquivo existe e rode `pnpm install:ubuntu` de novo.
+
 2. **Se você usa GNOME em Wayland, faça logout/login depois do install.**  
    Isso garante que a extensão carregue a versão nova. Em X11, pode usar `Alt+F2`, digitar `r`, e pressionar Enter.
 

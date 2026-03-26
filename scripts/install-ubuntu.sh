@@ -11,10 +11,21 @@ unit_path="${systemd_dir}/agent-bar.service"
 gnome_ext_src="$repo_root/apps/gnome-extension"
 gnome_ext_uuid="agent-bar-ubuntu@othavio.dev"
 gnome_ext_dir="${HOME}/.local/share/gnome-shell/extensions/${gnome_ext_uuid}"
+workspace_manifest="$repo_root/pnpm-workspace.yaml"
 
 fail() {
   echo "$1" >&2
   exit 1
+}
+
+require_workspace_toolchain() {
+  local package_dir="$1"
+  local binary_name="$2"
+  local binary_path="$package_dir/node_modules/.bin/$binary_name"
+
+  if [[ ! -x "$binary_path" ]]; then
+    fail "Workspace dependencies are incomplete for ${package_dir#$repo_root/}: missing $binary_name in node_modules/.bin. This usually means pnpm did not install the workspace packages correctly. Confirm $workspace_manifest exists, then rerun \`pnpm install:ubuntu\`."
+  fi
 }
 
 if [[ -z "${node_binary}" ]]; then
@@ -26,7 +37,11 @@ if [[ -z "${node_binary}" ]]; then
 fi
 
 if ! command -v pnpm >/dev/null 2>&1; then
-  fail "pnpm is required to install agent-bar. Install pnpm first, then run \`pnpm install\` and \`pnpm install:ubuntu\` again."
+  fail "pnpm is required to install agent-bar. Install pnpm first, then run \`pnpm install:ubuntu\` again."
+fi
+
+if [[ ! -f "$workspace_manifest" ]]; then
+  fail "Missing pnpm workspace manifest at $workspace_manifest. This repo must declare apps/* and packages/* as workspace packages before \`pnpm install:ubuntu\` can build agent-bar."
 fi
 
 # Always bootstrap workspace dependencies before building/installing.
@@ -37,6 +52,9 @@ if [[ -f "$repo_root/pnpm-lock.yaml" ]]; then
 else
   pnpm --dir "$repo_root" install
 fi
+
+require_workspace_toolchain "$repo_root/packages/shared-contract" tsc
+require_workspace_toolchain "$repo_root/apps/backend" tsc
 
 pnpm --dir "$repo_root" build:backend
 
