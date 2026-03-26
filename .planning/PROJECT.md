@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Agent Bar Ubuntu is now an archived `v1.0` Linux-native desktop product baseline that surfaces AI provider usage for Ubuntu users through a Node.js/TypeScript backend and a GNOME Shell extension in GJS. It still treats `CodexBar/` as a brownfield reference for provider-engine ideas, but the Ubuntu runtime, service, and shell integration are owned directly in this repo rather than ported from the macOS app.
+Agent Bar Ubuntu is now an archived `v1.1` Linux-native desktop product baseline that surfaces AI provider usage for Ubuntu users through a Node.js/TypeScript backend and a GNOME Shell extension in GJS. It still treats `CodexBar/` as a brownfield reference for provider-engine ideas, but the Ubuntu runtime, service, and shell integration are owned directly in this repo rather than ported from the macOS app.
 
 ## Core Value
 
@@ -10,21 +10,22 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 
 ## Current State
 
-`v1.0` was archived on 2026-03-26 with the backend contract, Linux config and secrets, first-wave providers, and the first GNOME Shell surface in place. The archive intentionally preserves open delivery-hardening work instead of pretending it shipped complete.
+`v1.1` was archived on 2026-03-26 after two follow-up phases: Phase 6 improved installed-runtime reliability with `node-pty`, Copilot device-flow auth, environment capture, and more actionable diagnostics; Phase 7 redesigned the GNOME extension into a calmer, more glanceable, progress-oriented surface.
 
-Known carried-forward gaps:
+The codebase now includes:
 
-- `OPS-01`: diagnostics and failure-reporting closure
-- `OPS-02`: install and launch documentation closure
-- `OPS-03`: backend-only and GNOME-only debug-loop closure
+- a Node.js/TypeScript backend with CLI and systemd service runtime
+- GNOME Shell extension assets and packaged provider icons
+- Copilot, Codex CLI, and Claude CLI provider paths shaped for Linux installs
+- systemd-oriented runtime hardening and a more compact GNOME usage display
 
-Real-world Ubuntu testing also showed that Copilot, Codex CLI, and Claude CLI are not yet reliable from the installed systemd-backed service path. That reliability work is now the immediate focus of Phase 6.
+The main remaining uncertainty is not code scaffolding but real-host validation breadth: Ubuntu-host verification for `v1.1` was explicitly waived during archival, and future milestone scope still needs to be defined.
 
 ## Next Milestone Goals
 
-- Make Copilot, Codex CLI, and Claude CLI reliable from the systemd service path
-- Reduce installed-setup friction with better auth, environment capture, and doctor guidance
-- Close the carried-forward `v1.0` delivery gaps without weakening the backend/extension contract
+- Define the next milestone with fresh requirements instead of carrying informal scope forward
+- Decide whether the next milestone prioritizes broader production validation, additional Linux surfaces, or more provider/auth depth
+- Close remaining live-host verification evidence and any deployment/documentation gaps that matter for shipping confidence
 
 ## Requirements
 
@@ -38,14 +39,14 @@ Real-world Ubuntu testing also showed that Copilot, Codex CLI, and Claude CLI ar
 - ✓ Support first-wave providers for v1: Copilot, Codex via CLI, and Claude via CLI — v1.0
 - ✓ Provide Ubuntu-friendly configuration and secret handling instead of Apple-specific storage assumptions — v1.0
 - ✓ Deliver a first desktop surface for Ubuntu users through a GNOME Shell extension on Ubuntu 24.04.4 LTS — v1.0
+- ✓ Make installed Ubuntu setups more reliable with service-mode PTY execution, Copilot device auth, environment capture, and better diagnostics — v1.1
+- ✓ Redesign the GNOME extension to be more glanceable with packaged assets, aggregate indicator copy, and compact provider rows — v1.1
 
 ### Active
 
-- [ ] Close carried-forward `v1.0` gaps: `OPS-01`, `OPS-02`, and `OPS-03`
-- [ ] Make all three providers work reliably from the installed systemd service path
-- [ ] Add a lower-friction Copilot auth path for installed Ubuntu setups
-- [ ] Capture enough user environment at install time to make provider CLIs and secrets usable from the service
-- [ ] Define the post-reliability milestone requirements via `$gsd-new-milestone`
+- [ ] Define the next milestone requirements via `$gsd-new-milestone`
+- [ ] Run broader real-host validation on supported Ubuntu targets to convert the remaining UAT evidence into observed behavior
+- [ ] Decide which post-`v1.1` investment matters most: production hardening, new Linux surfaces, or additional provider/auth paths
 
 ### Out of Scope
 
@@ -58,7 +59,7 @@ Real-world Ubuntu testing also showed that Copilot, Codex CLI, and Claude CLI ar
 
 The workspace contains two key inputs for this product direction. First, `CodexBar/` is a nested reference repo with a proven provider model, fetch pipeline, and CLI behavior. Second, `ubuntu-extension-analysis/` captured the decision that Ubuntu should be a CLI/backend-first design with a Linux-native shell on top.
 
-That direction is now implemented as an archived `v1.0` baseline. Backend build/install flow, systemd runtime, and GNOME extension wiring all exist, but Phase 6 investigation showed three concrete production blockers: Codex and Claude still rely on a PTY strategy that fails under systemd, Copilot needs a first-class Linux auth flow, and the installed service needs better environment capture for PATH and secret-store access.
+That direction is now implemented as archived `v1.0` and `v1.1` milestones. The first milestone established the Ubuntu baseline; the second milestone hardened the installed runtime and redesigned the GNOME surface. Remaining risk is concentrated in breadth of real-world Ubuntu validation, not in missing core architecture.
 
 ## Constraints
 
@@ -88,6 +89,7 @@ That direction is now implemented as an archived `v1.0` baseline. Backend build/
 | Archive `v1.0` with accepted gaps instead of holding the milestone open | The user explicitly preferred archival now, with Phase 5 debt and audit debt carried forward | ⚠ Revisit |
 | Use `node-pty` for Codex and Claude service-mode reliability | The `script` wrapper fails without a controlling TTY under systemd | ✓ Good |
 | Add a GitHub Device Flow auth command for Copilot | Installed Linux setups need a first-class token path instead of assuming env vars or external tooling | ✓ Good |
+| Package GNOME UI assets and keep the top bar aggregate-only | Installed extension paths must not depend on repo-relative assets, and glanceability matters more than dense top-bar detail | ✓ Good |
 
 ## Evolution
 
@@ -107,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-26 after archiving v1.0*
+*Last updated: 2026-03-26 after archiving v1.1*

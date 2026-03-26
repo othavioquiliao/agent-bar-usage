@@ -2,44 +2,20 @@
 
 ## Overview
 
-Agent Bar Ubuntu now has an archived `v1.0` baseline and one planned follow-up milestone focused on making the installed runtime reliable for daily Ubuntu use.
+Agent Bar Ubuntu now has two archived milestones: the original Ubuntu product baseline in `v1.0` and the reliability/UI hardening follow-up in `v1.1`. The next milestone has not been defined yet.
 
 ## Milestones
 
 - ✅ **v1.0 Agent Bar Ubuntu** — [archive](./milestones/v1.0-ROADMAP.md) (archived 2026-03-26; 5 phases, 15 plans; accepted gaps: `OPS-01`, `OPS-02`, `OPS-03`)
-- 🚧 **v1.1 Provider Reliability** — Phase 6 (planned)
+- ✅ **v1.1 Provider Reliability** — [archive](./milestones/v1.1-ROADMAP.md) (archived 2026-03-26; 2 phases, 5 plans, 14 tasks)
 
 ## Active Phases
 
-- [x] **Phase 6: Provider Reliability** - Make all 3 providers work reliably from systemd service with minimal user friction (completed 2026-03-26)
-- [x] **Phase 7: GNOME Extension UI Redesign** - Improve glanceability with qbar provider icons, compact progress bars, and less menu text (completed 2026-03-26)
-
-### Phase 6: Provider Reliability
-**Goal**: Make all three providers work reliably for any user with minimal friction, both from the CLI and from the systemd background service
-**Depends on**: v1.0 archived baseline
-**Requirements**: Fresh milestone requirements not yet defined; carries forward `OPS-01`, `OPS-02`, and `OPS-03`
-**Plans**: 2 plans
-
-Plans:
-- [x] 06-01: Replace the `script` PTY wrapper with `node-pty` for Codex and Claude service-mode usage
-- [x] 06-02: Add Copilot auth flow, service environment capture, and actionable doctor guidance
+No active phases. Start the next milestone with `$gsd-new-milestone`.
 
 ## Progress
 
 | Scope | Plans Complete | Status | Updated |
 |-------|----------------|--------|---------|
 | v1.0 Agent Bar Ubuntu | 12/15 archived | Archived with accepted gaps | 2026-03-26 |
-| 6. Provider Reliability | 2/2 | Complete   | 2026-03-26 |
-| 7. GNOME Extension UI Redesign | 3/3 | Complete | 2026-03-26 |
-
-### Phase 7: Redesign GNOME extension UI for glanceability, qbar provider icons, and compact progress bars
-
-**Goal:** Redesign the GNOME extension indicator and menu so provider usage is glanceable, icon-led, and progress-bar driven without adding text-heavy diagnostics to the default scan path
-**Requirements**: Use `07-CONTEXT.md` and `07-UI-SPEC.md` as the source of truth for visual and interaction decisions
-**Depends on:** Phase 6
-**Plans:** 3/3 plans complete
-
-Plans:
-- [x] 07-01-PLAN.md — package stylesheet, provider icons, and extension install/runtime asset wiring
-- [x] 07-02-PLAN.md — redefine and test the compact indicator/provider-row view-model contract
-- [x] 07-03-PLAN.md — render the redesigned indicator/menu UI and pause for GNOME Shell verification
+| v1.1 Provider Reliability | 5/5 | Archived | 2026-03-26 |
