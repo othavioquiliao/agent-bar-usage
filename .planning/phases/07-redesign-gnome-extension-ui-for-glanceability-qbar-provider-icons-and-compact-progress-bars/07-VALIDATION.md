@@ -19,18 +19,18 @@ created: 2026-03-26
 |----------|-------|
 | **Framework** | Vitest 3.2.4 |
 | **Config file** | `apps/gnome-extension/vitest.config.ts` |
-| **Quick run command** | `pnpm --filter gnome-extension exec vitest run test/view-model.test.js --config vitest.config.ts` |
+| **Quick run command** | `pnpm --filter gnome-extension exec vitest run test/view-model.test.js test/provider-row.test.js test/polling-service.test.js --config vitest.config.ts` |
 | **Full suite command** | `pnpm test:gnome` |
-| **Estimated runtime** | ~45 seconds |
+| **Estimated runtime** | ~25 seconds |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `pnpm --filter gnome-extension exec vitest run test/view-model.test.js --config vitest.config.ts`
+- **After every task commit:** Run the task-specific command from the map below, keeping the default targeted smoke suite under 30 seconds: `pnpm --filter gnome-extension exec vitest run test/view-model.test.js test/provider-row.test.js test/polling-service.test.js --config vitest.config.ts`
 - **After every plan wave:** Run `pnpm test:gnome`
 - **Before `$gsd-verify-work`:** Full extension tests plus one live GNOME 46 smoke pass must be green
-- **Max feedback latency:** 45 seconds
+- **Max feedback latency:** 25 seconds
 
 ---
 
@@ -39,11 +39,13 @@ created: 2026-03-26
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 7-01-01 | 01 | 0 | UI redesign summary contract | unit | `pnpm --filter gnome-extension exec vitest run test/view-model.test.js --config vitest.config.ts` | ✅ | ⬜ pending |
-| 7-01-03 | 01 | 0 | Install payload and GNOME smoke prerequisites | script/preflight | `bash scripts/verify-gnome-wave0.sh` | ✅ planned | ⬜ pending |
+| 7-01-02 | 01 | 0 | Install/runtime wiring for stylesheet and assets | static | `rg -n "load_stylesheet|unload_stylesheet|stylesheet\\.css|assets|panel|services|state|utils" apps/gnome-extension/extension.js scripts/install-ubuntu.sh` | ✅ | ⬜ pending |
+| 7-01-03 | 01 | 0 | Source-tree preflight before install | script/preflight | `bash scripts/verify-gnome-wave0.sh --source-only` | ✅ planned | ⬜ pending |
 | 7-02-01 | 02 | 1 | Compact provider row view model and progress semantics | unit | `pnpm --filter gnome-extension exec vitest run test/view-model.test.js --config vitest.config.ts` | ✅ | ⬜ pending |
 | 7-02-02 | 02 | 1 | Refresh remains single-flight while loading | unit | `pnpm --filter gnome-extension exec vitest run test/polling-service.test.js --config vitest.config.ts` | ✅ | ⬜ pending |
-| 7-03-01 | 03 | 2 | Packaged stylesheet and assets ship in install flow | integration/script | `bash scripts/install-ubuntu.sh` on a GNOME host, then inspect ~/.local/share/gnome-shell/extensions/agent-bar-ubuntu@othavio.dev/` | ❌ W0 | ⬜ pending |
-| 7-03-02 | 03 | 2 | Styled provider rows and icons render correctly in GNOME Shell 46 | manual smoke | `dbus-run-session gnome-shell --nested --wayland`, then `gnome-extensions enable agent-bar-ubuntu@othavio.dev` | ❌ W0 | ⬜ pending |
+| 7-03-01 | 03 | 2 | Structured provider-row layout and progress rendering seam | unit | `pnpm --filter gnome-extension exec vitest run test/provider-row.test.js test/polling-service.test.js --config vitest.config.ts` | ✅ planned | ⬜ pending |
+| 7-03-02 | 03 | 2 | Aggregate-only top-bar indicator contract | static | `rg -n "buildIndicatorSummaryViewModel|rebuildMenu|_label\\.visible|system-status-icon" apps/gnome-extension/panel/indicator.js` | ✅ | ⬜ pending |
+| 7-03-03 | 03 | 2 | Post-install payload verification after extension install | integration/script | `pnpm install:ubuntu && bash scripts/verify-gnome-wave0.sh --post-install` | ✅ planned | ⬜ pending |
 
 *Status: ⬜ pending - ✅ green - ❌ red - ⚠️ flaky*
 
@@ -56,6 +58,7 @@ created: 2026-03-26
 - [ ] source-tree preflight for `stylesheet.css`, packaged `assets/`, and no repo-relative icon fallback
 - [ ] post-install assertion for `stylesheet.css` and packaged `assets/` copy behavior
 - [ ] local `pnpm` availability so repo-standard GNOME extension test commands can actually run
+- [ ] GNOME binary availability check moved to post-install/manual verification instead of source-only preflight
 - [ ] GNOME 46 smoke checklist covering icon loading, compact row layout, progress bars, and refresh-state behavior
 
 ---
@@ -65,8 +68,8 @@ created: 2026-03-26
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
 | Provider rows remain scannable inside a real GNOME Shell popup | UI redesign summary contract | Node tests cannot validate shell spacing, focus, or popup clipping | Install the extension on GNOME 46, open the menu with healthy and failing provider snapshots, and confirm the provider list is the primary scan target while summary/details/action remain secondary |
-| Packaged icons resolve from the installed extension instead of the repo checkout | Packaged asset strategy | File-backed icon loading depends on installed extension paths | After install, disconnect the repo checkout path from the running extension context and confirm Claude/Codex icons still render |
-| Progress bars expand and align correctly on GNOME 46 | Compact progress visualization | `St.Bin` expansion behavior changed in GNOME 46 and is shell-specific | Validate one healthy and one error-state provider row in a GNOME 46 session; confirm bars size correctly and do not collapse |
+| Packaged icons resolve from the installed extension instead of the repo checkout | Packaged asset strategy | File-backed icon loading depends on installed extension paths | After `pnpm install:ubuntu` and `bash scripts/verify-gnome-wave0.sh --post-install`, confirm Claude/Codex icons still render from `~/.local/share/gnome-shell/extensions/agent-bar-ubuntu@othavio.dev/assets/` without any repo-relative fallback |
+| Progress bars expand and align correctly on GNOME 46 | Compact progress visualization | `St.Bin` expansion behavior changed in GNOME 46 and is shell-specific | After install and post-install verification, validate one healthy and one error-state provider row in a GNOME 46 session; confirm bars size correctly and do not collapse |
 
 ---
 
