@@ -53,7 +53,8 @@ created: 2026-03-26
 
 - [ ] `apps/gnome-extension/test/view-model.test.js` - cover aggregate ratio/issue summary, progress clamping, and secondary-line prioritization
 - [ ] `apps/gnome-extension/test/provider-row.test.js` or equivalent pure seam - cover row composition rules if `provider-row.js` gains non-trivial helper logic
-- [ ] install-flow assertion for `stylesheet.css` and packaged `assets/` copy behavior
+- [ ] source-tree preflight for `stylesheet.css`, packaged `assets/`, and no repo-relative icon fallback
+- [ ] post-install assertion for `stylesheet.css` and packaged `assets/` copy behavior
 - [ ] local `pnpm` availability so repo-standard GNOME extension test commands can actually run
 - [ ] GNOME 46 smoke checklist covering icon loading, compact row layout, progress bars, and refresh-state behavior
 
