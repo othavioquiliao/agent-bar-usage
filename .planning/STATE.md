@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Provider Reliability
-status: Phase complete — ready for verification
+status: Ready to execute
 stopped_at: Completed 07-03-PLAN.md
 last_updated: "2026-03-26T16:37:54.924Z"
 progress:
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 07 — redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars (complete, ready for verification)
+**Current focus:** Phase 6 — Provider Reliability
 
 ## Current Position
 
-Phase: 07 (redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars) — COMPLETE
-Plan: All 3 plans complete
+Phase: 06 (provider-reliability) — PLANNED
+Plan: 1 of 2 not started
 
 ## Performance Metrics
 
