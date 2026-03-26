@@ -3,9 +3,10 @@ import type { ProviderAdapterContext } from "../src/core/provider-adapter.js";
 import { createCodexCliAdapter } from "../src/providers/codex/codex-cli-adapter.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
 
-const { runInteractiveCommandMock, resolveCommandInPathMock } = vi.hoisted(() => ({
+const { runInteractiveCommandMock, resolveCommandInPathMock, fetchCodexUsageViaAppServerMock } = vi.hoisted(() => ({
   runInteractiveCommandMock: vi.fn(),
   resolveCommandInPathMock: vi.fn(),
+  fetchCodexUsageViaAppServerMock: vi.fn(),
 }));
 
 vi.mock("../src/providers/shared/interactive-command.js", async () => {
@@ -30,11 +31,26 @@ vi.mock("../src/utils/subprocess.js", async () => {
   };
 });
 
+vi.mock("../src/providers/codex/codex-appserver-fetcher.js", () => ({
+  fetchCodexUsageViaAppServer: fetchCodexUsageViaAppServerMock,
+}));
+
 describe("Codex CLI provider", () => {
   beforeEach(() => {
     runInteractiveCommandMock.mockReset();
     resolveCommandInPathMock.mockReset();
+    fetchCodexUsageViaAppServerMock.mockReset();
     resolveCommandInPathMock.mockReturnValue(null);
+    // Default: app-server reports CLI missing, so adapter falls through to PTY path
+    fetchCodexUsageViaAppServerMock.mockResolvedValue({
+      provider: "codex",
+      status: "error",
+      source: "api",
+      updated_at: new Date().toISOString(),
+      usage: null,
+      reset_window: null,
+      error: { code: "codex_cli_missing", message: "Codex CLI not found on PATH.", retryable: false },
+    });
   });
 
   afterAll(() => {
