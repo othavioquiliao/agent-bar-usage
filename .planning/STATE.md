@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Provider Reliability
-status: Executing Phase 06
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-03-26T16:55:35.295Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-03-26T16:58:41.632Z"
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 06 (provider-reliability) — EXECUTING
-Plan: 2 of 2
+Phase: 06 (provider-reliability) — COMPLETE
+Plan: 2 of 2 (ready for verification)
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Plan: 2 of 2
 | Phase 07 P02 | 2 min | 2 tasks | 4 files |
 | Phase 07 P03 | 10 min | 3 tasks | 7 files |
 | Phase 06 P01 | 6 min | 3 tasks | 8 files |
+| Phase 06 P02 | 2 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - [Phase 07]: Treat the resumed human checkpoint response approved as the required live GNOME Shell sign-off for Task 3.
 - [Phase 06]: Use node-pty as the single PTY execution path for service-mode Codex and Claude fetchers.
 - [Phase 06]: Keep the shared PTY runner aligned with SubprocessError semantics so existing provider error mapping continues to work.
+- [Phase 06]: Copilot auth resolves its GitHub OAuth client id from --client-id or AGENT_BAR_GITHUB_CLIENT_ID so the flow is testable before a production app id is registered.
+- [Phase 06]: Doctor treats node-pty and the systemd env drop-in as first-class runtime prerequisites and suggests direct fix commands instead of verification commands.
 
 ### Roadmap Evolution
 
@@ -100,13 +103,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- Copilot auth and installed environment capture still block full provider reliability from the systemd service path
 - Live service verification still depends on local provider configuration and tokens being present on each machine
 - Provider token/session prerequisites may vary per machine and must map to structured provider-level failures
 - Browser-cookie-based parity work remains intentionally deferred
 
 ## Session Continuity
 
-Last session: 2026-03-26T16:55:35.295Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-03-26T16:58:41.629Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
