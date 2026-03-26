@@ -67,13 +67,29 @@ function formatDiagnosticsSummary(providerSnapshot) {
   return null;
 }
 
+const ERROR_CODE_COMMANDS = {
+  copilot_token_missing: "agent-bar auth copilot",
+  claude_auth_expired: "claude auth login",
+  claude_cli_missing: "npm i -g @anthropic-ai/claude-code",
+  claude_cli_failed: "agent-bar doctor",
+  codex_cli_missing: "npm i -g @openai/codex",
+  codex_cli_failed: "agent-bar doctor",
+  codex_pty_unavailable: "sudo apt install build-essential python3 && pnpm install",
+  secret_store_unavailable: "sudo apt install libsecret-tools",
+};
+
 function formatSuggestedCommand(providerSnapshot) {
   if (!providerSnapshot) {
     return null;
   }
 
+  const code = providerSnapshot.error?.code;
+  if (code && ERROR_CODE_COMMANDS[code]) {
+    return `Run: ${ERROR_CODE_COMMANDS[code]}`;
+  }
+
   if (providerSnapshot.error || (providerSnapshot.diagnostics?.attempts?.length ?? 0) > 0) {
-    return "Suggested command: agent-bar doctor --json";
+    return "Run: agent-bar doctor";
   }
 
   return null;
