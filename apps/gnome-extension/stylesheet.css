@@ -1,0 +1,120 @@
+.agent-bar-ubuntu-summary-row,
+.agent-bar-ubuntu-provider-row,
+.agent-bar-ubuntu-details {
+  color: #c0c9d4;
+}
+
+.agent-bar-ubuntu-summary-row {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: #1f2329;
+}
+
+.agent-bar-ubuntu-provider-row {
+  padding: 8px 16px;
+  border-radius: 12px;
+  background-color: #242a33;
+  transition-duration: 120ms;
+}
+
+.agent-bar-ubuntu-provider-row:hover,
+.agent-bar-ubuntu-provider-row:focus {
+  background-color: rgba(192, 201, 212, 0.04);
+}
+
+.agent-bar-ubuntu-provider-row--ok .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--healthy .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--connected .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--ready .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--success .agent-bar-ubuntu-provider-label {
+  color: #98c379;
+}
+
+.agent-bar-ubuntu-provider-row--warning .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--degraded .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--stale .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--limited .agent-bar-ubuntu-provider-label {
+  color: #d19a66;
+}
+
+.agent-bar-ubuntu-provider-row--copilot .agent-bar-ubuntu-provider-badge {
+  color: #61afef;
+}
+
+.agent-bar-ubuntu-provider-row--error .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--offline .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--failed .agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-row--unavailable .agent-bar-ubuntu-provider-label {
+  color: #e06c75;
+}
+
+.agent-bar-ubuntu-provider-slot {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 4px;
+  border-radius: 999px;
+  background-color: rgba(192, 201, 212, 0.04);
+}
+
+.agent-bar-ubuntu-provider-icon {
+  min-width: 16px;
+  min-height: 16px;
+}
+
+.agent-bar-ubuntu-provider-badge {
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 999px;
+  background-color: rgba(97, 175, 239, 0.14);
+  color: #61afef;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 2px 0;
+}
+
+.agent-bar-ubuntu-provider-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.agent-bar-ubuntu-provider-label,
+.agent-bar-ubuntu-provider-meta,
+.agent-bar-ubuntu-details {
+  font-size: 12px;
+}
+
+.agent-bar-ubuntu-provider-meta,
+.agent-bar-ubuntu-details {
+  color: rgba(192, 201, 212, 0.78);
+}
+
+.agent-bar-ubuntu-progress {
+  min-height: 4px;
+  border-radius: 999px;
+  background-color: rgba(36, 42, 51, 0.95);
+}
+
+.agent-bar-ubuntu-progress-fill {
+  min-height: 4px;
+  border-radius: 999px;
+  background-color: #98c379;
+}
+
+.agent-bar-ubuntu-progress-fill--claude {
+  background-color: #d19a66;
+}
+
+.agent-bar-ubuntu-progress-fill--codex,
+.agent-bar-ubuntu-progress-fill--ok {
+  background-color: #98c379;
+}
+
+.agent-bar-ubuntu-progress-fill--copilot,
+.agent-bar-ubuntu-progress-fill--info {
+  background-color: #61afef;
+}
+
+.agent-bar-ubuntu-progress-fill--error {
+  background-color: #e06c75;
+}
