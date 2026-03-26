@@ -1,7 +1,7 @@
 import { applyLoadingState, applySnapshotError, applySnapshotSuccess, createInitialState } from "../state/extension-state.js";
 import { formatLastUpdatedText } from "../utils/time.js";
 
-const DEFAULT_INTERVAL_MS = 30_000;
+const DEFAULT_INTERVAL_MS = 150_000;
 
 function defaultScheduler() {
   return {

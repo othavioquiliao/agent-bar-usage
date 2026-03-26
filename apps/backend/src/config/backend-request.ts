@@ -1,6 +1,6 @@
 import { refreshRequestSchema, type ProviderId, type ProviderSourceMode, type RefreshRequest } from "shared-contract";
 
-export const DEFAULT_TTL_SECONDS = 30;
+export const DEFAULT_TTL_SECONDS = 150;
 
 export interface BackendRequest {
   providers: ProviderId[] | null;
