@@ -30,7 +30,7 @@ Plans:
 |-------|----------------|--------|---------|
 | v1.0 Agent Bar Ubuntu | 12/15 archived | Archived with accepted gaps | 2026-03-26 |
 | 6. Provider Reliability | 0/2 | Planned | 2026-03-26 |
-| 7. GNOME Extension UI Redesign | 0/0 | Planned | 2026-03-26 |
+| 7. GNOME Extension UI Redesign | 1/3 | In Progress | 2026-03-26 |
 
 ### Phase 7: Redesign GNOME extension UI for glanceability, qbar provider icons, and compact progress bars
 
@@ -40,6 +40,6 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — package stylesheet, provider icons, and extension install/runtime asset wiring
+- [x] 07-01-PLAN.md — package stylesheet, provider icons, and extension install/runtime asset wiring
 - [ ] 07-02-PLAN.md — redefine and test the compact indicator/provider-row view-model contract
 - [ ] 07-03-PLAN.md — render the redesigned indicator/menu UI and pause for GNOME Shell verification

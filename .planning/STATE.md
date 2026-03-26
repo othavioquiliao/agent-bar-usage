@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Provider Reliability
-status: Planning next milestone
-stopped_at: Phase 7 UI-SPEC approved
-last_updated: "2026-03-26T15:20:00.038Z"
+status: Ready to execute
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-03-26T16:17:36.292Z"
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 2
-  completed_plans: 0
+  total_plans: 5
+  completed_plans: 2
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 6 — provider-reliability
+**Current focus:** Phase 07 — redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars
 
 ## Current Position
 
-Phase: 6
-Plan: Planning complete, execution not started
+Phase: 07 (redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars) — EXECUTING
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -48,6 +48,8 @@ Plan: Planning complete, execution not started
 
 - Last 5 plans: 5/5 complete
 - Trend: Improving
+
+| Phase 07 P01 | 4 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -75,6 +77,8 @@ Recent decisions affecting current work:
 - [Milestone]: `v1.0` was archived with accepted `OPS-01`/`OPS-02`/`OPS-03` gaps at user request
 - [Phase 6]: Replace the `script` PTY wrapper with `node-pty` for service-mode Codex and Claude usage
 - [Phase 6]: Add GitHub Device Flow auth plus environment capture for Copilot and installed systemd setups
+- [Phase 07]: Package Phase 7 stylesheet and provider icons inside the GNOME extension instead of resolving qbar assets from the repo at runtime
+- [Phase 07]: Split Wave 0 verification into source-only and post-install modes so packaging checks do not require GNOME host binaries before install
 
 ### Roadmap Evolution
 
@@ -92,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T15:20:00.037Z
-Stopped at: Phase 7 UI-SPEC approved
-Resume file: .planning/phases/07-redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars/07-UI-SPEC.md
+Last session: 2026-03-26T16:17:06.507Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None
