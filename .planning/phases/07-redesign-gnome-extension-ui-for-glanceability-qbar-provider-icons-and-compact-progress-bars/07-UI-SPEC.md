@@ -1,10 +1,11 @@
 ---
 phase: 07
 slug: redesign-gnome-extension-ui-for-glanceability-qbar-provider-icons-and-compact-progress-bars
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-03-26
+reviewed_at: 2026-03-26T12:19:22-03:00
 ---
 
 # Phase 07 - UI Design Contract
@@ -118,6 +119,7 @@ Rules:
 | Action row | Refresh Now / Refreshing... | Keep as the final action; disable while a refresh is in flight |
 
 Rules:
+- The provider list is the primary scan target, the summary row is secondary context, and the details/action rows are tertiary support.
 - Remove paragraph-like status prose from the top of the menu.
 - Section labels should be brief and optional; if used, keep them single-line and muted.
 - The menu should fit quick scanning in one open-close cycle without forcing reading of wrapped paragraphs.
@@ -195,4 +197,4 @@ Rules:
 - [ ] Dimension 5 Spacing: PASS
 - [ ] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved
