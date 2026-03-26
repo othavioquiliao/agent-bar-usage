@@ -91,6 +91,7 @@ export function createPollingService({
         }
 
         emit(applySnapshotError(state, error));
+        throw error;
       })
       .finally(() => {
         if (inFlightPromise === refreshPromise) {

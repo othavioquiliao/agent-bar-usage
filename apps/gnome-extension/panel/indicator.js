@@ -15,6 +15,7 @@ class Indicator extends PanelMenu.Button {
     this._extension = extension;
     this._state = state;
     this._refreshHandler = onRefreshNow;
+    this.menu._agentBarExtension = extension;
 
     this._box = new St.BoxLayout({
       style_class: "agent-bar-ubuntu-indicator",
@@ -52,12 +53,14 @@ class Indicator extends PanelMenu.Button {
     this._icon.icon_name = summary.iconName;
     this._label.text = summary.labelText ?? "";
     this._label.visible = Boolean(summary.labelText);
+    this.menu._agentBarExtension = this._extension;
     rebuildMenu(this.menu, this._state, {
       onRefresh: this._refreshHandler,
     });
   }
 
   destroy() {
+    this.menu._agentBarExtension = null;
     this._extension = null;
     this._refreshHandler = null;
     this._state = null;
