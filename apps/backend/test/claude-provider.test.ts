@@ -3,9 +3,10 @@ import type { ProviderAdapterContext } from "../src/core/provider-adapter.js";
 import { createClaudeCliAdapter } from "../src/providers/claude/claude-cli-adapter.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
 
-const { runInteractiveCommandMock, resolveCommandInPathMock } = vi.hoisted(() => ({
+const { runInteractiveCommandMock, resolveCommandInPathMock, readClaudeCredentialsMock } = vi.hoisted(() => ({
   runInteractiveCommandMock: vi.fn(),
   resolveCommandInPathMock: vi.fn(),
+  readClaudeCredentialsMock: vi.fn(),
 }));
 
 vi.mock("../src/providers/shared/interactive-command.js", async () => {
@@ -30,11 +31,18 @@ vi.mock("../src/utils/subprocess.js", async () => {
   };
 });
 
+vi.mock("../src/providers/claude/claude-credentials.js", () => ({
+  readClaudeCredentials: readClaudeCredentialsMock,
+}));
+
 describe("Claude CLI provider", () => {
   beforeEach(() => {
     runInteractiveCommandMock.mockReset();
     resolveCommandInPathMock.mockReset();
+    readClaudeCredentialsMock.mockReset();
     resolveCommandInPathMock.mockReturnValue(null);
+    // Default: no credentials on disk, so adapter falls back to PTY
+    readClaudeCredentialsMock.mockResolvedValue(null);
   });
 
   afterAll(() => {
