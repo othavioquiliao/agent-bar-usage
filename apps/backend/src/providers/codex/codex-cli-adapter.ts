@@ -6,7 +6,7 @@ import { fetchCodexUsage } from "./codex-cli-fetcher.js";
 export function createCodexCliAdapter(): ProviderAdapter {
   return {
     id: "codex",
-    defaultSourceMode: "cli",
+    defaultSourceMode: "auto",
     async isAvailable(context: ProviderAdapterContext): Promise<boolean> {
       return context.sourceMode === "cli" || context.sourceMode === "auto";
     },

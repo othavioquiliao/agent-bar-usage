@@ -38,9 +38,28 @@ agent-bar doctor --json
 | Error | Cause | Fix |
 |---|---|---|
 | `copilot_token_missing` | No GitHub token in environment | Set `GITHUB_TOKEN` env var (see README) |
-| `codex_cli_failed` | Codex CLI not found or script wrapper failed | Ensure `codex` is on PATH, run `codex login` |
-| `claude_cli_failed` | Claude CLI not found or script wrapper failed | Ensure `claude` is on PATH |
+| `claude_cli_removed` | Config usa `sourceMode: "cli"` (PTY removido) | Mude para `"auto"` ou `"api"` no config |
+| `codex_cli_deprecated` | Config usa `sourceMode: "cli"` (PTY depreciado) | Mude para `"auto"` no config |
+| `claude_cli_missing` | Credenciais OAuth ausentes | Rode qualquer comando `claude` para gerar `~/.claude/.credentials.json` |
+| `claude_auth_expired` | Token OAuth expirou | Rode qualquer comando `claude` para renovar |
+| `codex_cli_failed` | Codex app-server falhou | Verifique `codex --version`, rode `codex login` |
 | `secret-tool` missing | `libsecret-tools` not installed | `sudo apt install libsecret-tools` |
+
+### Erros de sourceMode antigo
+
+Se voce atualizou o Agent Bar mas o config local (`~/.config/agent-bar/config.json`) ainda
+tem `sourceMode: "cli"` para Codex ou Claude, os providers vao falhar com erros
+`claude_cli_removed` ou `codex_cli_deprecated`.
+
+```bash
+# Corrija deletando o config (usa os novos defaults)
+rm ~/.config/agent-bar/config.json
+systemctl --user restart agent-bar.service
+
+# Ou edite manualmente: mude "cli" para "auto"
+nano ~/.config/agent-bar/config.json
+systemctl --user restart agent-bar.service
+```
 
 ## Extension doesn't appear in topbar
 
@@ -96,16 +115,24 @@ pnpm install:ubuntu
 
 ## Snapshot takes 20+ seconds
 
-The service socket is missing or the service isn't responding. The CLI falls back to direct provider fetching which is slow.
+O servico socket nao esta respondendo, e o CLI esta fazendo fallback direto para os providers.
+
+Causas comuns:
+- **Config com `sourceMode: "cli"`**: Os fetchers PTY antigos travam por 12-20s antes de dar timeout. Mude para `"auto"`.
+- **Socket ausente**: O servico precisa ser reiniciado.
 
 ```bash
-# Restart the service to recreate the socket
+# 1. Verifique o config
+cat ~/.config/agent-bar/config.json
+# Se codex ou claude tem "cli", mude para "auto"
+
+# 2. Restart the service to recreate the socket
 systemctl --user restart agent-bar.service
 
-# Verify socket exists
+# 3. Verify socket exists
 ls /run/user/1000/agent-bar/service.sock
 
-# Test speed (should be < 1 second)
+# 4. Test speed (should be < 1 second)
 time agent-bar service snapshot --json
 ```
 

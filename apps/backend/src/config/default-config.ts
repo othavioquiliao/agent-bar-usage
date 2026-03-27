@@ -15,12 +15,12 @@ export function createDefaultConfig(): BackendConfig {
       {
         id: "codex",
         enabled: true,
-        sourceMode: "cli",
+        sourceMode: "auto",
       },
       {
         id: "claude",
         enabled: true,
-        sourceMode: "cli",
+        sourceMode: "auto",
       },
     ],
   };

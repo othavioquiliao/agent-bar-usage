@@ -45,12 +45,12 @@ describe("backend config loader", () => {
       {
         id: "codex",
         enabled: true,
-        sourceMode: "cli",
+        sourceMode: "auto",
       },
       {
         id: "claude",
         enabled: true,
-        sourceMode: "cli",
+        sourceMode: "auto",
       },
     ]);
   });
@@ -115,7 +115,7 @@ describe("backend config loader", () => {
     }
 
     expect(loaded.config.providers.find((p) => p.id === "claude")?.enabled).toBe(true);
-    expect(loaded.config.providers.find((p) => p.id === "claude")?.sourceMode).toBe("cli");
+    expect(loaded.config.providers.find((p) => p.id === "claude")?.sourceMode).toBe("auto");
   });
 
   it("respects enabled: false to disable a provider", async () => {

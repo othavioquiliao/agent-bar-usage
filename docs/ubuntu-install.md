@@ -81,6 +81,35 @@ pnpm install:ubuntu
 # Then logout/login to reload the extension
 ```
 
+### Atualizando de versoes com sourceMode "cli"
+
+Se voce instalou o Agent Bar antes de marco/2026, o config local provavelmente usa
+`sourceMode: "cli"` para Codex e Claude. Esse modo dependia de sessoes PTY interativas
+que **nao funcionam mais** com as versoes atuais dos CLIs.
+
+Apos `pnpm install:ubuntu`, atualize o config:
+
+```bash
+# Opcao 1: Delete o config para usar os novos defaults (auto)
+rm ~/.config/agent-bar/config.json
+
+# Opcao 2: Edite manualmente
+# Mude "sourceMode": "cli" para "sourceMode": "auto" nos providers codex e claude
+nano ~/.config/agent-bar/config.json
+```
+
+Depois reinicie o servico:
+
+```bash
+systemctl --user restart agent-bar.service
+agent-bar usage   # Deve mostrar todos os providers com status ok
+```
+
+**O que mudou:**
+- **Claude** agora usa API HTTP (`api.anthropic.com/api/oauth/usage`) — o fetcher PTY (`/usage`) foi removido
+- **Codex** agora usa `codex app-server` (JSON-RPC) — o fetcher PTY (`/status`) foi depreciado
+- **Copilot** continua usando API GitHub (sem mudanca)
+
 ## Troubleshooting
 
 If you hit one of these during `pnpm install:ubuntu`:

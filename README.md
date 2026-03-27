@@ -52,93 +52,83 @@ agent-bar service status --json
 
 After login, the Agent Bar indicator appears in the GNOME topbar.
 
-## Para Testar
+## Atualizando de uma versao anterior
 
-Se a pessoa **já tinha o Agent Bar instalado**, estava numa versão anterior, e **acabou de rodar `git pull`** para trazer esta versão atual, o caminho mais simples é este:
+Se voce **ja tinha o Agent Bar instalado** e quer atualizar:
 
 ```bash
-# 1. Reinstale a versão atual no sistema
+# 1. Puxe as mudancas
+git pull
+
+# 2. Reinstale
 pnpm install:ubuntu
 
-# 2. Reinicie o serviço do usuário
+# 3. Atualize o config local (importante!)
+#    Versoes anteriores usavam sourceMode "cli" para Codex e Claude.
+#    Agora o padrao e "auto" (usa API/app-server em vez de PTY interativo).
+#    Se o seu config ainda tem "cli", atualize:
+cat ~/.config/agent-bar/config.json
+#    Mude "sourceMode": "cli" para "sourceMode": "auto" nos providers codex e claude.
+
+# 4. Reinicie o servico
 systemctl --user restart agent-bar.service
 
-# 3. Faça a checagem básica
+# 5. Verifique
 agent-bar doctor --json
-agent-bar service status --json
-agent-bar service snapshot --json
+agent-bar usage
 ```
 
-Passo a passo amigável:
+### Por que atualizar o config?
 
-1. **Não precisa desinstalar a versão antiga antes.**  
-   O `pnpm install:ubuntu` agora já instala/atualiza as dependências do workspace, recompila o backend, reinstala o wrapper `agent-bar`, atualiza o serviço systemd e copia a extensão GNOME atual.
+Versoes anteriores usavam `sourceMode: "cli"` que dependia de sessoes PTY interativas
+(`/usage` no Claude, `/status` no Codex). Esses comandos **nao existem mais** nas versoes
+atuais dos CLIs (Claude v2.1+ e Codex v0.117+), causando timeouts.
 
-   Se durante o install aparecer `sh: 1: tsc: not found` ou `Local package.json exists, but node_modules missing`, isso indica um checkout quebrado do workspace. A versão atual do repo restaura o `pnpm-workspace.yaml`; confirme que esse arquivo existe e rode `pnpm install:ubuntu` de novo.
+A versao atual usa caminhos mais robustos:
+- **Claude**: API HTTP via OAuth credentials (`~/.claude/.credentials.json`)
+- **Codex**: app-server JSON-RPC (`codex app-server`)
+- **Copilot**: API GitHub (sem mudanca)
 
-2. **Se você usa GNOME em Wayland, faça logout/login depois do install.**  
-   Isso garante que a extensão carregue a versão nova. Em X11, pode usar `Alt+F2`, digitar `r`, e pressionar Enter.
+Se o seu `~/.config/agent-bar/config.json` ainda tem `"sourceMode": "cli"`, o Agent Bar
+vai ignorar esses caminhos novos e tentar o PTY antigo (que vai falhar).
 
-3. **Se o `doctor` reclamar de dependências ou ambiente, resolva isso primeiro.**  
-   O fluxo normal agora é usar o que ele sugerir diretamente. Exemplo comum:
+### Passo a passo completo
+
+1. **Nao precisa desinstalar a versao antiga.** O `pnpm install:ubuntu` atualiza tudo.
+
+2. **Atualize o config** se ele existir com sourceModes antigos:
 
    ```bash
-   sudo apt install libsecret-tools
+   # Veja o config atual
+   cat ~/.config/agent-bar/config.json
+
+   # Se codex ou claude tem "sourceMode": "cli", edite para "auto":
+   # Ou delete o config para usar os novos defaults:
+   rm ~/.config/agent-bar/config.json
    ```
 
-4. **Se você quiser testar o Copilot na versão nova, use o comando novo de auth.**
+3. **Em Wayland, faca logout/login** para recarregar a extensao GNOME.
+
+4. **Se o `doctor` reclamar de dependencias**, resolva antes:
+
+   ```bash
+   sudo apt install libsecret-tools   # se secret-tool estiver faltando
+   ```
+
+5. **Para Copilot, use o comando de auth:**
 
    ```bash
    agent-bar auth copilot --client-id <github-oauth-client-id>
    ```
 
-   Isso salva o token no GNOME Keyring e atualiza a configuração do backend.
+   O `client-id` vem de um GitHub OAuth App (`GitHub -> Settings -> Developer settings -> OAuth Apps`).
 
-   De onde vem esse `client id`:
-
-   - Se o projeto/time já te passou um `GitHub OAuth client id`, use esse valor.
-   - Se ninguém te passou um, ele vem de um **GitHub OAuth App** criado em:
-     `GitHub -> Settings -> Developer settings -> OAuth Apps`
-   - Lá você cria um app novo e usa o campo **Client ID**.
-
-   Resumo:
+6. **Verifique que tudo funciona:**
 
    ```bash
-   agent-bar auth copilot --client-id SEU_CLIENT_ID_AQUI
+   agent-bar usage                    # Deve mostrar os 3 providers com status ok
+   pnpm verify:ubuntu                 # Verificacao completa
    ```
-
-   Se você **não tiver** esse `client id`, essa etapa do Copilot não vai funcionar ainda. Nesse caso, você ainda pode testar o resto da atualização normalmente com:
-
-   ```bash
-   agent-bar doctor --json
-   agent-bar service status --json
-   agent-bar service snapshot --json
-   ```
-
-5. **Se você quiser testar Codex e Claude, confirme primeiro que os CLIs ainda funcionam no seu sistema.**
-
-   ```bash
-   codex --version
-   claude --version
-   ```
-
-   Se necessário, refaça login/autenticação dos próprios CLIs antes de testar pelo Agent Bar.
-
-6. **Se a checagem básica passou, faça um teste mais real.**
-
-   ```bash
-   agent-bar service refresh --json
-   ```
-
-   Isso força um snapshot novo e ajuda a validar a versão atual de ponta a ponta.
-
-7. **Se quiser uma verificação mais completa, rode também:**
-
-   ```bash
-   pnpm verify:ubuntu
-   ```
-
-Resumo prático: para quem já estava com uma versão antiga instalada, o fluxo quase sempre é **`git pull` -> `pnpm install:ubuntu` -> reiniciar sessão GNOME -> `doctor`/`service status`/`service snapshot`**.
 
 ## Step-by-Step Installation
 
@@ -278,22 +268,26 @@ Token lookup order: `COPILOT_API_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, `COPILOT_TO
 
 ### Codex CLI
 
-Requires `codex` on PATH and authenticated:
+Requires `codex` on PATH and authenticated. O Agent Bar usa `codex app-server` (JSON-RPC) para buscar usage — nao precisa de sessao PTY interativa.
 
 ```bash
 codex login
 codex --version   # Confirm it works
 ```
 
+> **Importante:** O config deve ter `sourceMode: "auto"` (padrao atual). Com `"cli"`, o Agent Bar tenta o caminho PTY interativo antigo que nao funciona mais no Codex v0.117+.
+
 ### Claude CLI
 
-Requires `claude` on PATH and authenticated:
+Requires `claude` on PATH and authenticated. O Agent Bar usa a API HTTP da Anthropic (`api.anthropic.com/api/oauth/usage`) com credenciais OAuth locais — nao precisa de sessao PTY interativa.
 
 ```bash
 claude --version   # Confirm it works
 ```
 
-> **Current behavior:** Codex and Claude now use a `node-pty`-backed service-mode path instead of the old `script` wrapper. If they still fail, the likely causes are missing CLI auth/session state, missing prerequisites, or runtime environment issues. Start with `agent-bar doctor --json`, then inspect service logs if needed.
+As credenciais OAuth ficam em `~/.claude/.credentials.json` (criadas automaticamente quando voce faz login no Claude CLI). Se o token expirar, rode qualquer comando `claude` para renovar.
+
+> **Importante:** O caminho PTY antigo (que rodava `/usage` dentro do Claude interativo) foi removido — nao existe mais no Claude v2.1+. O config deve ter `sourceMode: "auto"` ou `"api"`.
 
 ## Development
 
@@ -387,7 +381,10 @@ agent-bar doctor --json
 
 Common causes:
 - **copilot_token_missing**: No `GITHUB_TOKEN` set. See Provider Setup above.
-- **codex_cli_failed / claude_cli_failed**: Interactive CLI wrapping issue. Known limitation.
+- **claude_cli_removed**: O config esta com `sourceMode: "cli"` mas o fetcher PTY foi removido. Mude para `"auto"` ou `"api"`.
+- **codex_cli_deprecated**: O config esta com `sourceMode: "cli"` mas o fetcher PTY foi depreciado. Mude para `"auto"`.
+- **claude_cli_missing**: Credenciais OAuth nao encontradas em `~/.claude/.credentials.json`. Rode qualquer comando `claude` para gerar.
+- **codex_cli_failed**: Codex app-server falhou. Verifique que `codex` esta no PATH e autenticado (`codex login`).
 - **secret-tool missing**: `sudo apt install libsecret-tools`
 
 ### Service won't start
