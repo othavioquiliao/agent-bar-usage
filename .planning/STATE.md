@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: v1.0 milestone complete
-stopped_at: Implemented One Dark Pro topbar refresh with 3-provider mini-strip
-last_updated: "2026-03-25T22:59:14-03:00"
+stopped_at: Completed quick task 260327-glx restoring auth and provider fallback contracts
+last_updated: "2026-03-27T12:04:02-03:00"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -80,6 +80,9 @@ Recent decisions affecting current work:
 - [Phase 06-provider-reliability]: systemd-env check is warn (not error): service can still work via env var fallbacks
 - [Phase 06-provider-reliability]: storeSecretViaSecretTool separate from SecretToolStore: write surface isolated from read path
 - [UI refresh]: GNOME topbar now uses a fixed Codex/Claude/Copilot mini-strip with centered icon + percentage readouts and a One Dark Pro-inspired palette
+- [Quick 260327-glx]: GitHub Device Flow stays form-encoded and accepts both `expired_token` and `token_expired` from GitHub polling
+- [Quick 260327-glx]: Claude honors explicit `cli` mode; only `auto` may prefer API and it falls back to CLI on API failure
+- [Quick 260327-glx]: Codex `app-server` is treated as CLI-backed and `auto` falls back to PTY when `app-server` fails
 
 ### Pending Todos
 
@@ -90,8 +93,14 @@ None yet.
 - Provider token/session prerequisites may vary per machine and must map to structured provider-level failures
 - Browser-cookie-based parity work remains intentionally deferred
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260327-glx | Restore GitHub Device Flow robustness and provider source/fallback contracts | 2026-03-27 | ea661b2 | [260327-glx-fix-regressions-after-install-ux-overhau](./quick/260327-glx-fix-regressions-after-install-ux-overhau/) |
+
 ## Session Continuity
 
-Last session: 2026-03-25T22:41:12.579Z
-Stopped at: Implemented One Dark Pro topbar refresh with provider assets and installer updates
+Last session: 2026-03-27T12:04:02-03:00
+Stopped at: Completed quick task 260327-glx restoring auth and provider fallback contracts
 Resume file: None
