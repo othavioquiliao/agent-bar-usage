@@ -4,9 +4,10 @@ import { createClaudeCliAdapter } from "../src/providers/claude/claude-cli-adapt
 import { PtyUnavailableError } from "../src/providers/shared/interactive-command.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
 
-const { runInteractiveCommandMock, resolveCommandInPathMock } = vi.hoisted(() => ({
+const { runInteractiveCommandMock, resolveCommandInPathMock, readClaudeCredentialsMock } = vi.hoisted(() => ({
   runInteractiveCommandMock: vi.fn(),
   resolveCommandInPathMock: vi.fn(),
+  readClaudeCredentialsMock: vi.fn(),
 }));
 
 vi.mock("../src/providers/shared/interactive-command.js", async () => {
@@ -31,11 +32,18 @@ vi.mock("../src/utils/subprocess.js", async () => {
   };
 });
 
+vi.mock("../src/providers/claude/claude-credentials.js", () => ({
+  readClaudeCredentials: readClaudeCredentialsMock,
+}));
+
 describe("Claude CLI provider", () => {
   beforeEach(() => {
     runInteractiveCommandMock.mockReset();
     resolveCommandInPathMock.mockReset();
+    readClaudeCredentialsMock.mockReset();
     resolveCommandInPathMock.mockReturnValue(null);
+    // Default: no credentials on disk, so adapter falls back to PTY
+    readClaudeCredentialsMock.mockResolvedValue(null);
   });
 
   afterAll(() => {
@@ -68,6 +76,27 @@ describe("Claude CLI provider", () => {
     expect(snapshot.status).toBe("error");
     expect(snapshot.error?.code).toBe("claude_parse_failed");
     expect(snapshot.error?.retryable).toBe(true);
+  });
+
+  it("maps PtyUnavailableError to a non-retryable provider error", async () => {
+    const { PtyUnavailableError } = await import("../src/providers/shared/interactive-command.js");
+    runInteractiveCommandMock.mockRejectedValue(new PtyUnavailableError());
+    resolveCommandInPathMock.mockImplementation((command: string) =>
+      command === "claude" ? "/usr/bin/claude" : null,
+    );
+
+    const adapter = createClaudeCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CLAUDE_CLI_PATH: "/usr/bin/claude",
+        },
+      }),
+    );
+
+    expect(snapshot.status).toBe("error");
+    expect(snapshot.error?.code).toBe("claude_pty_unavailable");
+    expect(snapshot.error?.retryable).toBe(false);
   });
 
   it("maps usage output into normalized quota fields", async () => {

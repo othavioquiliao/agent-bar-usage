@@ -1,118 +1,151 @@
 ---
 phase: 06-provider-reliability
 plan: "01"
-subsystem: infra
-tags: [node-pty, codex, claude, cli, systemd]
+subsystem: providers
+tags: [node-pty, pty, interactive-command, codex, claude, systemd]
+
+# Dependency graph
 requires:
-  - phase: v1.0
-    provides: backend provider adapters, systemd service runtime, and CLI-backed Codex/Claude fetchers
+  - phase: 03-first-wave-providers
+    provides: codex-cli-fetcher and claude-cli-fetcher using script -qec wrapper
 provides:
-  - shared PTY-backed interactive command execution for service-mode CLI providers
-  - Codex CLI fetching routed through the shared PTY runner with structured PTY failure handling
-  - Claude CLI PTY-unavailable error mapping and regression coverage for both CLI providers
-affects: [06-02-PLAN.md, apps/backend/src/providers/shared/interactive-command.ts, apps/backend/src/providers/codex/codex-cli-fetcher.ts, apps/backend/src/providers/claude/claude-cli-fetcher.ts]
+  - node-pty PTY infrastructure replacing script -qec for subprocess spawning
+  - PtyUnavailableError with clear install instructions for graceful degradation
+  - runInteractiveCommand using pty.spawn() that works from systemd services
+  - codex_pty_unavailable and claude_pty_unavailable error codes in provider snapshots
+affects:
+  - 06-02
+  - any provider that spawns interactive CLIs
+
+# Tech tracking
 tech-stack:
-  added: [node-pty]
-  patterns: [shared PTY runner for CLI providers, structured PTY-unavailable provider errors, provider-level runner contract assertions]
+  added: [node-pty ^1.0.0]
+  patterns:
+    - Dynamic import of native addon with graceful PtyUnavailableError fallback
+    - 200ms input delay to let CLI render its prompt before writing input
+    - Settled guard pattern to prevent double-resolve from timeout + onExit race
+    - PTY merges stdout+stderr; stderr field always empty string
+
 key-files:
   created: []
-  modified: [apps/backend/package.json, pnpm-workspace.yaml, pnpm-lock.yaml, apps/backend/src/providers/shared/interactive-command.ts, apps/backend/src/providers/codex/codex-cli-fetcher.ts, apps/backend/src/providers/claude/claude-cli-fetcher.ts, apps/backend/test/codex-provider.test.ts, apps/backend/test/claude-provider.test.ts]
+  modified:
+    - apps/backend/package.json
+    - pnpm-workspace.yaml
+    - pnpm-lock.yaml
+    - apps/backend/src/providers/shared/interactive-command.ts
+    - apps/backend/src/providers/codex/codex-cli-fetcher.ts
+    - apps/backend/src/providers/claude/claude-cli-fetcher.ts
+    - apps/backend/test/codex-provider.test.ts
+    - apps/backend/test/claude-provider.test.ts
+
 key-decisions:
-  - "Use node-pty as the single PTY execution path for service-mode Codex and Claude fetchers."
-  - "Keep the shared PTY runner aligned with SubprocessError semantics so existing provider error mapping continues to work."
+  - "Use node-pty instead of script -qec: node-pty calls forkpty() directly, creating a real PTY that works from systemd with no controlling terminal"
+  - "Dynamic import of node-pty: catches native addon compilation failures and surfaces PtyUnavailableError with clear build instructions"
+  - "200ms input delay: interactive CLIs (codex, claude) need time to render their prompt before accepting keyboard input"
+  - "PTY output is combined stdout+stderr: stderr field is always empty string; callers use stdout only"
+  - "PtyUnavailableError is non-retryable: user must install build-essential and rebuild; retrying will always fail"
+
 patterns-established:
-  - "CLI-backed providers should share one PTY execution helper instead of embedding per-provider shell wrappers."
-  - "Provider fetcher tests assert the interactive runner call contract and PTY-unavailable error mapping explicitly."
+  - "PTY spawning: use pty.spawn(command, args, {cols:120, rows:30}) for any interactive CLI"
+  - "Graceful degradation: dynamic import of native addons, catch import errors, throw domain-specific error"
+  - "Provider error isolation: every new error path gets its own error code (codex_pty_unavailable, claude_pty_unavailable)"
+
 requirements-completed: []
-duration: 6 min
-completed: 2026-03-26
+
+# Metrics
+duration: 10min
+completed: 2026-03-25
 ---
 
 # Phase 06 Plan 01: node-pty PTY Infrastructure Summary
 
-**Shared node-pty execution for Codex and Claude CLI fetchers with structured PTY failure mapping and regression coverage**
+**Replaced broken `script -qec` wrapper with `node-pty` so Codex and Claude providers spawn real kernel PTYs that work from systemd services with no controlling terminal**
 
 ## Performance
 
-- **Duration:** 6 min
-- **Started:** 2026-03-26T16:48:30Z
-- **Completed:** 2026-03-26T16:54:06Z
-- **Tasks:** 3
+- **Duration:** ~10 min
+- **Started:** 2026-03-25T22:31:09Z
+- **Completed:** 2026-03-25T22:33:53Z
+- **Tasks:** 4 implementation + 1 test fix
 - **Files modified:** 8
 
 ## Accomplishments
 
-- Replaced the shared `script -qec` wrapper with a `node-pty` runner that works from the installed systemd service path and keeps timeout/nonzero-exit behavior structured.
-- Removed the Codex-specific shell-wrapper path so Codex now uses the same PTY runner as Claude and reports a dedicated `codex_pty_unavailable` error when the addon is missing.
-- Added Claude-side `claude_pty_unavailable` mapping plus runner-contract regression tests for both CLI providers.
+- node-pty 1.1.0 installed and compiled via node-gyp on Linux x64 (no prebuilds needed)
+- `interactive-command.ts` rewritten to use `pty.spawn()` with settled guard, 200ms input delay, and graceful `PtyUnavailableError` on import failure
+- `codex-cli-fetcher.ts` refactored: removed `runCodexInteractive`/`buildScriptCommand`/`shellQuote`, now calls `runInteractiveCommand` directly with PTY-based input
+- `claude-cli-fetcher.ts` updated with `PtyUnavailableError` catch returning `claude_pty_unavailable` error
+- All 44 backend tests passing after updating codex test mocks to mock `runInteractiveCommand` instead of `context.runSubprocess`
 
 ## Task Commits
 
-Each code task was committed atomically:
+Each task was committed atomically:
 
-1. **Task 1: Add node-pty dependency and rewrite the shared interactive runner** - `62f7b07` (feat)
-2. **Task 2: Refactor Codex fetching to use the shared PTY runner** - `9907f89` (feat)
-3. **Task 3: Add Claude PTY failure handling and verify the backend suite** - `1761887` (feat)
+1. **Step 1.1: Add node-pty dependency** - `7f74ca0` (chore)
+2. **Step 1.2: Rewrite interactive-command.ts** - `a91472c` (feat)
+3. **Step 1.3: Refactor codex-cli-fetcher** - `65a07bb` (feat)
+4. **Step 1.4: Add PtyUnavailableError to claude-cli-fetcher** - `9cef661` (feat)
+5. **Test fix: Update provider tests** - `040a511` (fix)
+
+**Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
 
-- `apps/backend/package.json` - Added the `node-pty` runtime dependency for backend PTY execution.
-- `pnpm-workspace.yaml` - Allowed `node-pty` native builds through the workspace install policy.
-- `pnpm-lock.yaml` - Recorded the resolved `node-pty` and `node-addon-api` dependency graph.
-- `apps/backend/src/providers/shared/interactive-command.ts` - Replaced the `script` wrapper with dynamic `node-pty` loading, PTY execution, timeout handling, and `PtyUnavailableError`.
-- `apps/backend/src/providers/codex/codex-cli-fetcher.ts` - Routed Codex through the shared PTY runner and mapped PTY addon failures to provider-level errors.
-- `apps/backend/src/providers/claude/claude-cli-fetcher.ts` - Added provider-level PTY-unavailable handling for Claude fetches.
-- `apps/backend/test/codex-provider.test.ts` - Updated Codex mocks for the shared runner and added PTY failure coverage.
-- `apps/backend/test/claude-provider.test.ts` - Added Claude PTY failure coverage and asserted the shared runner call contract.
+- `apps/backend/package.json` - Added node-pty ^1.0.0 dependency
+- `pnpm-workspace.yaml` - Added node-pty to onlyBuiltDependencies for native compilation
+- `pnpm-lock.yaml` - Updated lockfile after pnpm install
+- `apps/backend/src/providers/shared/interactive-command.ts` - Rewritten to use node-pty; added PtyUnavailableError
+- `apps/backend/src/providers/codex/codex-cli-fetcher.ts` - Uses runInteractiveCommand; removed script helpers; added PtyUnavailableError catch
+- `apps/backend/src/providers/claude/claude-cli-fetcher.ts` - Added PtyUnavailableError import and catch branch
+- `apps/backend/test/codex-provider.test.ts` - Switched to mock runInteractiveCommand; added PtyUnavailableError test
+- `apps/backend/test/claude-provider.test.ts` - Added PtyUnavailableError test case
 
 ## Decisions Made
 
-- Kept `node-pty` behind a dynamic import so missing native builds fail with an actionable install message instead of a generic module load error.
-- Preserved `SubprocessError`-style rejection semantics in the PTY runner so existing provider error parsing still works for nonzero exits and spawn failures.
+- Used node-pty instead of alternatives (expect, socat, direct API): it is the only approach that creates a real kernel PTY device via `forkpty()`, making `isatty(0)` return true inside the spawned process regardless of whether the caller has a controlling terminal
+- Used dynamic import (`await import("node-pty")`) so compilation failures are caught at runtime with a meaningful error message pointing users to `sudo apt install build-essential python3 && pnpm install`
+- 200ms input delay is hardcoded (not configurable per the plan) — this is adequate for both Codex and Claude CLIs
+- PTY stderr is always empty string (PTY merges stdout+stderr into a single stream) — callers that previously concatenated `stdout + stderr` now only use `stdout`
 
 ## Deviations from Plan
 
 ### Auto-fixed Issues
 
-**1. [Rule 2 - Missing Critical] Preserve structured failure semantics in the shared PTY runner**
-- **Found during:** Task 1 (Add node-pty dependency and rewrite the shared interactive runner)
-- **Issue:** The plan sketch resolved PTY exits unconditionally, which would have broken existing provider error handling that depends on rejected nonzero subprocess exits.
-- **Fix:** Rejected nonzero PTY exits with `SubprocessError` and added synchronous spawn-failure handling in the shared runner.
-- **Files modified:** `apps/backend/src/providers/shared/interactive-command.ts`
-- **Verification:** `npx pnpm --filter backend build`, `npx pnpm test:backend`
-- **Committed in:** `62f7b07`
+**1. [Rule 1 - Bug] Updated codex-provider.test.ts to mock runInteractiveCommand**
+- **Found during:** Verification after Task 3
+- **Issue:** Old codex tests mocked `context.runSubprocess` which is no longer called — the refactored fetcher now calls module-level `runInteractiveCommand` directly. Tests would fail or try to spawn a real PTY.
+- **Fix:** Added `vi.mock("../src/providers/shared/interactive-command.js")` to mock `runInteractiveCommand`, removed `runSubprocess` from `createContext`, updated `createRunResult` command label from "script" to "codex"
+- **Files modified:** `apps/backend/test/codex-provider.test.ts`
+- **Verification:** All 44 tests pass
+- **Committed in:** `040a511`
 
-**2. [Rule 3 - Blocking] Use `npx pnpm` because the execution shell lacked `pnpm` and `corepack`**
-- **Found during:** Task 1 (Add node-pty dependency and rewrite the shared interactive runner)
-- **Issue:** The plan verification commands assumed `pnpm` was directly available on `PATH`, but this shell only exposed `npm`/`npx`.
-- **Fix:** Ran install, build, and test commands through `npx pnpm` without changing repository files.
-- **Files modified:** None
-- **Verification:** `npx pnpm install`, `npx pnpm test:backend`, `npx pnpm build:backend`
-- **Committed in:** Not applicable (execution-environment workaround only)
+**2. [Rule 2 - Missing Critical] Added PtyUnavailableError test to both provider test files**
+- **Found during:** Task 5 (test fix)
+- **Issue:** New error code paths `codex_pty_unavailable` and `claude_pty_unavailable` had no test coverage
+- **Fix:** Added one test per provider asserting the error code and non-retryable status when PtyUnavailableError is thrown
+- **Files modified:** `apps/backend/test/codex-provider.test.ts`, `apps/backend/test/claude-provider.test.ts`
+- **Verification:** New tests pass (5 codex tests, 4 claude tests)
+- **Committed in:** `040a511`
 
 ---
 
-**Total deviations:** 2 auto-fixed (1 missing critical, 1 blocking)
-**Impact on plan:** Both deviations were necessary to keep verification truthful and preserve existing provider error behavior. The implementation scope stayed within the planned PTY refactor.
+**Total deviations:** 2 auto-fixed (1 bug, 1 missing critical test coverage)
+**Impact on plan:** Both auto-fixes necessary for test correctness and error path coverage. No scope creep.
 
 ## Issues Encountered
 
-- The initial PTY runner build failed on a TypeScript narrowing issue around delayed input writes; fixed inline before Task 1 was committed.
-- Root-level `node -e "import('node-pty')"` could not resolve the backend dependency because `node-pty` is installed in the workspace package, so runtime verification was rerun from `apps/backend/` and against the built backend output instead.
-- `agent-bar service snapshot --json` returned an empty provider list in this local environment after the service restart, so live service health was verified but provider fetch output was not observable from that command alone.
+- node-pty 1.1.0 was resolved (semver-compatible with ^1.0.0) and compiled successfully without any missing system dependencies on this machine.
 
 ## User Setup Required
 
-None - no external service configuration required.
+None — no external service configuration required. If `node-pty` fails to compile on another machine (missing `build-essential`), the backend will surface a clear `PtyUnavailableError` with instructions.
 
 ## Next Phase Readiness
 
-- Phase `06-02` can build on one shared PTY execution seam instead of maintaining separate Codex and Claude shell-wrapper logic.
-- The installed service now has a PTY-capable execution path plus explicit `*_pty_unavailable` errors, which gives the follow-on doctor/auth work a clearer runtime surface to diagnose.
+- PTY infrastructure is ready for Etapa 2: auth command and doctor check
+- Both Codex and Claude providers now correctly propagate `PtyUnavailableError` as structured non-retryable errors
+- All 44 backend tests pass with the new PTY-based implementation
 
-## Self-Check
-
-PASSED
-
-- Found summary file on disk.
-- Verified task commits `62f7b07`, `9907f89`, and `1761887` in git history.
+---
+*Phase: 06-provider-reliability*
+*Completed: 2026-03-25*

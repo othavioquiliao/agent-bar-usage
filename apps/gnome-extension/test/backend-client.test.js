@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createBackendClient } from "../services/backend-client.js";
-import { resolveBackendInvocation } from "../utils/backend-command.js";
+import { resolveBackendInvocation, resolveRepoRoot } from "../utils/backend-command.js";
+
+describe("resolveRepoRoot", () => {
+  it("resolves repo root from a file:// URI without using URL global", () => {
+    // file is at repo/apps/gnome-extension/utils/backend-command.js
+    // walk up 3 dirs from the file: remove filename → utils/ → gnome-extension/ → apps/ = repo root
+    const root = resolveRepoRoot("file:///home/user/projects/agent-bar/apps/gnome-extension/utils/backend-command.js");
+    expect(root).toBe("/home/user/projects/agent-bar");
+  });
+
+  it("handles percent-encoded paths", () => {
+    const root = resolveRepoRoot("file:///home/user/my%20projects/agent-bar/apps/gnome-extension/utils/backend-command.js");
+    expect(root).toBe("/home/user/my projects/agent-bar");
+  });
+});
 
 describe("backend command resolution", () => {
   it("prefers agent-bar from PATH and appends force refresh when requested", () => {
@@ -78,6 +92,47 @@ describe("backend client", () => {
       exitCode: 1,
       stderr: "provider unavailable",
     });
+  });
+
+  it("logs structured error when subprocess fails", async () => {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args.join(" "));
+
+    const client = createBackendClient({
+      runCommand: vi.fn(async () => ({
+        success: false,
+        stdout: "",
+        stderr: "ENOENT",
+        exitCode: 127,
+      })),
+      findProgramInPath: () => "/usr/bin/agent-bar",
+      repoRoot: "/repo",
+    });
+
+    await expect(client.fetchUsageSnapshot()).rejects.toThrow();
+    expect(errors.some((e) => e.includes("[agent-bar]") && e.includes("ENOENT"))).toBe(true);
+
+    console.error = originalError;
+  });
+
+  it("logs structured error when subprocess spawn throws", async () => {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args.join(" "));
+
+    const client = createBackendClient({
+      runCommand: vi.fn(async () => {
+        throw new Error("spawn failed: No such file or directory");
+      }),
+      findProgramInPath: () => "/usr/bin/agent-bar",
+      repoRoot: "/repo",
+    });
+
+    await expect(client.fetchUsageSnapshot()).rejects.toThrow();
+    expect(errors.some((e) => e.includes("[agent-bar]") && e.includes("spawn failed"))).toBe(true);
+
+    console.error = originalError;
   });
 
   it("throws when backend stdout is not valid JSON", async () => {

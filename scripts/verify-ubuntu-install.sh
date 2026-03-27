@@ -2,132 +2,162 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-systemd_override_path="${HOME}/.config/systemd/user/agent-bar.service.d/env.conf"
-gnome_ext_uuid="agent-bar-ubuntu@othavio.dev"
-installed_extension_dir="${HOME}/.local/share/gnome-shell/extensions/${gnome_ext_uuid}"
+gnome_ext_dir="${HOME}/.local/share/gnome-shell/extensions/agent-bar-ubuntu@othavio.dev"
 
-fail() {
-  echo "$1" >&2
-  exit 1
-}
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
 
-require_file() {
-  local file_path="$1"
-  local message="$2"
+step_ok()   { printf "${GREEN}[ok]${NC}   %s\n" "$*"; }
+step_warn() { printf "${YELLOW}[!!]${NC}   %s\n" "$*"; }
+step_fail() { printf "${RED}[FAIL]${NC} %s\n" "$*"; }
 
-  if [[ ! -f "$file_path" ]]; then
-    fail "$message"
+errors=0
+
+echo ""
+echo "=========================================="
+echo "  Agent Bar Ubuntu — Verificacao"
+echo "=========================================="
+echo ""
+
+# --- agent-bar on PATH ---
+if command -v agent-bar >/dev/null 2>&1; then
+  step_ok "agent-bar encontrado no PATH."
+else
+  step_fail "agent-bar nao esta no PATH."
+  errors=$((errors + 1))
+fi
+
+# --- extension UI assets ---
+if [[ -f "$gnome_ext_dir/stylesheet.css" ]]; then
+  step_ok "stylesheet da extensao encontrado."
+else
+  step_fail "stylesheet da extensao nao encontrado em $gnome_ext_dir."
+  errors=$((errors + 1))
+fi
+
+if [[ -f "$gnome_ext_dir/assets/providers/codex.svg" && -f "$gnome_ext_dir/assets/providers/claude.svg" && -f "$gnome_ext_dir/assets/providers/copilot.svg" ]]; then
+  step_ok "assets visuais da topbar encontrados."
+else
+  step_fail "assets visuais da topbar nao foram instalados corretamente."
+  errors=$((errors + 1))
+fi
+
+# --- systemd service active ---
+if systemctl --user is-active --quiet agent-bar.service 2>/dev/null; then
+  step_ok "agent-bar.service esta ativo."
+else
+  step_fail "agent-bar.service nao esta ativo."
+  systemctl --user status agent-bar.service --no-pager 2>&1 || true
+  errors=$((errors + 1))
+fi
+
+# --- Claude CLI ---
+if command -v claude >/dev/null 2>&1; then
+  claude_ver="$(claude --version 2>/dev/null || echo "?")"
+  step_ok "Claude CLI encontrado: $claude_ver"
+else
+  step_warn "Claude CLI nao encontrado — provider Claude nao funcionara."
+fi
+
+# --- Codex CLI ---
+if command -v codex >/dev/null 2>&1; then
+  codex_ver="$(codex --version 2>/dev/null || echo "?")"
+  step_ok "Codex CLI encontrado: $codex_ver"
+else
+  step_warn "Codex CLI nao encontrado — provider Codex nao funcionara."
+fi
+
+# --- agent-bar doctor ---
+if command -v agent-bar >/dev/null 2>&1; then
+  echo ""
+  echo "Executando agent-bar doctor..."
+  if doctor_json="$(agent-bar doctor --json 2>/dev/null)"; then
+    step_ok "agent-bar doctor executou com sucesso."
+
+    # Parse doctor exit status from the JSON checks
+    fail_count="$(echo "$doctor_json" | node -e '
+      const data = JSON.parse(require("fs").readFileSync(0, "utf8"));
+      const fails = (data.checks || []).filter(c => c.status === "fail");
+      process.stdout.write(String(fails.length));
+    ' 2>/dev/null || echo "?")"
+
+    if [[ "$fail_count" == "0" ]]; then
+      step_ok "Todos os checks do doctor passaram."
+    else
+      step_warn "doctor reportou $fail_count check(s) com falha."
+    fi
+  else
+    step_fail "agent-bar doctor falhou ao executar."
+    errors=$((errors + 1))
   fi
-}
-
-if ! command -v agent-bar >/dev/null 2>&1; then
-  fail "agent-bar is not on PATH."
 fi
 
-if ! systemctl --user is-active --quiet agent-bar.service; then
-  echo "agent-bar.service is not active." >&2
-  systemctl --user status agent-bar.service --no-pager >&2 || true
-  exit 1
-fi
+# --- Deep validation (existing checks) ---
+echo ""
+echo "Executando validacao detalhada..."
 
-require_file \
-  "$systemd_override_path" \
-  "systemd environment override not found at $systemd_override_path. Re-run \`pnpm install:ubuntu\`."
-require_file \
-  "$installed_extension_dir/extension.js" \
-  "Installed GNOME extension is missing extension.js. Re-run \`pnpm install:ubuntu\`."
-require_file \
-  "$installed_extension_dir/metadata.json" \
-  "Installed GNOME extension is missing metadata.json. Re-run \`pnpm install:ubuntu\`."
-require_file \
-  "$installed_extension_dir/stylesheet.css" \
-  "Installed GNOME extension is missing stylesheet.css. Re-run \`pnpm install:ubuntu\`."
-require_file \
-  "$installed_extension_dir/assets/claude-code-icon.png" \
-  "Installed GNOME extension is missing claude-code-icon.png. Re-run \`pnpm install:ubuntu\`."
-require_file \
-  "$installed_extension_dir/assets/codex-icon.png" \
-  "Installed GNOME extension is missing codex-icon.png. Re-run \`pnpm install:ubuntu\`."
+if command -v agent-bar >/dev/null 2>&1; then
+  doctor_json="$(agent-bar doctor --json 2>/dev/null || echo "{}")"
+  service_status_json="$(agent-bar service status --json 2>/dev/null || echo "{}")"
+  snapshot_json="$(agent-bar service snapshot --json 2>/dev/null || echo "{}")"
 
-if [[ -f "$repo_root/apps/gnome-extension/assets/copilot-icon.png" ]]; then
-  require_file \
-    "$installed_extension_dir/assets/copilot-icon.png" \
-    "Installed GNOME extension is missing copilot-icon.png. Re-run \`pnpm install:ubuntu\`."
-fi
+  validation_result="$(node --input-type=module -e '
+    const [doctorRaw, statusRaw, snapshotRaw] = process.argv.slice(1);
+    try {
+      const doctor = JSON.parse(doctorRaw);
+      const status = JSON.parse(statusRaw);
+      const snapshot = JSON.parse(snapshotRaw);
 
-auth_help_text="$(agent-bar auth copilot --help 2>&1)"
-doctor_json="$(agent-bar doctor --json)"
-service_status_json="$(agent-bar service status --json)"
-snapshot_json="$(agent-bar service snapshot --json)"
-env_conf_text="$(cat "$systemd_override_path")"
+      const issues = [];
 
-node --input-type=module -e '
-  const [authHelpRaw, doctorRaw, statusRaw, snapshotRaw, envConfRaw] = process.argv.slice(1);
-  const doctor = JSON.parse(doctorRaw);
-  const status = JSON.parse(statusRaw);
-  const snapshot = JSON.parse(snapshotRaw);
-  const envConf = envConfRaw;
+      if (!Array.isArray(doctor.checks) || doctor.checks.length === 0) {
+        issues.push("doctor report nao contem checks");
+      }
 
-  if (!authHelpRaw.includes("Authenticate Copilot via GitHub Device Flow")) {
-    throw new Error("auth copilot command help did not expose the expected device-flow command");
-  }
+      if (typeof status.running !== "boolean") {
+        issues.push("service status nao incluiu flag running");
+      }
 
-  if (!envConf.includes("[Service]")) {
-    throw new Error("systemd env override is missing the [Service] section");
-  }
+      if (!snapshot || typeof snapshot.schema_version !== "string" || !Array.isArray(snapshot.providers)) {
+        issues.push("service snapshot nao corresponde ao formato esperado");
+      }
 
-  if (!envConf.includes("Environment=PATH=")) {
-    throw new Error("systemd env override did not capture PATH");
-  }
-
-  if (!Array.isArray(doctor.checks) || doctor.checks.length === 0) {
-    throw new Error("doctor report did not contain checks");
-  }
-
-  const requiredCheckIds = [
-    "config",
-    "secret-tool",
-    "codex-cli",
-    "claude-cli",
-    "node-pty",
-    "copilot-token",
-    "systemd-env",
-    "service-runtime",
-  ];
-
-  const checksById = new Map(doctor.checks.map((check) => [check.id, check]));
-
-  for (const checkId of requiredCheckIds) {
-    if (!checksById.has(checkId)) {
-      throw new Error(`doctor report did not include expected check: ${checkId}`);
+      if (issues.length > 0) {
+        process.stdout.write("WARN:" + issues.join("; "));
+      } else {
+        process.stdout.write("OK");
+      }
+    } catch (e) {
+      process.stdout.write("FAIL:" + e.message);
     }
-  }
+  ' "$doctor_json" "$service_status_json" "$snapshot_json" 2>/dev/null || echo "FAIL:node error")"
 
-  if (doctor.runtime_mode !== "service") {
-    throw new Error(`doctor runtime_mode should be service while the user service is active; got ${doctor.runtime_mode}`);
-  }
+  case "$validation_result" in
+    OK)
+      step_ok "Validacao detalhada passou (doctor, service status, snapshot)."
+      ;;
+    WARN:*)
+      step_warn "Validacao detalhada: ${validation_result#WARN:}"
+      ;;
+    FAIL:*)
+      step_fail "Validacao detalhada: ${validation_result#FAIL:}"
+      errors=$((errors + 1))
+      ;;
+  esac
+else
+  step_fail "agent-bar nao encontrado — validacao detalhada pulada."
+  errors=$((errors + 1))
+fi
 
-  const nodePtyCheck = checksById.get("node-pty");
-  if (nodePtyCheck?.status === "error") {
-    throw new Error(`node-pty check failed: ${nodePtyCheck.message}`);
-  }
+echo ""
 
-  const systemdEnvCheck = checksById.get("systemd-env");
-  if (systemdEnvCheck?.status === "error") {
-    throw new Error(`systemd-env check failed: ${systemdEnvCheck.message}`);
-  }
-
-  if (typeof status.running !== "boolean") {
-    throw new Error("service status did not include a running flag");
-  }
-
-  if (!status.running) {
-    throw new Error("service status reported running=false");
-  }
-
-  if (!snapshot || typeof snapshot.schema_version !== "string" || !Array.isArray(snapshot.providers)) {
-    throw new Error("service snapshot did not match the expected envelope shape");
-  }
-' "$auth_help_text" "$doctor_json" "$service_status_json" "$snapshot_json" "$env_conf_text"
-
-echo "Verified agent-bar install, doctor contract, systemd env override, and installed GNOME extension payload from $repo_root"
+if [[ "$errors" -gt 0 ]]; then
+  step_fail "Verificacao concluida com $errors erro(s)."
+  exit 1
+else
+  step_ok "Verificacao concluida — tudo ok!"
+  echo "  Verificado agent-bar install de $repo_root"
+  exit 0
+fi

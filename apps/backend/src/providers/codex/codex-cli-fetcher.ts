@@ -7,12 +7,7 @@ import {
   type ProviderAdapterContext,
 } from "../../core/provider-adapter.js";
 import { describeSubprocessFailure, resolveCommandInPath, SubprocessError } from "../../utils/subprocess.js";
-import {
-  normalizeLineEndings,
-  PtyUnavailableError,
-  runInteractiveCommand,
-  stripAnsi,
-} from "../shared/interactive-command.js";
+import { normalizeLineEndings, PtyUnavailableError, runInteractiveCommand, stripAnsi } from "../shared/interactive-command.js";
 import { CodexCliParseError, mapCodexUsageToSnapshot, parseCodexUsage } from "./codex-cli-parser.js";
 
 const DEFAULT_SOURCE: ProviderSourceMode = "cli";
@@ -60,6 +55,15 @@ export async function fetchCodexUsage(context: ProviderAdapterContext): Promise<
 
     return buildSnapshotFromText(context, source, updatedAt, output, startedAt, "codex.cli");
   } catch (error) {
+    if (error instanceof PtyUnavailableError) {
+      return createErrorSnapshot(
+        context.providerId,
+        source,
+        updatedAt,
+        createProviderError("codex_pty_unavailable", error.message, false),
+      );
+    }
+
     if (error instanceof CodexCliParseError) {
       return createErrorSnapshot(
         context.providerId,
@@ -70,15 +74,6 @@ export async function fetchCodexUsage(context: ProviderAdapterContext): Promise<
           error.message,
           error.code === "codex_parse_failed",
         ),
-      );
-    }
-
-    if (error instanceof PtyUnavailableError) {
-      return createErrorSnapshot(
-        context.providerId,
-        source,
-        updatedAt,
-        createProviderError("codex_pty_unavailable", error.message, false),
       );
     }
 
@@ -237,3 +232,4 @@ function normalizeSourceMode(
 ): ProviderSourceMode {
   return sourceMode === "auto" ? defaultMode : sourceMode;
 }
+

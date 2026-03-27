@@ -72,8 +72,8 @@ program
     process.stdout.write(`${output}\n`);
   });
 
-registerConfigCommand(program);
 registerAuthCommand(program);
+registerConfigCommand(program);
 registerDoctorCommand(program);
 registerServiceCommand(program);
 

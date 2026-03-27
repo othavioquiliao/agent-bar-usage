@@ -4,7 +4,7 @@ export function createDefaultConfig(): BackendConfig {
   return {
     schemaVersion: 1,
     defaults: {
-      ttlSeconds: 30,
+      ttlSeconds: 150,
     },
     providers: [
       {

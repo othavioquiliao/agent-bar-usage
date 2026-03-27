@@ -1,39 +1,38 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Provider Reliability
-status: Milestone archived — ready to define next milestone
-stopped_at: Archived milestone v1.1
-last_updated: "2026-03-26T17:14:54.000Z"
+milestone: v1.0
+milestone_name: milestone
+status: v1.0 milestone complete
+stopped_at: Implemented One Dark Pro topbar refresh with 3-provider mini-strip
+last_updated: "2026-03-25T22:59:14-03:00"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-26)
+See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Planning next milestone
+**Current focus:** Post-v1.0 UI polish — One Dark Pro GNOME topbar refresh
 
 ## Current Position
 
-Phase: None active
-Plan: Milestone archived
+Phase: Post-v1.0 follow-up
+Plan: UI refresh implemented locally
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 17
-- Archived milestones: v1.0 and v1.1
-- Average duration: 23 min
-- Total execution time: 4.9 hours
+- Total plans completed: 12
+- Average duration: 24 min
+- Total execution time: 4.8 hours
 
 **By Phase:**
 
@@ -49,11 +48,8 @@ Plan: Milestone archived
 - Last 5 plans: 5/5 complete
 - Trend: Improving
 
-| Phase 07 P01 | 4 | 3 tasks | 7 files |
-| Phase 07 P02 | 2 min | 2 tasks | 4 files |
-| Phase 07 P03 | 10 min | 3 tasks | 7 files |
-| Phase 06 P01 | 6 min | 3 tasks | 8 files |
-| Phase 06 P02 | 2 min | 3 tasks | 10 files |
+| Phase 06-provider-reliability P01 | 10 | 5 tasks | 8 files |
+| Phase 06 P02 | 3 | 9 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -78,24 +74,12 @@ Recent decisions affecting current work:
 - [Phase 3]: Provider isolation behavior is explicitly validated and kept envelope-safe
 - [Phase 4]: Manual refresh is gated while a refresh is in flight so repeated clicks do not overlap backend requests.
 - [Phase 4]: The GNOME surface consumes normalized snapshot view models instead of reaching into subprocess or backend concerns.
-- [Milestone]: `v1.0` was archived with accepted `OPS-01`/`OPS-02`/`OPS-03` gaps at user request
-- [Phase 6]: Replace the `script` PTY wrapper with `node-pty` for service-mode Codex and Claude usage
-- [Phase 6]: Add GitHub Device Flow auth plus environment capture for Copilot and installed systemd setups
-- [Phase 07]: Package Phase 7 stylesheet and provider icons inside the GNOME extension instead of resolving qbar assets from the repo at runtime
-- [Phase 07]: Split Wave 0 verification into source-only and post-install modes so packaging checks do not require GNOME host binaries before install
-- [Phase 07]: Keep the normalized snapshot seam intact while adding the Phase 7 compact row and indicator fields.
-- [Phase 07]: Preserve legacy row aliases during the contract transition so Phase 7 rendering can migrate incrementally.
-- [Phase 07]: Keep each provider row to identity, status, quota/progress, and one short secondary line while moving actionable command text to Details.
-- [Phase 07]: Keep the panel indicator aggregate-only with one icon and one short label instead of adding per-provider strips.
-- [Phase 07]: Treat the resumed human checkpoint response approved as the required live GNOME Shell sign-off for Task 3.
-- [Phase 06]: Use node-pty as the single PTY execution path for service-mode Codex and Claude fetchers.
-- [Phase 06]: Keep the shared PTY runner aligned with SubprocessError semantics so existing provider error mapping continues to work.
-- [Phase 06]: Copilot auth resolves its GitHub OAuth client id from --client-id or AGENT_BAR_GITHUB_CLIENT_ID so the flow is testable before a production app id is registered.
-- [Phase 06]: Doctor treats node-pty and the systemd env drop-in as first-class runtime prerequisites and suggests direct fix commands instead of verification commands.
-
-### Roadmap Evolution
-
-- Phase 7 added: Redesign GNOME extension UI for glanceability, qbar provider icons, and compact progress bars
+- [Phase 06-provider-reliability]: node-pty replaces script -qec: creates real kernel PTY via forkpty(), works from systemd with no controlling terminal
+- [Phase 06-provider-reliability]: PtyUnavailableError is non-retryable: surfaces clear build instructions when native addon compilation fails
+- [Phase 06-provider-reliability]: GitHub Device Flow: same flow as gh auth login — user gets a code, opens browser, authorizes, done
+- [Phase 06-provider-reliability]: systemd-env check is warn (not error): service can still work via env var fallbacks
+- [Phase 06-provider-reliability]: storeSecretViaSecretTool separate from SecretToolStore: write surface isolated from read path
+- [UI refresh]: GNOME topbar now uses a fixed Codex/Claude/Copilot mini-strip with centered icon + percentage readouts and a One Dark Pro-inspired palette
 
 ### Pending Todos
 
@@ -103,13 +87,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Live service verification still depends on local provider configuration and tokens being present on each machine
 - Provider token/session prerequisites may vary per machine and must map to structured provider-level failures
 - Browser-cookie-based parity work remains intentionally deferred
-- Next milestone scope and requirements have not been defined yet
 
 ## Session Continuity
 
-Last session: 2026-03-26T17:14:54.000Z
-Stopped at: Archived milestone v1.1
+Last session: 2026-03-25T22:41:12.579Z
+Stopped at: Implemented One Dark Pro topbar refresh with provider assets and installer updates
 Resume file: None

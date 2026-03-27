@@ -26,7 +26,7 @@ export const usageSchema = z.object({
 export type UsageSnapshot = z.infer<typeof usageSchema>;
 
 export const resetWindowSchema = z.object({
-  resets_at: z.string().datetime(),
+  resets_at: z.string().datetime({ offset: true }),
   label: z.string(),
 }).strict();
 
@@ -51,7 +51,7 @@ export const providerSnapshotSchema = z.object({
   provider: providerIdSchema,
   status: providerStatusSchema,
   source: providerSourceModeSchema,
-  updated_at: z.string().datetime(),
+  updated_at: z.string().datetime({ offset: true }),
   usage: usageSchema.nullable().optional(),
   reset_window: resetWindowSchema.nullable().optional(),
   error: providerErrorSchema.nullable(),
@@ -62,7 +62,7 @@ export type ProviderSnapshot = z.infer<typeof providerSnapshotSchema>;
 
 export const snapshotEnvelopeSchema = z.object({
   schema_version: z.literal(snapshotSchemaVersion),
-  generated_at: z.string().datetime(),
+  generated_at: z.string().datetime({ offset: true }),
   providers: z.array(providerSnapshotSchema),
 }).strict();
 

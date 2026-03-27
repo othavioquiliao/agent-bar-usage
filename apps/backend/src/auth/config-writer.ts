@@ -1,9 +1,12 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+/**
+ * Idempotent writer for the agent-bar config.json file.
+ *
+ * Used by the auth command to ensure the Copilot provider has a secretRef
+ * pointing at the token that was just stored in GNOME Keyring.
+ */
 
-import type { BackendConfig, ProviderConfig } from "../config/config-schema.js";
-import { backendConfigSchema } from "../config/config-schema.js";
-import { loadBackendConfig } from "../config/config-loader.js";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 export interface SecretReference {
   store: "secret-tool";
@@ -11,81 +14,102 @@ export interface SecretReference {
   account: string;
 }
 
-export interface EnsureCopilotSecretRefOptions {
-  fileExists?: (filePath: string) => Promise<boolean>;
-  readTextFile?: (filePath: string) => Promise<string>;
-  writeTextFile?: (filePath: string, contents: string) => Promise<void>;
-  mkdirFn?: (directoryPath: string) => Promise<void>;
+/**
+ * Raw config shape we read/write. Kept intentionally loose so we do not strip
+ * unrecognized fields that were put there by other tools or future schema
+ * versions.
+ */
+interface RawConfig {
+  schemaVersion?: number;
+  defaults?: Record<string, unknown>;
+  providers?: RawProviderEntry[];
+  [key: string]: unknown;
 }
 
+interface RawProviderEntry {
+  id?: string;
+  secretRef?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * Ensure ~/.config/agent-bar/config.json exists and the copilot provider
+ * has the given secretRef. Creates the file if it does not exist.
+ *
+ * All four cases are handled:
+ *  1. File does not exist → create default config with copilot secretRef
+ *  2. File exists, no copilot entry → add copilot provider entry
+ *  3. File exists, copilot entry present but no secretRef → add secretRef
+ *  4. File exists, copilot entry already has correct secretRef → no-op
+ */
 export async function ensureCopilotSecretRef(
   configPath: string,
   secretRef: SecretReference,
-  options: EnsureCopilotSecretRefOptions = {},
 ): Promise<void> {
-  const loadedConfig = await loadBackendConfig({
-    explicitPath: configPath,
-    fileExists: options.fileExists,
-    readTextFile: options.readTextFile,
-  });
-  const currentCopilot = loadedConfig.config.providers.find((provider) => provider.id === "copilot");
+  let config: RawConfig;
 
-  if (hasMatchingSecretRef(currentCopilot, secretRef)) {
+  try {
+    const text = await readFile(configPath, "utf8");
+    config = JSON.parse(text) as RawConfig;
+  } catch {
+    // File does not exist or is invalid JSON — start fresh.
+    config = buildDefaultConfig(secretRef);
+    await persistConfig(configPath, config);
     return;
   }
 
-  const nextConfig = upsertCopilotSecretRef(loadedConfig.config, secretRef);
-  const serialized = `${JSON.stringify(backendConfigSchema.parse(nextConfig), null, 2)}\n`;
+  const providers: RawProviderEntry[] = Array.isArray(config.providers) ? config.providers : [];
+  const copilotIndex = providers.findIndex((p) => p.id === "copilot");
 
-  await (options.mkdirFn ?? defaultMkdir)(path.dirname(configPath));
-  await (options.writeTextFile ?? defaultWriteTextFile)(configPath, serialized);
-}
-
-function upsertCopilotSecretRef(config: BackendConfig, secretRef: SecretReference): BackendConfig {
-  const providers = [...config.providers];
-  const providerIndex = providers.findIndex((provider) => provider.id === "copilot");
-
-  if (providerIndex >= 0) {
-    const provider = providers[providerIndex];
-    providers[providerIndex] = {
-      ...provider,
-      secretRef: {
-        store: "secret-tool",
-        service: secretRef.service,
-        account: secretRef.account,
-      },
-    };
-  } else {
-    providers.push({
-      id: "copilot",
-      enabled: true,
-      sourceMode: "api",
-      secretRef: {
-        store: "secret-tool",
-        service: secretRef.service,
-        account: secretRef.account,
-      },
-    });
+  if (copilotIndex === -1) {
+    // No copilot provider at all — append one.
+    providers.push(buildCopilotEntry(secretRef));
+    config.providers = providers;
+    await persistConfig(configPath, config);
+    return;
   }
 
+  const existing = providers[copilotIndex]!;
+  const existingRef = existing.secretRef;
+
+  if (
+    existingRef &&
+    existingRef["store"] === secretRef.store &&
+    existingRef["service"] === secretRef.service &&
+    existingRef["account"] === secretRef.account
+  ) {
+    // Already configured correctly — nothing to do.
+    return;
+  }
+
+  // Add or replace the secretRef.
+  providers[copilotIndex] = { ...existing, secretRef: { ...secretRef } };
+  config.providers = providers;
+  await persistConfig(configPath, config);
+}
+
+function buildDefaultConfig(secretRef: SecretReference): RawConfig {
   return {
-    ...config,
-    providers,
+    schemaVersion: 1,
+    defaults: { ttlSeconds: 30 },
+    providers: [
+      buildCopilotEntry(secretRef),
+      { id: "codex", enabled: true, sourceMode: "cli" },
+      { id: "claude", enabled: true, sourceMode: "cli" },
+    ],
   };
 }
 
-function hasMatchingSecretRef(provider: ProviderConfig | undefined, secretRef: SecretReference): boolean {
-  return provider?.secretRef?.store === "secret-tool"
-    && provider.secretRef.service === secretRef.service
-    && provider.secretRef.account === secretRef.account;
+function buildCopilotEntry(secretRef: SecretReference): RawProviderEntry {
+  return {
+    id: "copilot",
+    enabled: true,
+    sourceMode: "api",
+    secretRef: { ...secretRef },
+  };
 }
 
-async function defaultMkdir(directoryPath: string): Promise<void> {
-  await mkdir(directoryPath, {
-    recursive: true,
-  });
-}
-
-async function defaultWriteTextFile(filePath: string, contents: string): Promise<void> {
-  await writeFile(filePath, contents, "utf8");
+async function persistConfig(configPath: string, config: RawConfig): Promise<void> {
+  await mkdir(dirname(configPath), { recursive: true });
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
 }

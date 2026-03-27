@@ -1,21 +1,32 @@
 # Roadmap: Agent Bar Ubuntu
 
-## Overview
-
-Agent Bar Ubuntu now has two archived milestones: the original Ubuntu product baseline in `v1.0` and the reliability/UI hardening follow-up in `v1.1`. The next milestone has not been defined yet.
-
 ## Milestones
 
-- ✅ **v1.0 Agent Bar Ubuntu** — [archive](./milestones/v1.0-ROADMAP.md) (archived 2026-03-26; 5 phases, 15 plans; accepted gaps: `OPS-01`, `OPS-02`, `OPS-03`)
-- ✅ **v1.1 Provider Reliability** — [archive](./milestones/v1.1-ROADMAP.md) (archived 2026-03-26; 2 phases, 5 plans, 14 tasks)
+- ✅ **v1.0 Ubuntu v1 MVP** — Phases 1–6 (shipped 2026-03-25)
 
-## Active Phases
+## Phases
 
-No active phases. Start the next milestone with `$gsd-new-milestone`.
+<details>
+<summary>✅ v1.0 Ubuntu v1 MVP (Phases 1–6) — SHIPPED 2026-03-25</summary>
+
+- [x] Phase 1: Backend Contract — completed 2026-03-25
+- [x] Phase 2: Linux Config & Secrets — completed 2026-03-25
+- [x] Phase 3: First-Wave Providers — completed 2026-03-25
+- [x] Phase 4: Ubuntu Desktop Surface — completed 2026-03-25
+- [x] Phase 5: Delivery & Hardening — completed 2026-03-25
+- [x] Phase 6: Provider Reliability — completed 2026-03-25
+
+Full details: `.planning/milestones/v1.0-ROADMAP.md`
+
+</details>
 
 ## Progress
 
-| Scope | Plans Complete | Status | Updated |
-|-------|----------------|--------|---------|
-| v1.0 Agent Bar Ubuntu | 12/15 archived | Archived with accepted gaps | 2026-03-26 |
-| v1.1 Provider Reliability | 5/5 | Archived | 2026-03-26 |
+| Phase | Milestone | Plans | Status | Completed |
+|-------|-----------|-------|--------|-----------|
+| 1. Backend Contract | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 2. Linux Config & Secrets | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 3. First-Wave Providers | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 4. Ubuntu Desktop Surface | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 5. Delivery & Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 6. Provider Reliability | v1.0 | 2/2 | Complete | 2026-03-25 |

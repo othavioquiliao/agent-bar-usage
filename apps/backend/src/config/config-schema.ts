@@ -32,11 +32,11 @@ export const backendConfigSchema = z
     schemaVersion: z.literal(1).default(1),
     defaults: z
       .object({
-        ttlSeconds: z.coerce.number().int().positive().default(30),
+        ttlSeconds: z.coerce.number().int().positive().default(150),
       })
       .strict()
       .default({
-        ttlSeconds: 30,
+        ttlSeconds: 150,
       }),
     providers: z.array(providerConfigSchema).default([]),
   })

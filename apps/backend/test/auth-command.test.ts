@@ -11,7 +11,7 @@ import {
 } from "../src/auth/github-device-flow.js";
 import { ensureCopilotSecretRef } from "../src/auth/config-writer.js";
 import { storeSecretViaSecretTool } from "../src/auth/secret-tool-writer.js";
-import { runCopilotAuthCommand } from "../src/commands/auth-command.js";
+import { runAuthCopilotCommand } from "../src/commands/auth-command.js";
 
 describe("GitHub device flow", () => {
   afterEach(() => {
@@ -24,10 +24,11 @@ describe("GitHub device flow", () => {
       expect(init?.method).toBe("POST");
       expect(init?.headers).toMatchObject({
         Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
       });
-      expect(String(init?.body)).toContain("client_id=client-123");
-      expect(String(init?.body)).toContain("scope=copilot");
+      const body = JSON.parse(String(init?.body)) as { client_id: string; scope: string };
+      expect(body.client_id).toBe("client-123");
+      expect(body.scope).toBe("copilot");
 
       return new Response(JSON.stringify({
         device_code: "device-code",
@@ -60,6 +61,7 @@ describe("GitHub device flow", () => {
     const resultPromise = pollForAccessToken("client-123", "device-code", 1, 30, fetchFn);
 
     await vi.advanceTimersByTimeAsync(1_000);
+    await vi.advanceTimersByTimeAsync(1_000);
     const result = await resultPromise;
 
     expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -80,7 +82,7 @@ describe("GitHub device flow", () => {
 
     await expect(
       pollForAccessToken("client-123", "device-code", 1, 30, fetchFn),
-    ).rejects.toThrow("GitHub device authorization was denied.");
+    ).rejects.toThrow("Authorization denied.");
   });
 });
 
@@ -163,7 +165,6 @@ describe("secret-tool writer", () => {
       "token-123",
       "Agent Bar Copilot",
       {
-        resolveCommandInPathFn: () => "/usr/bin/secret-tool",
         runSubprocessFn: async (command, args, options) => {
           calls.push({
             command,
@@ -185,7 +186,7 @@ describe("secret-tool writer", () => {
 
     expect(calls).toEqual([
       {
-        command: "/usr/bin/secret-tool",
+        command: "secret-tool",
         args: ["store", "--label=Agent Bar Copilot", "service", "agent-bar", "account", "copilot"],
         input: "token-123",
       },
@@ -193,58 +194,33 @@ describe("secret-tool writer", () => {
   });
 });
 
-describe("runCopilotAuthCommand", () => {
-  it("orchestrates the device flow, config update, and service restart", async () => {
-    const output: string[] = [];
-    const requestDeviceCodeFn = vi.fn().mockResolvedValue({
-      device_code: "device-code",
-      user_code: "AB12-CD34",
-      verification_uri: "https://github.com/login/device",
-      expires_in: 900,
-      interval: 5,
-    });
-    const pollForAccessTokenFn = vi.fn().mockResolvedValue({
-      access_token: "token-123",
-      token_type: "bearer",
-      scope: "copilot",
-    });
+describe("runAuthCopilotCommand", () => {
+  it("stores a token directly when --token is provided", async () => {
     const storeSecretFn = vi.fn().mockResolvedValue(undefined);
-    const ensureCopilotSecretRefFn = vi.fn().mockResolvedValue(undefined);
-    const promptForEnterFn = vi.fn().mockResolvedValue(undefined);
-    const openUrlFn = vi.fn().mockResolvedValue(true);
-    const restartServiceFn = vi.fn().mockResolvedValue(true);
+    const ensureConfigRefFn = vi.fn().mockResolvedValue(undefined);
+    const restartServiceFn = vi.fn().mockResolvedValue(undefined);
 
-    await runCopilotAuthCommand(
+    await runAuthCopilotCommand(
+      { token: "ghp_test_token_123" },
       {
-        clientId: "client-123",
-        configPath: "/tmp/agent-bar.json",
-      },
-      {
-        stdout: {
-          write(chunk: string) {
-            output.push(chunk);
-            return true;
-          },
-        },
-        requestDeviceCodeFn,
-        pollForAccessTokenFn,
-        storeSecretFn,
-        ensureCopilotSecretRefFn,
-        promptForEnterFn,
-        openUrlFn,
-        restartServiceFn,
+        storeSecret: storeSecretFn,
+        ensureConfigRef: ensureConfigRefFn,
+        resolveConfigPath: () => "/tmp/agent-bar/config.json",
+        restartService: restartServiceFn,
       },
     );
 
-    expect(requestDeviceCodeFn).toHaveBeenCalledWith("client-123", "copilot");
-    expect(pollForAccessTokenFn).toHaveBeenCalledWith("client-123", "device-code", 5, 900);
-    expect(storeSecretFn).toHaveBeenCalledWith("agent-bar", "copilot", "token-123", "Agent Bar Copilot");
-    expect(ensureCopilotSecretRefFn).toHaveBeenCalledWith("/tmp/agent-bar.json", {
+    expect(storeSecretFn).toHaveBeenCalledWith(
+      "agent-bar",
+      "copilot",
+      "ghp_test_token_123",
+      "Agent Bar Copilot",
+    );
+    expect(ensureConfigRefFn).toHaveBeenCalledWith("/tmp/agent-bar/config.json", {
       store: "secret-tool",
       service: "agent-bar",
       account: "copilot",
     });
-    expect(output.join("")).toContain("✓ Authenticated!");
-    expect(output.join("")).toContain("Service restarted.");
+    expect(restartServiceFn).toHaveBeenCalled();
   });
 });

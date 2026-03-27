@@ -103,13 +103,29 @@ export function createBackendClient(dependencies = {}) {
   return {
     async fetchUsageSnapshot(options = {}) {
       const invocation = resolveBackendInvocation(options, commandDependencies);
-      const result = await runCommand(invocation.argv, {
-        cwd: invocation.cwd,
-        Gio: dependencies.Gio,
-        mode: invocation.mode,
-      });
+      let result;
+      try {
+        result = await runCommand(invocation.argv, {
+          cwd: invocation.cwd,
+          Gio: dependencies.Gio,
+          mode: invocation.mode,
+        });
+      } catch (spawnError) {
+        console.error(`[agent-bar] Subprocess spawn failed (mode=${invocation.mode}): ${spawnError?.message ?? spawnError}`);
+        console.error(`[agent-bar]   argv: ${invocation.argv.join(" ")}`);
+        console.error(`[agent-bar]   cwd: ${invocation.cwd ?? "none"}`);
+        throw new BackendClientError(`Subprocess spawn failed: ${spawnError?.message ?? spawnError}`, {
+          argv: invocation.argv,
+          cwd: invocation.cwd,
+          mode: invocation.mode,
+          cause: spawnError,
+        });
+      }
 
       if (!result?.success) {
+        console.error(`[agent-bar] Backend command failed (mode=${invocation.mode}, exit=${result?.exitCode ?? "?"})`);
+        console.error(`[agent-bar]   argv: ${invocation.argv.join(" ")}`);
+        console.error(`[agent-bar]   stderr: ${result?.stderr?.trim() || "none"}`);
         throw createFailureError(invocation, result);
       }
 

@@ -1,9 +1,17 @@
 import { formatLastUpdatedText, formatTimestampLabel } from "./time.js";
 
-const PROVIDER_ACCENT_COLORS = {
-  claude: "#d19a66",
-  codex: "#98c379",
-  copilot: "#61afef",
+export const INDICATOR_PROVIDER_ORDER = ["codex", "claude", "copilot"];
+
+const INDICATOR_PROVIDER_META = {
+  codex: {
+    title: "Codex",
+  },
+  claude: {
+    title: "Claude",
+  },
+  copilot: {
+    title: "Copilot",
+  },
 };
 
 function formatProviderTitle(providerId) {
@@ -19,7 +27,7 @@ function formatStatusText(status) {
     case "ok":
       return "Healthy";
     case "degraded":
-      return "Issue";
+      return "Degraded";
     case "error":
       return "Error";
     case "unavailable":
@@ -31,15 +39,28 @@ function formatStatusText(status) {
 
 function formatUsageText(usage) {
   if (!usage || usage.kind !== "quota") {
-    return null;
+    return "Usage unavailable";
   }
 
   const used = usage.used ?? "?";
   const limit = usage.limit ?? "?";
-  const percent = clampPercent(usage.percent_used);
+  const percent = usage.percent_used ?? null;
   const percentText = percent === null ? "" : ` (${percent}%)`;
 
-  return `${used} / ${limit}${percentText}`;
+  return `Usage: ${used} / ${limit}${percentText}`;
+}
+
+function formatUsagePercentText(usage) {
+  if (!usage || usage.kind !== "quota") {
+    return "--%";
+  }
+
+  const percent = usage.percent_used;
+  if (typeof percent !== "number" || !Number.isFinite(percent)) {
+    return "--%";
+  }
+
+  return `${Math.round(percent)}%`;
 }
 
 function formatResetWindowText(resetWindow) {
@@ -47,81 +68,55 @@ function formatResetWindowText(resetWindow) {
     return null;
   }
 
-  return `Reset ${resetWindow.label}`;
+  return `Reset: ${resetWindow.label}`;
 }
 
-function formatStatusIconName(status) {
-  switch (status) {
-    case "ok":
-      return "emblem-ok-symbolic";
-    case "degraded":
-    case "unavailable":
-      return "dialog-warning-symbolic";
-    case "error":
-      return "dialog-error-symbolic";
-    default:
-      return "dialog-information-symbolic";
-  }
-}
-
-function clampPercent(value) {
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function formatIssueSummary(providerSnapshot) {
+function formatDiagnosticsSummary(providerSnapshot) {
   const error = providerSnapshot?.error ?? null;
   const attempts = providerSnapshot?.diagnostics?.attempts ?? [];
-  const status = providerSnapshot?.status ?? "unknown";
-  const message = error?.message ?? "";
 
-  if (error?.code === "secret_store_unavailable" || /secret-tool/i.test(message)) {
-    return "Missing secret-tool";
+  if (error?.code === "secret_store_unavailable" || /secret-tool/i.test(error?.message ?? "")) {
+    return "Missing prerequisite: secret-tool";
   }
 
   if (error?.code === "secret_not_found") {
-    return "Missing credential";
+    return "Missing prerequisite: stored credential";
   }
 
-  if (
-    error?.code === "auth_required"
-    || error?.code === "unauthorized"
-    || error?.code === "forbidden"
-    || /auth/i.test(message)
-    || /\b401\b|\b403\b/i.test(message)
-  ) {
-    return "Auth needed";
-  }
-
-  if (status === "unavailable") {
-    return "Unavailable";
-  }
-
-  if (status === "degraded") {
-    return "Needs attention";
-  }
-
-  if (status === "error") {
-    return "Error";
+  if (error?.message) {
+    return `Diagnostics: ${error.message}`;
   }
 
   if (attempts.length > 0) {
-    return "Needs attention";
+    return `Diagnostics: ${attempts.length} attempt${attempts.length === 1 ? "" : "s"}`;
   }
 
   return null;
 }
+
+const ERROR_CODE_COMMANDS = {
+  copilot_token_missing: "agent-bar auth copilot",
+  claude_auth_expired: "claude auth login",
+  claude_cli_missing: "npm i -g @anthropic-ai/claude-code",
+  claude_cli_failed: "agent-bar doctor",
+  codex_cli_missing: "npm i -g @openai/codex",
+  codex_cli_failed: "agent-bar doctor",
+  codex_pty_unavailable: "sudo apt install build-essential python3 && pnpm install",
+  secret_store_unavailable: "sudo apt install libsecret-tools",
+};
 
 function formatSuggestedCommand(providerSnapshot) {
   if (!providerSnapshot) {
     return null;
   }
 
+  const code = providerSnapshot.error?.code;
+  if (code && ERROR_CODE_COMMANDS[code]) {
+    return `Run: ${ERROR_CODE_COMMANDS[code]}`;
+  }
+
   if (providerSnapshot.error || (providerSnapshot.diagnostics?.attempts?.length ?? 0) > 0) {
-    return "Suggested command: agent-bar doctor --json";
+    return "Run: agent-bar doctor";
   }
 
   return null;
@@ -132,47 +127,64 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
   const title = formatProviderTitle(providerId);
   const status = providerSnapshot?.status ?? "unknown";
   const statusText = formatStatusText(status);
-  const iconKey = providerId;
-  const statusIconName = formatStatusIconName(status);
-  const accentColor = PROVIDER_ACCENT_COLORS[providerId] ?? null;
-  const quotaText = formatUsageText(providerSnapshot?.usage ?? null);
-  const progressPercent = clampPercent(providerSnapshot?.usage?.percent_used ?? null);
-  const progressVisible = progressPercent !== null;
+  const usageText = formatUsageText(providerSnapshot?.usage ?? null);
+  const usagePercentText = formatUsagePercentText(providerSnapshot?.usage ?? null);
   const resetText = formatResetWindowText(providerSnapshot?.reset_window ?? null);
-  const issueSummaryText = formatIssueSummary(providerSnapshot);
-  const secondaryText = resetText ?? issueSummaryText;
   const updatedAtText = providerSnapshot?.updated_at
     ? formatTimestampLabel(providerSnapshot.updated_at, { prefix: "Updated", now })
     : "Updated time unavailable";
   const errorText = providerSnapshot?.error?.message ?? null;
-  const detailsSourceText = providerSnapshot?.source ? `Source: ${providerSnapshot.source}` : null;
-  const detailsSuggestedCommandText = formatSuggestedCommand(providerSnapshot);
+  const sourceText = providerSnapshot?.source ? `Source: ${providerSnapshot.source}` : null;
+  const diagnosticsSummaryText = formatDiagnosticsSummary(providerSnapshot);
+  const suggestedCommandText = formatSuggestedCommand(providerSnapshot);
 
   return {
     providerId,
     title,
     status,
     statusText,
-    statusIconName,
-    iconKey,
-    accentColor,
-    quotaText,
-    progressPercent,
-    progressVisible,
-    secondaryText,
-    detailsSuggestedCommandText,
-    detailsSourceText,
-    issueSummaryText,
+    usageText,
+    usagePercentText,
     resetText,
     updatedAtText,
     errorText,
-    usageText: quotaText,
-    sourceText: detailsSourceText,
-    diagnosticsSummaryText: issueSummaryText,
-    suggestedCommandText: detailsSuggestedCommandText,
-    hasError: Boolean(issueSummaryText || errorText || status === "error"),
-    hasUsage: progressVisible,
+    sourceText,
+    diagnosticsSummaryText,
+    suggestedCommandText,
+    hasError: Boolean(errorText),
+    hasUsage: Boolean(providerSnapshot?.usage),
     isUnavailable: status === "unavailable",
+  };
+}
+
+function buildIndicatorProviderViewModel(providerId, providerSnapshot, state, { now = new Date() } = {}) {
+  const meta = INDICATOR_PROVIDER_META[providerId] ?? {
+    title: formatProviderTitle(providerId),
+  };
+  const usagePercentText = formatUsagePercentText(providerSnapshot?.usage ?? null);
+  const status = providerSnapshot?.status
+    ?? (state.lastError ? "error" : state.isLoading ? "loading" : "idle");
+  const statusText = providerSnapshot?.status
+    ? formatStatusText(providerSnapshot.status)
+    : state.lastError
+      ? "Backend error"
+      : state.isLoading
+        ? "Refreshing"
+        : "Waiting for data";
+  const updatedAtText = providerSnapshot?.updated_at
+    ? formatTimestampLabel(providerSnapshot.updated_at, { prefix: "Updated", now })
+    : null;
+
+  return {
+    providerId,
+    title: meta.title,
+    usagePercentText,
+    status,
+    statusText,
+    updatedAtText,
+    isMissingUsage: usagePercentText === "--%",
+    isLoading: state.isLoading,
+    isStale: Boolean(state.lastError),
   };
 }
 
@@ -183,36 +195,30 @@ export function buildSnapshotViewModel(state = {}, { now = new Date() } = {}) {
     buildProviderRowViewModel(providerSnapshot, { now }),
   );
   const providerCount = providerRows.length;
-  const healthyCount = providerRows.filter((row) => row.status === "ok").length;
-  const issueCount = providerRows.filter((row) => row.status !== "ok").length;
-  const errorCount = providerRows.filter((row) => row.status === "error").length;
+  const errorCount = providerRows.filter((row) => row.hasError || row.status === "error").length;
   const unavailableCount = providerRows.filter((row) => row.status === "unavailable").length;
   const hasProviders = providerCount > 0;
   const diagnosticsSummaryText = state.lastError
     ? `Backend error: ${state.lastError}`
-    : issueCount > 0
-      ? `${issueCount} issue${issueCount === 1 ? "" : "s"}`
-      : hasProviders
-        ? `${healthyCount}/${providerCount} ok`
+    : errorCount > 0
+      ? `${errorCount} provider${errorCount === 1 ? "" : "s"} reported an error`
+      : unavailableCount > 0
+        ? `${unavailableCount} provider${unavailableCount === 1 ? "" : "s"} unavailable`
         : null;
-  const suggestedCommandText = state.lastError || issueCount > 0
+  const suggestedCommandText = state.lastError || errorCount > 0 || unavailableCount > 0
     ? "Suggested command: agent-bar doctor --json"
     : null;
   const summaryTitle = state.isLoading
-    ? "Refreshing"
-    : state.lastError
-      ? "Service"
-      : issueCount > 0
-        ? `${issueCount} issue${issueCount === 1 ? "" : "s"}`
-        : hasProviders
-          ? `${healthyCount}/${providerCount} ok`
-          : "No provider data yet";
+    ? "Refreshing provider snapshots"
+    : hasProviders
+      ? `${providerCount} provider${providerCount === 1 ? "" : "s"} loaded`
+      : "No provider data yet";
   const summaryBody = state.lastError
     ? `Backend error: ${state.lastError}`
     : hasProviders
-      ? issueCount > 0
-        ? `${issueCount} issue${issueCount === 1 ? "" : "s"}`
-        : `${healthyCount}/${providerCount} ok`
+      ? errorCount > 0
+        ? `${errorCount} provider${errorCount === 1 ? "" : "s"} reported an error`
+        : "All providers reporting normally"
       : state.isLoading
         ? "Waiting for refreshed data"
         : "Enable providers to see usage";
@@ -222,8 +228,6 @@ export function buildSnapshotViewModel(state = {}, { now = new Date() } = {}) {
   return {
     providerRows,
     providerCount,
-    healthyCount,
-    issueCount,
     errorCount,
     unavailableCount,
     hasProviders,
@@ -233,38 +237,38 @@ export function buildSnapshotViewModel(state = {}, { now = new Date() } = {}) {
     suggestedCommandText,
     lastUpdatedText,
     lastErrorText: state.lastError ?? null,
-    emptyStateText: hasProviders ? null : "No provider data yet",
+    emptyStateText: hasProviders ? null : "No provider snapshots yet",
   };
 }
 
 export function buildIndicatorSummaryViewModel(state = {}, { now = new Date() } = {}) {
   const snapshot = buildSnapshotViewModel(state, { now });
-  let iconName = "dialog-information-symbolic";
-  let labelText = "No data";
+  const providerSnapshots = Array.isArray(state.snapshotEnvelope?.providers) ? state.snapshotEnvelope.providers : [];
+  const providerSnapshotsById = new Map(providerSnapshots.map((providerSnapshot) => [providerSnapshot.provider, providerSnapshot]));
+  const providerItems = INDICATOR_PROVIDER_ORDER.map((providerId) =>
+    buildIndicatorProviderViewModel(providerId, providerSnapshotsById.get(providerId) ?? null, state, { now }),
+  );
+  let panelStatus = "idle";
 
-  if (state.isLoading) {
-    iconName = "view-refresh-symbolic";
-    labelText = "Refreshing";
-  } else if (state.lastError) {
-    iconName = "dialog-error-symbolic";
-    labelText = "Service";
-  } else if (snapshot.issueCount > 0) {
-    iconName = "dialog-warning-symbolic";
-    labelText = `${snapshot.issueCount} issue${snapshot.issueCount === 1 ? "" : "s"}`;
+  if (state.lastError) {
+    panelStatus = "error";
+  } else if (state.isLoading) {
+    panelStatus = "loading";
+  } else if (snapshot.errorCount > 0) {
+    panelStatus = "warning";
   } else if (snapshot.hasProviders) {
-    iconName = "emblem-ok-symbolic";
-    labelText = `${snapshot.healthyCount}/${snapshot.providerCount} ok`;
+    panelStatus = "ready";
   }
 
   return {
-    iconName,
-    labelText,
+    providerItems,
+    panelStatus,
     statusText: snapshot.lastUpdatedText ?? snapshot.summaryBody,
     providerCount: snapshot.providerCount,
-    healthyCount: snapshot.healthyCount,
-    issueCount: snapshot.issueCount,
     errorCount: snapshot.errorCount,
     hasProviders: snapshot.hasProviders,
     lastUpdatedText: snapshot.lastUpdatedText,
+    hasGlobalError: Boolean(state.lastError),
+    isLoading: Boolean(state.isLoading),
   };
 }

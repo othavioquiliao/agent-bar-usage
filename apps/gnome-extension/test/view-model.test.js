@@ -6,125 +6,8 @@ import {
   buildSnapshotViewModel,
 } from "../utils/view-model.js";
 
-const NOW = new Date("2026-03-25T17:10:00.000Z");
-
-function buildState(providers, overrides = {}) {
-  return {
-    isLoading: false,
-    lastError: null,
-    lastUpdatedText: null,
-    snapshotEnvelope: providers
-      ? {
-          generated_at: "2026-03-25T17:05:00.000Z",
-          providers,
-        }
-      : null,
-    ...overrides,
-  };
-}
-
-describe("indicator summary view model", () => {
-  it("returns aggregate-only healthy indicator copy", () => {
-    const summary = buildIndicatorSummaryViewModel(
-      buildState([
-        {
-          provider: "codex",
-          status: "ok",
-          usage: {
-            kind: "quota",
-            used: 10,
-            limit: 100,
-            percent_used: 10,
-          },
-        },
-        {
-          provider: "claude",
-          status: "ok",
-          usage: {
-            kind: "quota",
-            used: 25,
-            limit: 100,
-            percent_used: 25,
-          },
-        },
-      ]),
-      { now: NOW },
-    );
-
-    expect(summary).toMatchObject({
-      iconName: "emblem-ok-symbolic",
-      labelText: "2/2 ok",
-      healthyCount: 2,
-      issueCount: 0,
-      providerCount: 2,
-    });
-  });
-
-  it("returns issue indicator copy with singular and plural labels", () => {
-    const singleIssue = buildIndicatorSummaryViewModel(
-      buildState([
-        { provider: "codex", status: "ok", usage: { kind: "quota", used: 10, limit: 100, percent_used: 10 } },
-        { provider: "claude", status: "error", usage: null, error: { code: "provider_fetch_failed", message: "boom" } },
-      ]),
-      { now: NOW },
-    );
-    const pluralIssues = buildIndicatorSummaryViewModel(
-      buildState([
-        { provider: "codex", status: "error", usage: null, error: { code: "provider_fetch_failed", message: "boom" } },
-        { provider: "claude", status: "degraded", usage: null, error: { code: "auth_required", message: "auth expired" } },
-        { provider: "copilot", status: "ok", usage: { kind: "quota", used: 20, limit: 100, percent_used: 20 } },
-      ]),
-      { now: NOW },
-    );
-
-    expect(singleIssue).toMatchObject({
-      iconName: "dialog-warning-symbolic",
-      labelText: "1 issue",
-      issueCount: 1,
-    });
-    expect(pluralIssues).toMatchObject({
-      iconName: "dialog-warning-symbolic",
-      labelText: "2 issues",
-      issueCount: 2,
-    });
-  });
-
-  it("returns service failure indicator copy for backend errors", () => {
-    const summary = buildIndicatorSummaryViewModel(
-      buildState(null, {
-        lastError: "backend unavailable",
-      }),
-      { now: NOW },
-    );
-
-    expect(summary).toMatchObject({
-      iconName: "dialog-error-symbolic",
-      labelText: "Service",
-      issueCount: 0,
-      providerCount: 0,
-    });
-  });
-
-  it("returns exact loading and empty indicator labels", () => {
-    const loading = buildIndicatorSummaryViewModel(
-      buildState(null, {
-        isLoading: true,
-      }),
-      { now: NOW },
-    );
-    const empty = buildIndicatorSummaryViewModel(buildState(null), { now: NOW });
-
-    expect(loading.labelText).toBe("Refreshing");
-    expect(empty).toMatchObject({
-      iconName: "dialog-information-symbolic",
-      labelText: "No data",
-      providerCount: 0,
-    });
-  });
-});
-
-describe("provider row view models", () => {
-  it("exposes compact healthy row fields without inline diagnostics noise", () => {
+describe("provider view models", () => {
+  it("maps a healthy provider snapshot into display text", () => {
     const row = buildProviderRowViewModel(
       {
         provider: "codex",
@@ -143,31 +26,127 @@ describe("provider row view models", () => {
         },
         error: null,
       },
-      { now: NOW },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
     );
 
     expect(row).toMatchObject({
-      providerId: "codex",
       title: "Codex",
-      status: "ok",
       statusText: "Healthy",
-      statusIconName: "emblem-ok-symbolic",
-      iconKey: "codex",
-      quotaText: "10 / 100 (10%)",
-      progressPercent: 10,
-      progressVisible: true,
-      secondaryText: "Reset Tomorrow",
-      issueSummaryText: null,
-      detailsSourceText: "Source: cli",
-      detailsSuggestedCommandText: null,
+      usageText: "Usage: 10 / 100 (10%)",
+      usagePercentText: "10%",
+      resetText: "Reset: Tomorrow",
+      sourceText: "Source: cli",
+      errorText: null,
     });
-    expect(row.updatedAtText).toBe("Updated 5 minutes ago");
-    expect(row.secondaryText).not.toContain("Source:");
-    expect(row.secondaryText).not.toContain("Suggested command:");
+    expect(row.updatedAtText).toMatch(/Updated .*(5 minutes ago|há 5 minutos|5 min)/i);
   });
 
-  it("normalizes missing prerequisites and auth failures into compact secondary labels", () => {
-    const missingPrerequisite = buildProviderRowViewModel(
+  it("maps an error provider snapshot into readable error text", () => {
+    const row = buildProviderRowViewModel(
+      {
+        provider: "claude",
+        status: "error",
+        source: "cli",
+        updated_at: "2026-03-25T17:02:00.000Z",
+        usage: null,
+        reset_window: null,
+        error: {
+          code: "provider_fetch_failed",
+          message: "adapter exploded",
+          retryable: false,
+        },
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(row).toMatchObject({
+      title: "Claude",
+      statusText: "Error",
+      usageText: "Usage unavailable",
+      usagePercentText: "--%",
+      errorText: "adapter exploded",
+      sourceText: "Source: cli",
+      diagnosticsSummaryText: "Diagnostics: adapter exploded",
+      suggestedCommandText: "Run: agent-bar doctor",
+    });
+  });
+
+  it("maps copilot_token_missing to actionable suggestion", () => {
+    const snapshot = {
+      provider: "copilot",
+      status: "error",
+      error: { code: "copilot_token_missing", message: "No token" },
+    };
+    const vm = buildProviderRowViewModel(snapshot);
+    expect(vm.suggestedCommandText).toContain("agent-bar auth copilot");
+  });
+
+  it("maps claude_auth_expired to actionable suggestion", () => {
+    const snapshot = {
+      provider: "claude",
+      status: "error",
+      error: { code: "claude_auth_expired", message: "Expired" },
+    };
+    const vm = buildProviderRowViewModel(snapshot);
+    expect(vm.suggestedCommandText).toContain("claude auth login");
+  });
+
+  it("maps claude_cli_missing to npm install suggestion", () => {
+    const snapshot = {
+      provider: "claude",
+      status: "error",
+      error: { code: "claude_cli_missing", message: "CLI not found" },
+    };
+    const vm = buildProviderRowViewModel(snapshot);
+    expect(vm.suggestedCommandText).toContain("npm i -g @anthropic-ai/claude-code");
+  });
+
+  it("maps codex_cli_missing to npm install suggestion", () => {
+    const snapshot = {
+      provider: "codex",
+      status: "error",
+      error: { code: "codex_cli_missing", message: "CLI not found" },
+    };
+    const vm = buildProviderRowViewModel(snapshot);
+    expect(vm.suggestedCommandText).toContain("npm i -g @openai/codex");
+  });
+
+  it("maps codex_pty_unavailable to build-essential suggestion", () => {
+    const snapshot = {
+      provider: "codex",
+      status: "error",
+      error: { code: "codex_pty_unavailable", message: "PTY unavailable" },
+    };
+    const vm = buildProviderRowViewModel(snapshot);
+    expect(vm.suggestedCommandText).toContain("sudo apt install build-essential");
+  });
+
+  it("maps secret_store_unavailable to libsecret-tools suggestion", () => {
+    const snapshot = {
+      provider: "claude",
+      status: "error",
+      error: { code: "secret_store_unavailable", message: "secret-tool missing" },
+    };
+    const vm = buildProviderRowViewModel(snapshot);
+    expect(vm.suggestedCommandText).toContain("sudo apt install libsecret-tools");
+  });
+
+  it("falls back to agent-bar doctor for unknown error codes", () => {
+    const snapshot = {
+      provider: "claude",
+      status: "error",
+      error: { code: "some_unknown_error", message: "Something broke" },
+    };
+    const vm = buildProviderRowViewModel(snapshot);
+    expect(vm.suggestedCommandText).toContain("agent-bar doctor");
+  });
+
+  it("surfaces missing prerequisite guidance for secret-tool failures", () => {
+    const row = buildProviderRowViewModel(
       {
         provider: "claude",
         status: "error",
@@ -181,83 +160,175 @@ describe("provider row view models", () => {
           retryable: false,
         },
       },
-      { now: NOW },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
     );
-    const authNeeded = buildProviderRowViewModel(
+
+    expect(row.diagnosticsSummaryText).toBe("Missing prerequisite: secret-tool");
+    expect(row.suggestedCommandText).toBe("Run: sudo apt install libsecret-tools");
+  });
+
+  it("maps an unavailable provider snapshot without losing the placeholder text", () => {
+    const row = buildProviderRowViewModel(
       {
         provider: "copilot",
-        status: "degraded",
+        status: "unavailable",
         source: "api",
         updated_at: "2026-03-25T17:02:00.000Z",
         usage: null,
         reset_window: null,
-        error: {
-          code: "auth_required",
-          message: "Sign in again",
-          retryable: true,
-        },
-        diagnostics: {
-          attempts: [{ command: "copilot auth login" }],
-        },
+        error: null,
       },
-      { now: NOW },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
     );
 
-    expect(missingPrerequisite).toMatchObject({
-      statusIconName: "dialog-error-symbolic",
-      quotaText: null,
-      progressPercent: null,
-      progressVisible: false,
-      secondaryText: "Missing secret-tool",
-      issueSummaryText: "Missing secret-tool",
-      detailsSourceText: "Source: cli",
-      detailsSuggestedCommandText: "Suggested command: agent-bar doctor --json",
+    expect(row).toMatchObject({
+      title: "Copilot",
+      statusText: "Unavailable",
+      usageText: "Usage unavailable",
+      usagePercentText: "--%",
+      errorText: null,
     });
-    expect(authNeeded).toMatchObject({
-      statusIconName: "dialog-warning-symbolic",
-      progressVisible: false,
-      secondaryText: "Auth needed",
-      issueSummaryText: "Auth needed",
-      detailsSuggestedCommandText: "Suggested command: agent-bar doctor --json",
-    });
-    expect(authNeeded.secondaryText).not.toContain("Suggested command:");
-    expect(authNeeded.secondaryText).not.toContain("Source:");
   });
 });
 
 describe("snapshot view models", () => {
-  it("tracks aggregate healthy and issue counts for menu rendering", () => {
+  it("returns an empty state when no snapshot envelope exists", () => {
     const snapshot = buildSnapshotViewModel(
-      buildState([
-        {
-          provider: "codex",
-          status: "ok",
-          usage: {
-            kind: "quota",
-            used: 10,
-            limit: 100,
-            percent_used: 10,
-          },
-        },
-        {
-          provider: "claude",
-          status: "error",
-          usage: null,
-          error: {
-            code: "provider_fetch_failed",
-            message: "adapter exploded",
-          },
-        },
-      ]),
-      { now: NOW },
+      {
+        snapshotEnvelope: null,
+        isLoading: false,
+        lastUpdatedText: null,
+        lastError: null,
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
     );
 
-    expect(snapshot).toMatchObject({
-      providerCount: 2,
-      healthyCount: 1,
-      issueCount: 1,
-      diagnosticsSummaryText: "1 issue",
-      suggestedCommandText: "Suggested command: agent-bar doctor --json",
+    expect(snapshot.providerRows).toEqual([]);
+    expect(snapshot.summaryTitle).toBe("No provider data yet");
+    expect(snapshot.emptyStateText).toBe("No provider snapshots yet");
+  });
+
+  it("builds the loading indicator summary text", () => {
+    const summary = buildIndicatorSummaryViewModel(
+      {
+        isLoading: true,
+        snapshotEnvelope: null,
+        lastError: null,
+        lastUpdatedText: null,
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(summary).toMatchObject({
+      panelStatus: "loading",
+      hasProviders: false,
+      providerItems: [
+        expect.objectContaining({ providerId: "codex", usagePercentText: "--%", status: "loading" }),
+        expect.objectContaining({ providerId: "claude", usagePercentText: "--%", status: "loading" }),
+        expect.objectContaining({ providerId: "copilot", usagePercentText: "--%", status: "loading" }),
+      ],
+    });
+  });
+
+  it("surfaces backend errors in the snapshot summary", () => {
+    const snapshot = buildSnapshotViewModel(
+      {
+        snapshotEnvelope: null,
+        isLoading: false,
+        lastUpdatedText: null,
+        lastError: "backend unavailable",
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(snapshot.diagnosticsSummaryText).toBe("Backend error: backend unavailable");
+    expect(snapshot.suggestedCommandText).toBe("Suggested command: agent-bar doctor --json");
+  });
+
+  it("builds a fixed three-provider topbar view model with usage percentages", () => {
+    const summary = buildIndicatorSummaryViewModel(
+      {
+        isLoading: false,
+        lastError: null,
+        lastUpdatedText: "Last updated just now",
+        snapshotEnvelope: {
+          schema_version: "1",
+          generated_at: "2026-03-25T17:10:00.000Z",
+          providers: [
+            {
+              provider: "copilot",
+              status: "ok",
+              usage: { kind: "quota", used: 42, limit: 100, percent_used: 42 },
+              updated_at: "2026-03-25T17:10:00.000Z",
+              error: null,
+            },
+            {
+              provider: "codex",
+              status: "ok",
+              usage: { kind: "quota", used: 10, limit: 100, percent_used: 10 },
+              updated_at: "2026-03-25T17:10:00.000Z",
+              error: null,
+            },
+          ],
+        },
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(summary.panelStatus).toBe("ready");
+    expect(summary.providerItems).toEqual([
+      expect.objectContaining({ providerId: "codex", usagePercentText: "10%", status: "ok" }),
+      expect.objectContaining({ providerId: "claude", usagePercentText: "--%", status: "idle" }),
+      expect.objectContaining({ providerId: "copilot", usagePercentText: "42%", status: "ok" }),
+    ]);
+  });
+
+  it("marks topbar providers as stale when a backend error happens after data loads", () => {
+    const summary = buildIndicatorSummaryViewModel(
+      {
+        isLoading: false,
+        lastError: "backend unavailable",
+        lastUpdatedText: "Last updated 1 minute ago",
+        snapshotEnvelope: {
+          schema_version: "1",
+          generated_at: "2026-03-25T17:09:00.000Z",
+          providers: [
+            {
+              provider: "claude",
+              status: "degraded",
+              usage: { kind: "quota", used: 91, limit: 100, percent_used: 91 },
+              updated_at: "2026-03-25T17:09:00.000Z",
+              error: null,
+            },
+          ],
+        },
+      },
+      {
+        now: new Date("2026-03-25T17:10:00.000Z"),
+      },
+    );
+
+    expect(summary).toMatchObject({
+      panelStatus: "error",
+      hasGlobalError: true,
+    });
+    expect(summary.providerItems[1]).toMatchObject({
+      providerId: "claude",
+      usagePercentText: "91%",
+      status: "degraded",
+      isStale: true,
     });
   });
 });

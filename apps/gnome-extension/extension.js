@@ -22,6 +22,8 @@ export default class AgentBarUbuntuExtension extends Extension {
       return;
     }
 
+    this._loadStylesheet();
+
     const initialState = createInitialState();
     const findProgramInPath = (name) => {
       const found = GLib.find_program_in_path(name);
@@ -57,7 +59,6 @@ export default class AgentBarUbuntuExtension extends Extension {
     this._indicator = indicator;
     this._backendClient = backendClient;
     this._pollingService = pollingService;
-    this._loadStylesheet();
     indicator.setRefreshHandler(() => this._pollingService?.refreshNow({ forceRefresh: true }));
 
     try {
@@ -69,8 +70,8 @@ export default class AgentBarUbuntuExtension extends Extension {
       this._pollingService = null;
       this._backendClient = null;
       this._indicator = null;
-      this._unloadStylesheet();
       indicator.destroy();
+      this._unloadStylesheet();
       throw error;
     }
   }
@@ -90,13 +91,17 @@ export default class AgentBarUbuntuExtension extends Extension {
   }
 
   _loadStylesheet() {
-    const stylesheetFile = this.dir.get_child("stylesheet.css");
-    if (!stylesheetFile?.query_exists(null)) {
+    if (this._stylesheetFile) {
       return;
     }
 
-    const theme = St.ThemeContext.get_for_stage(global.stage)?.get_theme();
-    theme?.load_stylesheet(stylesheetFile);
+    const stylesheetFile = this.dir.get_child("stylesheet.css");
+    if (!stylesheetFile.query_exists(null)) {
+      return;
+    }
+
+    const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
+    theme.load_stylesheet(stylesheetFile);
     this._stylesheetFile = stylesheetFile;
   }
 
@@ -105,8 +110,8 @@ export default class AgentBarUbuntuExtension extends Extension {
       return;
     }
 
-    const theme = St.ThemeContext.get_for_stage(global.stage)?.get_theme();
-    theme?.unload_stylesheet(this._stylesheetFile);
+    const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
+    theme.unload_stylesheet(this._stylesheetFile);
     this._stylesheetFile = null;
   }
 }

@@ -1,259 +1,272 @@
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline/promises";
+/**
+ * `agent-bar auth copilot` — GitHub Device Flow authentication for Copilot.
+ *
+ * Flow:
+ *  1. Request a device code from GitHub.
+ *  2. Show the user code + verification URL; try xdg-open to open browser.
+ *  3. Wait for Enter from the user.
+ *  4. Poll GitHub for the access token.
+ *  5. Store the token in GNOME Keyring via secret-tool.
+ *  6. Ensure config.json has the copilot secretRef.
+ *  7. Restart the agent-bar systemd service (best-effort).
+ */
 
+import { exec } from "node:child_process";
+import * as readline from "node:readline";
+import path from "node:path";
+import os from "node:os";
 import type { Command } from "commander";
 
-import { resolveBackendConfigPath } from "../config/config-path.js";
-import { resolveCommandInPath, runSubprocess } from "../utils/subprocess.js";
-import {
-  pollForAccessToken,
-  requestDeviceCode,
-  type DeviceCodeResponse,
-  type DeviceFlowResult,
-} from "../auth/github-device-flow.js";
+import { requestDeviceCode, pollForAccessToken } from "../auth/github-device-flow.js";
 import { storeSecretViaSecretTool } from "../auth/secret-tool-writer.js";
 import { ensureCopilotSecretRef } from "../auth/config-writer.js";
+import { runSubprocess } from "../utils/subprocess.js";
+import { readClaudeCredentials } from "../providers/claude/claude-credentials.js";
+import { readCodexCredentials } from "../providers/codex/codex-credentials.js";
 
-const DEFAULT_SECRET_SERVICE = "agent-bar";
-const DEFAULT_SECRET_ACCOUNT = "copilot";
-const DEFAULT_SECRET_LABEL = "Agent Bar Copilot";
+/** GitHub OAuth App client ID for Agent Bar. Override with --client-id for testing. */
+const DEFAULT_CLIENT_ID = "Ov23liWCdSLUEPTXJz4c";
 
-export interface AuthCommandRuntimeOptions {
+const COPILOT_SERVICE = "agent-bar";
+const COPILOT_ACCOUNT = "copilot";
+const COPILOT_LABEL = "Agent Bar Copilot";
+const COPILOT_SCOPE = "copilot";
+
+export interface AuthCommandOptions {
   clientId?: string;
-  configPath?: string;
-  noBrowser?: boolean;
+  token?: string;
 }
+
+export const COPILOT_SETUP_GUIDE = `  Como configurar o Copilot manualmente:
+
+  1. Abra https://github.com/settings/tokens?type=beta
+  2. Clique "Generate new token"
+  3. De um nome (ex: "agent-bar"), selecione expiration, e crie
+  4. Copie o token e rode:
+
+     agent-bar auth copilot --token ghp_SEU_TOKEN
+
+  5. Verifique:
+
+     agent-bar doctor
+
+`;
 
 export interface AuthCommandDependencies {
-  env?: NodeJS.ProcessEnv;
-  homeDir?: string;
-  stdout?: Pick<NodeJS.WriteStream, "write">;
-  requestDeviceCodeFn?: (
-    clientId: string,
-    scope: string,
-  ) => Promise<DeviceCodeResponse>;
-  pollForAccessTokenFn?: (
-    clientId: string,
-    deviceCode: string,
-    interval: number,
-    expiresIn: number,
-  ) => Promise<DeviceFlowResult>;
-  storeSecretFn?: (
-    service: string,
-    account: string,
-    value: string,
-    label?: string,
-  ) => Promise<void>;
-  ensureCopilotSecretRefFn?: (
-    configPath: string,
-    secretRef: {
-      store: "secret-tool";
-      service: string;
-      account: string;
-    },
-  ) => Promise<void>;
-  promptForEnterFn?: (message: string) => Promise<void>;
-  openUrlFn?: (url: string) => Promise<boolean>;
-  restartServiceFn?: () => Promise<boolean>;
+  fetchFn?: typeof fetch;
+  storeSecret?: typeof storeSecretViaSecretTool;
+  ensureConfigRef?: typeof ensureCopilotSecretRef;
+  resolveConfigPath?: () => string;
+  openBrowser?: (url: string) => void;
+  waitForEnter?: () => Promise<void>;
+  restartService?: () => Promise<void>;
 }
 
-export class CopilotAuthCommandError extends Error {
-  constructor(
-    readonly code: "client_id_missing",
-    message: string,
-  ) {
-    super(message);
-    this.name = "CopilotAuthCommandError";
-  }
-}
-
-export async function runCopilotAuthCommand(
-  options: AuthCommandRuntimeOptions = {},
+export async function runAuthCopilotCommand(
+  options: AuthCommandOptions = {},
   dependencies: AuthCommandDependencies = {},
 ): Promise<void> {
-  const env = dependencies.env ?? process.env;
-  const stdout = dependencies.stdout ?? process.stdout;
-  const clientId = resolveClientId(options.clientId, env);
-  const requestDeviceCodeFn = dependencies.requestDeviceCodeFn ?? defaultRequestDeviceCode;
-  const pollForAccessTokenFn = dependencies.pollForAccessTokenFn ?? defaultPollForAccessToken;
-  const storeSecretFn = dependencies.storeSecretFn ?? defaultStoreSecret;
-  const ensureCopilotSecretRefFn = dependencies.ensureCopilotSecretRefFn ?? defaultEnsureCopilotSecretRef;
-  const promptForEnterFn = dependencies.promptForEnterFn ?? defaultPromptForEnter;
-  const openUrlFn = dependencies.openUrlFn ?? openUrlInBrowser;
-  const restartServiceFn = dependencies.restartServiceFn ?? restartAgentBarService;
+  const clientId = options.clientId ?? DEFAULT_CLIENT_ID;
+  const fetchFn = dependencies.fetchFn ?? fetch;
+  const store = dependencies.storeSecret ?? storeSecretViaSecretTool;
+  const ensureRef = dependencies.ensureConfigRef ?? ensureCopilotSecretRef;
+  const resolveConfig =
+    dependencies.resolveConfigPath ??
+    (() => {
+      const xdgConfigHome = process.env.XDG_CONFIG_HOME;
+      const configRoot =
+        xdgConfigHome && xdgConfigHome.trim().length > 0
+          ? xdgConfigHome
+          : path.join(os.homedir(), ".config");
+      return path.join(configRoot, "agent-bar", "config.json");
+    });
+  const openBrowser = dependencies.openBrowser ?? defaultOpenBrowser;
+  const waitForEnter = dependencies.waitForEnter ?? defaultWaitForEnter;
+  const restart = dependencies.restartService ?? defaultRestartService;
 
-  stdout.write("Requesting device code from GitHub...\n\n");
-  const deviceCode = await requestDeviceCodeFn(clientId, "copilot");
+  // If --token provided, skip Device Flow entirely and store directly
+  if (options.token) {
+    process.stdout.write("\n  Storing token in GNOME Keyring...\n");
+    await store(COPILOT_SERVICE, COPILOT_ACCOUNT, options.token, COPILOT_LABEL);
 
-  stdout.write(`! Copy this code: ${deviceCode.user_code}\n`);
-  stdout.write(`  Then open: ${deviceCode.verification_uri}\n`);
+    process.stdout.write("  Updating config...\n");
+    const configPath = resolveConfig();
+    await ensureRef(configPath, {
+      store: "secret-tool",
+      service: COPILOT_SERVICE,
+      account: COPILOT_ACCOUNT,
+    });
 
-  if (!options.noBrowser) {
-    await promptForEnterFn("  Press Enter to open your browser...");
-    await openUrlFn(deviceCode.verification_uri);
-    stdout.write("\n");
-  } else {
-    stdout.write("  Browser auto-open skipped.\n\n");
+    process.stdout.write("  Restarting agent-bar service...\n");
+    await restart();
+
+    process.stdout.write("\n\u2713 Authenticated!\n");
+    process.stdout.write(
+      `  Token stored in GNOME Keyring (service=${COPILOT_SERVICE}, account=${COPILOT_ACCOUNT}).\n`,
+    );
+    process.stdout.write(`  Config updated at ${configPath}.\n`);
+    process.stdout.write("  Service restarted.\n\n");
+    process.stdout.write('  Run "agent-bar doctor --json" to verify.\n\n');
+    return;
   }
 
-  stdout.write(`  Waiting for authorization... (expires in ${formatDuration(deviceCode.expires_in)})\n`);
-  const token = await pollForAccessTokenFn(
+  process.stdout.write("\n  Requesting device code from GitHub...\n\n");
+
+  let deviceCode;
+  try {
+    deviceCode = await requestDeviceCode(clientId, COPILOT_SCOPE, fetchFn);
+  } catch (deviceError: unknown) {
+    const msg = deviceError instanceof Error ? deviceError.message : String(deviceError);
+    process.stderr.write(`\n  Device Flow falhou: ${msg}\n\n`);
+    process.stderr.write(COPILOT_SETUP_GUIDE);
+    process.exitCode = 1;
+    return;
+  }
+
+  process.stdout.write(`! Copy this code: ${deviceCode.user_code}\n`);
+  process.stdout.write(`  Then open:      ${deviceCode.verification_uri}\n`);
+  process.stdout.write("  Press Enter to open your browser...\n");
+
+  openBrowser(deviceCode.verification_uri);
+  await waitForEnter();
+
+  const expiresMinutes = Math.round(deviceCode.expires_in / 60);
+  process.stdout.write(`\n  Waiting for authorization... (expires in ${expiresMinutes} minutes)\n`);
+
+  const tokenResult = await pollForAccessToken(
     clientId,
     deviceCode.device_code,
     deviceCode.interval,
     deviceCode.expires_in,
+    fetchFn,
   );
 
-  await storeSecretFn(
-    DEFAULT_SECRET_SERVICE,
-    DEFAULT_SECRET_ACCOUNT,
-    token.access_token,
-    DEFAULT_SECRET_LABEL,
-  );
+  process.stdout.write("\n  Storing token in GNOME Keyring...\n");
+  await store(COPILOT_SERVICE, COPILOT_ACCOUNT, tokenResult.access_token, COPILOT_LABEL);
 
-  const configPath = options.configPath ?? resolveBackendConfigPath({
-    env,
-    homeDir: dependencies.homeDir,
-  });
-
-  await ensureCopilotSecretRefFn(configPath, {
+  process.stdout.write("  Updating config...\n");
+  const configPath = resolveConfig();
+  await ensureRef(configPath, {
     store: "secret-tool",
-    service: DEFAULT_SECRET_SERVICE,
-    account: DEFAULT_SECRET_ACCOUNT,
+    service: COPILOT_SERVICE,
+    account: COPILOT_ACCOUNT,
   });
 
-  const restarted = await restartServiceFn();
+  process.stdout.write("  Restarting agent-bar service...\n");
+  await restart();
 
-  stdout.write("\n");
-  stdout.write("✓ Authenticated!\n");
-  stdout.write(`  Token stored in GNOME Keyring (service=${DEFAULT_SECRET_SERVICE}, account=${DEFAULT_SECRET_ACCOUNT}).\n`);
-  stdout.write(`  Config updated at ${configPath}.\n`);
-  stdout.write(restarted ? "  Service restarted.\n" : "  Service restart skipped.\n");
-  stdout.write('\n  Run "agent-bar doctor --json" to verify.\n');
+  process.stdout.write("\n\u2713 Authenticated!\n");
+  process.stdout.write(
+    `  Token stored in GNOME Keyring (service=${COPILOT_SERVICE}, account=${COPILOT_ACCOUNT}).\n`,
+  );
+  process.stdout.write(`  Config updated at ${configPath}.\n`);
+  process.stdout.write("  Service restarted.\n\n");
+  process.stdout.write('  Run "agent-bar doctor --json" to verify.\n\n');
 }
 
-export function registerAuthCommand(program: Command, dependencies: AuthCommandDependencies = {}): void {
-  const authCommand = program
-    .command("auth")
-    .description("Authenticate provider credentials for the local backend.");
+export function registerAuthCommand(program: Command): void {
+  const auth = program.command("auth").description("Authenticate with AI providers.");
 
-  authCommand
+  auth
     .command("copilot")
-    .description("Authenticate Copilot via GitHub Device Flow and store the token in secret-tool.")
-    .option("--client-id <clientId>", "Override the GitHub OAuth client id")
-    .option("--config-path <path>", "Use an explicit backend config path")
-    .option("--no-browser", "Skip xdg-open and show the verification URL only")
-    .action(async (options: AuthCommandRuntimeOptions) => {
-      await runCopilotAuthCommand(options, dependencies);
+    .description("Authenticate with GitHub Copilot using Device Flow OAuth.")
+    .option("--client-id <id>", "GitHub OAuth App client ID (overrides built-in default)")
+    .option("--token <token>", "Store a GitHub token directly (skip Device Flow)")
+    .action(async (options: AuthCommandOptions) => {
+      try {
+        await runAuthCopilotCommand(options);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`\nError: ${message}\n`);
+        process.exitCode = 1;
+      }
+    });
+
+  auth
+    .command("claude")
+    .description("Validate Claude CLI authentication.")
+    .action(async () => {
+      try {
+        await runAuthClaudeCommand();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`\nError: ${message}\n`);
+        process.exitCode = 1;
+      }
+    });
+
+  auth
+    .command("codex")
+    .description("Validate Codex CLI authentication.")
+    .action(async () => {
+      try {
+        await runAuthCodexCommand();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`\nError: ${message}\n`);
+        process.exitCode = 1;
+      }
     });
 }
 
-function resolveClientId(clientId: string | undefined, env: NodeJS.ProcessEnv): string {
-  const resolved = clientId?.trim() || env.AGENT_BAR_GITHUB_CLIENT_ID?.trim();
-
-  if (!resolved) {
-    throw new CopilotAuthCommandError(
-      "client_id_missing",
-      "GitHub OAuth client id is required. Re-run with `agent-bar auth copilot --client-id <id>` or set `AGENT_BAR_GITHUB_CLIENT_ID`.",
-    );
-  }
-
-  return resolved;
+export interface AuthClaudeCommandDependencies {
+  readCredentials?: typeof readClaudeCredentials;
 }
 
-async function defaultRequestDeviceCode(clientId: string, scope: string): Promise<DeviceCodeResponse> {
-  return await requestDeviceCode(clientId, scope);
-}
-
-async function defaultPollForAccessToken(
-  clientId: string,
-  deviceCode: string,
-  interval: number,
-  expiresIn: number,
-): Promise<DeviceFlowResult> {
-  return await pollForAccessToken(clientId, deviceCode, interval, expiresIn);
-}
-
-async function defaultStoreSecret(
-  service: string,
-  account: string,
-  value: string,
-  label = DEFAULT_SECRET_LABEL,
+export async function runAuthClaudeCommand(
+  dependencies: AuthClaudeCommandDependencies = {},
 ): Promise<void> {
-  await storeSecretViaSecretTool(service, account, value, label);
-}
+  const read = dependencies.readCredentials ?? readClaudeCredentials;
+  const credentials = await read();
 
-async function defaultEnsureCopilotSecretRef(
-  configPath: string,
-  secretRef: {
-    store: "secret-tool";
-    service: string;
-    account: string;
-  },
-): Promise<void> {
-  await ensureCopilotSecretRef(configPath, secretRef);
-}
-
-async function defaultPromptForEnter(message: string): Promise<void> {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+  if (!credentials) {
+    process.stderr.write("Claude credentials not found.\n  -> Run: claude auth login\n");
+    process.exitCode = 1;
     return;
   }
 
-  const readline = createInterface({
-    input: process.stdin,
-    output: process.stdout,
+  process.stdout.write("Claude: authenticated (token found in ~/.claude/.credentials.json)\n");
+}
+
+export interface AuthCodexCommandDependencies {
+  readCredentials?: typeof readCodexCredentials;
+}
+
+export async function runAuthCodexCommand(
+  dependencies: AuthCodexCommandDependencies = {},
+): Promise<void> {
+  const read = dependencies.readCredentials ?? readCodexCredentials;
+  const credentials = await read();
+
+  if (!credentials) {
+    process.stderr.write("Codex credentials not found.\n  -> Run: codex auth login\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  process.stdout.write("Codex: authenticated (token found in ~/.codex/auth.json)\n");
+}
+
+function defaultOpenBrowser(url: string): void {
+  exec(`xdg-open ${url}`, () => {
+    // Intentionally silent — xdg-open may not be available in all environments
   });
-
-  try {
-    await readline.question(`${message}\n`);
-  } finally {
-    readline.close();
-  }
 }
 
-async function openUrlInBrowser(url: string): Promise<boolean> {
-  const command = resolveCommandInPath("xdg-open");
-
-  if (!command) {
-    return false;
-  }
-
-  try {
-    const child = spawn(command, [url], {
-      detached: true,
-      stdio: "ignore",
+async function defaultWaitForEnter(): Promise<void> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question("", () => {
+      rl.close();
+      resolve();
     });
-
-    child.unref();
-    return true;
-  } catch {
-    return false;
-  }
+  });
 }
 
-async function restartAgentBarService(): Promise<boolean> {
-  const command = resolveCommandInPath("systemctl");
-
-  if (!command) {
-    return false;
-  }
-
+async function defaultRestartService(): Promise<void> {
   try {
-    await runSubprocess(command, ["--user", "restart", "agent-bar.service"], {
-      timeoutMs: 10_000,
-    });
-    return true;
+    await runSubprocess("systemctl", ["--user", "restart", "agent-bar.service"]);
   } catch {
-    return false;
+    // Best-effort: service may not be installed yet
   }
-}
-
-function formatDuration(totalSeconds: number): string {
-  const minutes = Math.ceil(totalSeconds / 60);
-
-  if (minutes <= 1) {
-    return "1 minute";
-  }
-
-  return `${minutes} minutes`;
 }
