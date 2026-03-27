@@ -4,10 +4,11 @@ import { createClaudeCliAdapter } from "../src/providers/claude/claude-cli-adapt
 import { PtyUnavailableError } from "../src/providers/shared/interactive-command.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
 
-const { runInteractiveCommandMock, resolveCommandInPathMock, readClaudeCredentialsMock } = vi.hoisted(() => ({
+const { runInteractiveCommandMock, resolveCommandInPathMock, readClaudeCredentialsMock, fetchClaudeUsageViaApiMock } = vi.hoisted(() => ({
   runInteractiveCommandMock: vi.fn(),
   resolveCommandInPathMock: vi.fn(),
   readClaudeCredentialsMock: vi.fn(),
+  fetchClaudeUsageViaApiMock: vi.fn(),
 }));
 
 vi.mock("../src/providers/shared/interactive-command.js", async () => {
@@ -36,11 +37,16 @@ vi.mock("../src/providers/claude/claude-credentials.js", () => ({
   readClaudeCredentials: readClaudeCredentialsMock,
 }));
 
+vi.mock("../src/providers/claude/claude-api-fetcher.js", () => ({
+  fetchClaudeUsageViaApi: fetchClaudeUsageViaApiMock,
+}));
+
 describe("Claude CLI provider", () => {
   beforeEach(() => {
     runInteractiveCommandMock.mockReset();
     resolveCommandInPathMock.mockReset();
     readClaudeCredentialsMock.mockReset();
+    fetchClaudeUsageViaApiMock.mockReset();
     resolveCommandInPathMock.mockReturnValue(null);
     // Default: no credentials on disk, so adapter falls back to PTY
     readClaudeCredentialsMock.mockResolvedValue(null);
@@ -157,17 +163,102 @@ describe("Claude CLI provider", () => {
     expect(snapshot.error?.code).toBe("claude_pty_unavailable");
     expect(snapshot.error?.retryable).toBe(false);
   });
+
+  it("honors explicit cli mode even when OAuth credentials exist", async () => {
+    readClaudeCredentialsMock.mockResolvedValue({ accessToken: "sk-ant-test", expiresAt: null });
+    fetchClaudeUsageViaApiMock.mockResolvedValue({
+      provider: "claude",
+      status: "ok",
+      source: "api",
+      updated_at: new Date().toISOString(),
+      usage: { kind: "quota", used: 12, limit: 100, percent_used: 12 },
+      reset_window: null,
+      error: null,
+    });
+    runInteractiveCommandMock.mockResolvedValue(
+      createRunResult("Current session 40% (resets at 2026-03-25T17:00:00.000Z)"),
+    );
+
+    const adapter = createClaudeCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CLAUDE_CLI_PATH: "/usr/bin/claude",
+        },
+        sourceMode: "cli",
+      }),
+    );
+
+    expect(snapshot.source).toBe("cli");
+    expect(fetchClaudeUsageViaApiMock).not.toHaveBeenCalled();
+    expect(runInteractiveCommandMock).toHaveBeenCalled();
+  });
+
+  it("uses the API path only when api mode is requested", async () => {
+    fetchClaudeUsageViaApiMock.mockResolvedValue({
+      provider: "claude",
+      status: "ok",
+      source: "api",
+      updated_at: new Date().toISOString(),
+      usage: { kind: "quota", used: 22, limit: 100, percent_used: 22 },
+      reset_window: null,
+      error: null,
+    });
+
+    const adapter = createClaudeCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {},
+        sourceMode: "api",
+      }),
+    );
+
+    expect(snapshot.source).toBe("api");
+    expect(fetchClaudeUsageViaApiMock).toHaveBeenCalledTimes(1);
+    expect(runInteractiveCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to CLI in auto mode when the API path fails", async () => {
+    readClaudeCredentialsMock.mockResolvedValue({ accessToken: "sk-ant-test", expiresAt: null });
+    fetchClaudeUsageViaApiMock.mockResolvedValue({
+      provider: "claude",
+      status: "error",
+      source: "api",
+      updated_at: new Date().toISOString(),
+      usage: null,
+      reset_window: null,
+      error: { code: "claude_auth_expired", message: "expired", retryable: false },
+    });
+    runInteractiveCommandMock.mockResolvedValue(
+      createRunResult("Current session 40% (resets at 2026-03-25T17:00:00.000Z)"),
+    );
+
+    const adapter = createClaudeCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CLAUDE_CLI_PATH: "/usr/bin/claude",
+        },
+        sourceMode: "auto",
+      }),
+    );
+
+    expect(fetchClaudeUsageViaApiMock).toHaveBeenCalledTimes(1);
+    expect(runInteractiveCommandMock).toHaveBeenCalledTimes(1);
+    expect(snapshot.source).toBe("cli");
+  });
 });
 
 function createContext(options: {
   env: NodeJS.ProcessEnv;
+  sourceMode?: ProviderAdapterContext["sourceMode"];
 }): ProviderAdapterContext {
   return {
     request: normalizeBackendRequest({
       providers: ["claude"],
     }),
     providerId: "claude",
-    sourceMode: "cli",
+    sourceMode: options.sourceMode ?? "cli",
     env: options.env,
     now: () => new Date("2026-03-25T15:00:00Z"),
     runSubprocess: async () => {

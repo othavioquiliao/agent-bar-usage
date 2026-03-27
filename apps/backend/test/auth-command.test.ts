@@ -18,17 +18,17 @@ describe("GitHub device flow", () => {
     vi.useRealTimers();
   });
 
-  it("requests a GitHub device code with JSON headers", async () => {
+  it("requests a GitHub device code with form-encoded headers", async () => {
     const fetchFn = vi.fn<typeof fetch>(async (input, init) => {
       expect(input).toBe("https://github.com/login/device/code");
       expect(init?.method).toBe("POST");
       expect(init?.headers).toMatchObject({
         Accept: "application/json",
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
       });
-      const body = JSON.parse(String(init?.body)) as { client_id: string; scope: string };
-      expect(body.client_id).toBe("client-123");
-      expect(body.scope).toBe("copilot");
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get("client_id")).toBe("client-123");
+      expect(body.get("scope")).toBe("copilot");
 
       return new Response(JSON.stringify({
         device_code: "device-code",
@@ -83,6 +83,18 @@ describe("GitHub device flow", () => {
     await expect(
       pollForAccessToken("client-123", "device-code", 1, 30, fetchFn),
     ).rejects.toThrow("Authorization denied.");
+  });
+
+  it("treats token_expired as an expiration alias", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({
+        error: "token_expired",
+      })),
+    );
+
+    await expect(
+      pollForAccessToken("client-123", "device-code", 0, 30, fetchFn),
+    ).rejects.toThrow("Device flow code expired.");
   });
 });
 

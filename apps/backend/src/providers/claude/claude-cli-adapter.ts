@@ -12,17 +12,26 @@ export function createClaudeCliAdapter(): ProviderAdapter {
       return context.sourceMode === "cli" || context.sourceMode === "auto" || context.sourceMode === "api";
     },
     async fetch(context: ProviderAdapterContext) {
-      if (context.sourceMode === "api" || context.sourceMode === "auto" || context.sourceMode === "cli") {
-        // Prefer HTTP API when Claude OAuth credentials exist on disk
+      if (context.sourceMode === "api") {
+        return await fetchClaudeUsageViaApi();
+      }
+
+      if (context.sourceMode === "cli") {
+        return await fetchClaudeUsage(context);
+      }
+
+      if (context.sourceMode === "auto") {
+        // Prefer HTTP API only in auto mode when Claude OAuth credentials exist on disk.
         const credentials = await readClaudeCredentials();
         if (credentials) {
-          return fetchClaudeUsageViaApi({ credentials });
+          const apiSnapshot = await fetchClaudeUsageViaApi({ credentials });
+          if (!apiSnapshot.error) {
+            return apiSnapshot;
+          }
         }
 
-        // Fallback to PTY-based CLI fetcher when no credentials file
-        if (context.sourceMode !== "api") {
-          return await fetchClaudeUsage(context);
-        }
+        // Fall back to PTY-based CLI fetcher when auto-selected API lookup fails.
+        return await fetchClaudeUsage(context);
       }
 
       return createUnavailableSnapshot(context.providerId, context.sourceMode, context.now().toISOString());

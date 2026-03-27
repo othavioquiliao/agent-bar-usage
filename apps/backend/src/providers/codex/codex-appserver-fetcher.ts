@@ -48,7 +48,7 @@ export function mapToSnapshot(result: RateLimitsResult, now = Date.now()): Provi
   return {
     provider: "codex",
     status,
-    source: "api",
+    source: "cli",
     updated_at: new Date(now).toISOString(),
     usage: usedPercent !== null
       ? { kind: "quota", used: Math.round(usedPercent), limit: 100, percent_used: Math.round(usedPercent) }
@@ -77,7 +77,7 @@ export async function fetchCodexUsageViaAppServer(
     return {
       provider: "codex",
       status: "error",
-      source: "api",
+      source: "cli",
       updated_at: new Date().toISOString(),
       usage: null,
       reset_window: null,
@@ -108,7 +108,7 @@ export async function fetchCodexUsageViaAppServer(
       settle({
         provider: "codex",
         status: "error",
-        source: "api",
+        source: "cli",
         updated_at: new Date().toISOString(),
         usage: null,
         reset_window: null,
@@ -148,7 +148,7 @@ export async function fetchCodexUsageViaAppServer(
             settle({
               provider: "codex",
               status: "error",
-              source: "api",
+              source: "cli",
               updated_at: new Date().toISOString(),
               usage: null,
               reset_window: null,
@@ -168,7 +168,7 @@ export async function fetchCodexUsageViaAppServer(
             settle({
               provider: "codex",
               status: "error",
-              source: "api",
+              source: "cli",
               updated_at: new Date().toISOString(),
               usage: null,
               reset_window: null,
@@ -188,7 +188,7 @@ export async function fetchCodexUsageViaAppServer(
       settle({
         provider: "codex",
         status: "error",
-        source: "api",
+        source: "cli",
         updated_at: new Date().toISOString(),
         usage: null,
         reset_window: null,
@@ -201,7 +201,7 @@ export async function fetchCodexUsageViaAppServer(
       settle({
         provider: "codex",
         status: "error",
-        source: "api",
+        source: "cli",
         updated_at: new Date().toISOString(),
         usage: null,
         reset_window: null,

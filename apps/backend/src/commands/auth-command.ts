@@ -127,19 +127,28 @@ export async function runAuthCopilotCommand(
   process.stdout.write(`  Then open:      ${deviceCode.verification_uri}\n`);
   process.stdout.write("  Press Enter to open your browser...\n");
 
-  openBrowser(deviceCode.verification_uri);
   await waitForEnter();
+  openBrowser(deviceCode.verification_uri);
 
   const expiresMinutes = Math.round(deviceCode.expires_in / 60);
   process.stdout.write(`\n  Waiting for authorization... (expires in ${expiresMinutes} minutes)\n`);
 
-  const tokenResult = await pollForAccessToken(
-    clientId,
-    deviceCode.device_code,
-    deviceCode.interval,
-    deviceCode.expires_in,
-    fetchFn,
-  );
+  let tokenResult: Awaited<ReturnType<typeof pollForAccessToken>>;
+  try {
+    tokenResult = await pollForAccessToken(
+      clientId,
+      deviceCode.device_code,
+      deviceCode.interval,
+      deviceCode.expires_in,
+      fetchFn,
+    );
+  } catch (pollError: unknown) {
+    const msg = pollError instanceof Error ? pollError.message : String(pollError);
+    process.stderr.write(`\n  Device Flow falhou: ${msg}\n\n`);
+    process.stderr.write(COPILOT_SETUP_GUIDE);
+    process.exitCode = 1;
+    return;
+  }
 
   process.stdout.write("\n  Storing token in GNOME Keyring...\n");
   await store(COPILOT_SERVICE, COPILOT_ACCOUNT, tokenResult.access_token, COPILOT_LABEL);

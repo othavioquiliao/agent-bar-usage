@@ -22,6 +22,7 @@ describe("runAuthClaudeCommand", () => {
     stdoutSpy.mockRestore();
     stderrSpy.mockRestore();
     process.exitCode = originalExitCode;
+    vi.useRealTimers();
   });
 
   it("reports authenticated when credentials are found", async () => {
@@ -155,5 +156,45 @@ describe("runAuthCopilotCommand", () => {
     );
     expect(stderrSpy).toHaveBeenCalledWith(COPILOT_SETUP_GUIDE);
     expect(process.exitCode).toBe(1);
+  });
+
+  it("shows setup guide when token polling fails after the device code step", async () => {
+    vi.useFakeTimers();
+
+    const fetchFn = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        device_code: "device-code",
+        user_code: "AB12-CD34",
+        verification_uri: "https://github.com/login/device",
+        expires_in: 900,
+        interval: 1,
+      })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: "token_expired",
+      })));
+
+    const runPromise = runAuthCopilotCommand(
+      {},
+      {
+        fetchFn,
+        storeSecret: vi.fn(),
+        ensureConfigRef: vi.fn(),
+        resolveConfigPath: () => "/tmp/test-config.json",
+        restartService: vi.fn(),
+        waitForEnter: async () => undefined,
+        openBrowser: () => undefined,
+      },
+    );
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await runPromise;
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Device Flow falhou"),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(COPILOT_SETUP_GUIDE);
+    expect(process.exitCode).toBe(1);
+
+    vi.useRealTimers();
   });
 });

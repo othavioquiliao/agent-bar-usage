@@ -168,17 +168,106 @@ describe("Codex CLI provider", () => {
     expect(snapshot.error?.code).toBe("codex_pty_unavailable");
     expect(snapshot.error?.retryable).toBe(false);
   });
+
+  it("honors explicit cli mode instead of routing through app-server", async () => {
+    fetchCodexUsageViaAppServerMock.mockResolvedValue({
+      provider: "codex",
+      status: "ok",
+      source: "cli",
+      updated_at: new Date().toISOString(),
+      usage: { kind: "quota", used: 14, limit: 100, percent_used: 14 },
+      reset_window: null,
+      error: null,
+    });
+    runInteractiveCommandMock.mockResolvedValue(
+      createRunResult("Credits: 42\n5h limit 65% (resets at 2026-03-25T16:00:00.000Z)"),
+    );
+    resolveCommandInPathMock.mockImplementation((command: string) =>
+      command === "codex" ? "/usr/bin/codex" : null,
+    );
+
+    const adapter = createCodexCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CODEX_CLI_PATH: "/usr/bin/codex",
+        },
+        sourceMode: "cli",
+      }),
+    );
+
+    expect(snapshot.source).toBe("cli");
+    expect(fetchCodexUsageViaAppServerMock).not.toHaveBeenCalled();
+    expect(runInteractiveCommandMock).toHaveBeenCalled();
+  });
+
+  it("uses app-server in auto mode when it succeeds", async () => {
+    fetchCodexUsageViaAppServerMock.mockResolvedValue({
+      provider: "codex",
+      status: "ok",
+      source: "cli",
+      updated_at: new Date().toISOString(),
+      usage: { kind: "quota", used: 18, limit: 100, percent_used: 18 },
+      reset_window: null,
+      error: null,
+    });
+
+    const adapter = createCodexCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {},
+        sourceMode: "auto",
+      }),
+    );
+
+    expect(fetchCodexUsageViaAppServerMock).toHaveBeenCalledTimes(1);
+    expect(runInteractiveCommandMock).not.toHaveBeenCalled();
+    expect(snapshot.source).toBe("cli");
+  });
+
+  it("falls back to PTY when app-server fails in auto mode", async () => {
+    fetchCodexUsageViaAppServerMock.mockResolvedValue({
+      provider: "codex",
+      status: "error",
+      source: "cli",
+      updated_at: new Date().toISOString(),
+      usage: null,
+      reset_window: null,
+      error: { code: "codex_cli_failed", message: "app-server failed", retryable: true },
+    });
+    runInteractiveCommandMock.mockResolvedValue(
+      createRunResult("Credits: 42\n5h limit 65% (resets at 2026-03-25T16:00:00.000Z)"),
+    );
+    resolveCommandInPathMock.mockImplementation((command: string) =>
+      command === "codex" ? "/usr/bin/codex" : null,
+    );
+
+    const adapter = createCodexCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CODEX_CLI_PATH: "/usr/bin/codex",
+        },
+        sourceMode: "auto",
+      }),
+    );
+
+    expect(fetchCodexUsageViaAppServerMock).toHaveBeenCalledTimes(1);
+    expect(runInteractiveCommandMock).toHaveBeenCalledTimes(1);
+    expect(snapshot.source).toBe("cli");
+  });
 });
 
 function createContext(options: {
   env: NodeJS.ProcessEnv;
+  sourceMode?: ProviderAdapterContext["sourceMode"];
 }): ProviderAdapterContext {
   return {
     request: normalizeBackendRequest({
       providers: ["codex"],
     }),
     providerId: "codex",
-    sourceMode: "cli",
+    sourceMode: options.sourceMode ?? "cli",
     env: options.env,
     now: () => new Date("2026-03-25T15:00:00Z"),
     runSubprocess: async () => {

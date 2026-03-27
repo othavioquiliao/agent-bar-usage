@@ -33,7 +33,7 @@ describe("mapToSnapshot", () => {
 
     expect(result.provider).toBe("codex");
     expect(result.status).toBe("ok");
-    expect(result.source).toBe("api");
+    expect(result.source).toBe("cli");
     expect(result.usage).toEqual({ kind: "quota", used: 14, limit: 100, percent_used: 14 });
     expect(result.error).toBeNull();
   });

@@ -11,20 +11,21 @@ export function createCodexCliAdapter(): ProviderAdapter {
       return context.sourceMode === "cli" || context.sourceMode === "auto";
     },
     async fetch(context: ProviderAdapterContext) {
-      if (context.sourceMode !== "cli" && context.sourceMode !== "auto") {
-        return createUnavailableSnapshot(context.providerId, context.sourceMode, context.now().toISOString());
-      }
-
-      // Primary: JSON-RPC via `codex app-server` (no PTY required)
-      const appServerResult = await fetchCodexUsageViaAppServer({ env: context.env });
-
-      // If the binary is missing entirely, fall through to PTY path
-      // which has its own binary resolution and richer error reporting
-      if (appServerResult.error?.code === "codex_cli_missing") {
+      if (context.sourceMode === "cli") {
         return await fetchCodexUsage(context);
       }
 
-      return appServerResult;
+      if (context.sourceMode !== "auto") {
+        return createUnavailableSnapshot(context.providerId, context.sourceMode, context.now().toISOString());
+      }
+
+      // In auto mode, prefer the app-server path but keep the PTY CLI path as a fallback.
+      const appServerResult = await fetchCodexUsageViaAppServer({ env: context.env });
+      if (!appServerResult.error) {
+        return appServerResult;
+      }
+
+      return await fetchCodexUsage(context);
     },
   };
 }
