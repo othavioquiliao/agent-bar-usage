@@ -12,15 +12,12 @@ Complete step-by-step installation of Agent Bar Ubuntu: backend service, CLI, an
 | systemd user session | `systemctl --user status` | Standard on Ubuntu desktop |
 | secret-tool (optional) | `which secret-tool` | `sudo apt install libsecret-tools` |
 
-## Step 1: Clone and install dependencies
+## Step 1: Clone the repo
 
 ```bash
 git clone <repo-url>
 cd agent-bar-usage
-pnpm install
 ```
-
-If pnpm asks to approve builds (e.g., esbuild), press space to select, then confirm.
 
 ## Step 2: Build and install
 
@@ -38,6 +35,8 @@ This command does everything:
 6. Enables and starts the systemd service
 7. Copies the GNOME extension to `~/.local/share/gnome-shell/extensions/agent-bar-ubuntu@othavio.dev/`
 8. Enables the extension
+
+If pnpm asks to approve builds (e.g., esbuild), press space to select, then confirm.
 
 ## Step 3: Restart GNOME Shell
 
@@ -78,9 +77,23 @@ pnpm verify:ubuntu
 After pulling new changes:
 
 ```bash
-pnpm install
 pnpm install:ubuntu
 # Then logout/login to reload the extension
+```
+
+## Troubleshooting
+
+If you hit one of these during `pnpm install:ubuntu`:
+
+- `sh: 1: tsc: not found`
+- `Local package.json exists, but node_modules missing`
+
+that means the workspace packages were not installed correctly. The current repo version includes `pnpm-workspace.yaml`, which tells pnpm to install `apps/*` and `packages/*` together.
+
+Confirm that file exists in your checkout, then rerun:
+
+```bash
+pnpm install:ubuntu
 ```
 
 ## Uninstalling

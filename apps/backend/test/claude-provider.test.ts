@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProviderAdapterContext } from "../src/core/provider-adapter.js";
 import { createClaudeCliAdapter } from "../src/providers/claude/claude-cli-adapter.js";
+import { PtyUnavailableError } from "../src/providers/shared/interactive-command.js";
 import { normalizeBackendRequest } from "../src/config/backend-request.js";
 
 const { runInteractiveCommandMock, resolveCommandInPathMock, readClaudeCredentialsMock } = vi.hoisted(() => ({
@@ -131,6 +132,30 @@ describe("Claude CLI provider", () => {
       label: "Current session",
     });
     expect(snapshot.diagnostics?.attempts[0]?.strategy).toBe("claude.cli");
+    expect(runInteractiveCommandMock).toHaveBeenCalledWith("/usr/bin/claude", [], {
+      env: {
+        CLAUDE_CLI_PATH: "/usr/bin/claude",
+      },
+      timeoutMs: 20_000,
+      input: "y\r\r/usage\r",
+    });
+  });
+
+  it("maps PTY availability failures to a structured provider error", async () => {
+    runInteractiveCommandMock.mockRejectedValue(new PtyUnavailableError());
+
+    const adapter = createClaudeCliAdapter();
+    const snapshot = await adapter.fetch(
+      createContext({
+        env: {
+          CLAUDE_CLI_PATH: "/usr/bin/claude",
+        },
+      }),
+    );
+
+    expect(snapshot.status).toBe("error");
+    expect(snapshot.error?.code).toBe("claude_pty_unavailable");
+    expect(snapshot.error?.retryable).toBe(false);
   });
 });
 

@@ -52,6 +52,94 @@ agent-bar service status --json
 
 After login, the Agent Bar indicator appears in the GNOME topbar.
 
+## Para Testar
+
+Se a pessoa **já tinha o Agent Bar instalado**, estava numa versão anterior, e **acabou de rodar `git pull`** para trazer esta versão atual, o caminho mais simples é este:
+
+```bash
+# 1. Reinstale a versão atual no sistema
+pnpm install:ubuntu
+
+# 2. Reinicie o serviço do usuário
+systemctl --user restart agent-bar.service
+
+# 3. Faça a checagem básica
+agent-bar doctor --json
+agent-bar service status --json
+agent-bar service snapshot --json
+```
+
+Passo a passo amigável:
+
+1. **Não precisa desinstalar a versão antiga antes.**  
+   O `pnpm install:ubuntu` agora já instala/atualiza as dependências do workspace, recompila o backend, reinstala o wrapper `agent-bar`, atualiza o serviço systemd e copia a extensão GNOME atual.
+
+   Se durante o install aparecer `sh: 1: tsc: not found` ou `Local package.json exists, but node_modules missing`, isso indica um checkout quebrado do workspace. A versão atual do repo restaura o `pnpm-workspace.yaml`; confirme que esse arquivo existe e rode `pnpm install:ubuntu` de novo.
+
+2. **Se você usa GNOME em Wayland, faça logout/login depois do install.**  
+   Isso garante que a extensão carregue a versão nova. Em X11, pode usar `Alt+F2`, digitar `r`, e pressionar Enter.
+
+3. **Se o `doctor` reclamar de dependências ou ambiente, resolva isso primeiro.**  
+   O fluxo normal agora é usar o que ele sugerir diretamente. Exemplo comum:
+
+   ```bash
+   sudo apt install libsecret-tools
+   ```
+
+4. **Se você quiser testar o Copilot na versão nova, use o comando novo de auth.**
+
+   ```bash
+   agent-bar auth copilot --client-id <github-oauth-client-id>
+   ```
+
+   Isso salva o token no GNOME Keyring e atualiza a configuração do backend.
+
+   De onde vem esse `client id`:
+
+   - Se o projeto/time já te passou um `GitHub OAuth client id`, use esse valor.
+   - Se ninguém te passou um, ele vem de um **GitHub OAuth App** criado em:
+     `GitHub -> Settings -> Developer settings -> OAuth Apps`
+   - Lá você cria um app novo e usa o campo **Client ID**.
+
+   Resumo:
+
+   ```bash
+   agent-bar auth copilot --client-id SEU_CLIENT_ID_AQUI
+   ```
+
+   Se você **não tiver** esse `client id`, essa etapa do Copilot não vai funcionar ainda. Nesse caso, você ainda pode testar o resto da atualização normalmente com:
+
+   ```bash
+   agent-bar doctor --json
+   agent-bar service status --json
+   agent-bar service snapshot --json
+   ```
+
+5. **Se você quiser testar Codex e Claude, confirme primeiro que os CLIs ainda funcionam no seu sistema.**
+
+   ```bash
+   codex --version
+   claude --version
+   ```
+
+   Se necessário, refaça login/autenticação dos próprios CLIs antes de testar pelo Agent Bar.
+
+6. **Se a checagem básica passou, faça um teste mais real.**
+
+   ```bash
+   agent-bar service refresh --json
+   ```
+
+   Isso força um snapshot novo e ajuda a validar a versão atual de ponta a ponta.
+
+7. **Se quiser uma verificação mais completa, rode também:**
+
+   ```bash
+   pnpm verify:ubuntu
+   ```
+
+Resumo prático: para quem já estava com uma versão antiga instalada, o fluxo quase sempre é **`git pull` -> `pnpm install:ubuntu` -> reiniciar sessão GNOME -> `doctor`/`service status`/`service snapshot`**.
+
 ## Step-by-Step Installation
 
 ### 1. Install system prerequisites
@@ -205,7 +293,7 @@ Requires `claude` on PATH and authenticated:
 claude --version   # Confirm it works
 ```
 
-> **Known limitation:** Codex and Claude providers currently use interactive CLI wrapping via the `script` command, which can be unreliable when the backend runs as a systemd service (no TTY). Provider errors like `codex_cli_failed` or `claude_cli_failed` are expected in the current version. API-based fetchers are planned.
+> **Current behavior:** Codex and Claude now use a `node-pty`-backed service-mode path instead of the old `script` wrapper. If they still fail, the likely causes are missing CLI auth/session state, missing prerequisites, or runtime environment issues. Start with `agent-bar doctor --json`, then inspect service logs if needed.
 
 ## Development
 
