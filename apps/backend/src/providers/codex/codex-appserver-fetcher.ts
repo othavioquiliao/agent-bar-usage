@@ -1,5 +1,3 @@
-import { spawn } from "node:child_process";
-
 import type { ProviderSnapshot } from "shared-contract";
 
 import { resolveCommandInPath } from "../../utils/subprocess.js";
@@ -96,9 +94,11 @@ export async function fetchCodexUsageViaAppServer(
       resolve(snapshot);
     };
 
-    const child = spawn(binary, ["app-server"], {
+    const child = Bun.spawn([binary, "app-server"], {
       env: { ...process.env, ...env },
-      stdio: ["pipe", "pipe", "pipe"],
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
     });
 
     let stdout = "";
@@ -116,12 +116,10 @@ export async function fetchCodexUsageViaAppServer(
       });
     }, timeoutMs);
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-
-      // Parse line-delimited JSON-RPC responses
+    function processChunk(chunk: string) {
+      stdout += chunk;
       const lines = stdout.split("\n");
-      stdout = lines.pop() ?? ""; // keep incomplete line in buffer
+      stdout = lines.pop() ?? "";
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -140,6 +138,7 @@ export async function fetchCodexUsageViaAppServer(
           child.stdin.write(
             '{"jsonrpc":"2.0","method":"account/rateLimits/read","id":2,"params":{}}\n',
           );
+          child.stdin.flush();
         }
 
         // Response to rateLimits (id=2)
@@ -182,36 +181,41 @@ export async function fetchCodexUsageViaAppServer(
           return;
         }
       }
-    });
+    }
 
-    child.on("error", (err) => {
-      settle({
-        provider: "codex",
-        status: "error",
-        source: "cli",
-        updated_at: new Date().toISOString(),
-        usage: null,
-        reset_window: null,
-        error: { code: "codex_cli_failed", message: `Codex app-server failed: ${err.message}`, retryable: true },
-      });
-    });
+    // Read stdout as a stream via ReadableStream reader
+    const reader = child.stdout.getReader();
 
-    child.on("close", () => {
-      // If close fires before we got the response, it's an unexpected exit
-      settle({
-        provider: "codex",
-        status: "error",
-        source: "cli",
-        updated_at: new Date().toISOString(),
-        usage: null,
-        reset_window: null,
-        error: { code: "codex_cli_failed", message: "Codex app-server exited before returning rate limits.", retryable: true },
-      });
+    (async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || settled) break;
+          processChunk(new TextDecoder().decode(value));
+        }
+      } catch {
+        // Stream closed -- handled by exited promise below
+      }
+    })();
+
+    child.exited.then(() => {
+      if (!settled) {
+        settle({
+          provider: "codex",
+          status: "error",
+          source: "cli",
+          updated_at: new Date().toISOString(),
+          usage: null,
+          reset_window: null,
+          error: { code: "codex_cli_failed", message: "Codex app-server exited before returning rate limits.", retryable: true },
+        });
+      }
     });
 
     // Send initialize request immediately
     child.stdin.write(
       '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"clientInfo":{"name":"agent-bar","version":"1.0.0"}}}\n',
     );
+    child.stdin.flush();
   });
 }
