@@ -53,7 +53,11 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
   2. Codex and Claude CLI providers execute through Bun.Terminal API and return usage data
   3. CLI-to-daemon communication works over a Unix socket created with Bun.serve({ unix })
   4. Developer can edit a .ts file and re-run immediately without any build/compile step
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 08-01-PLAN.md -- Runtime infrastructure: tsconfig, package.json, bunfig, shebang, shared-contract exports
+- [ ] 08-02-PLAN.md -- Subprocess and PTY migration: Bun.spawn for subprocess.ts, interactive-command.ts, codex-appserver-fetcher.ts
+- [ ] 08-03-PLAN.md -- IPC socket migration: Bun.listen/connect for service-server.ts and service-client.ts
 
 ### Phase 9: Lifecycle Commands
 **Goal**: Users can install, remove, update, and fully uninstall Agent Bar through interactive TypeScript commands that manage systemd, GNOME extension, and settings safely
@@ -117,7 +121,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12
 | 5. Delivery & Hardening | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 6. Provider Reliability | v1.1 | 2/2 | Complete | 2026-03-26 |
 | 7. GNOME Extension UI Redesign | v1.1 | 3/3 | Complete | 2026-03-26 |
-| 8. Bun Runtime Migration | v2.0 | 0/TBD | Not started | - |
+| 8. Bun Runtime Migration | v2.0 | 0/3 | Not started | - |
 | 9. Lifecycle Commands | v2.0 | 0/TBD | Not started | - |
 | 10. CLI Overhaul | v2.0 | 0/TBD | Not started | - |
 | 11. Provider Independence & Data | v2.0 | 0/TBD | Not started | - |
