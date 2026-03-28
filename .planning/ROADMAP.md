@@ -55,7 +55,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
   4. Developer can edit a .ts file and re-run immediately without any build/compile step
 **Plans:** 3 plans
 Plans:
-- [ ] 08-01-PLAN.md -- Runtime infrastructure: tsconfig, package.json, bunfig, shebang, shared-contract exports
+- [x] 08-01-PLAN.md -- Runtime infrastructure: tsconfig, package.json, bunfig, shebang, shared-contract exports
 - [ ] 08-02-PLAN.md -- Subprocess and PTY migration: Bun.spawn for subprocess.ts, interactive-command.ts, codex-appserver-fetcher.ts
 - [ ] 08-03-PLAN.md -- IPC socket migration: Bun.listen/connect for service-server.ts and service-client.ts
 
