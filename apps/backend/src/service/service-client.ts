@@ -1,5 +1,3 @@
-import net from "node:net";
-
 import { snapshotEnvelopeSchema, type SnapshotEnvelope } from "shared-contract";
 
 export interface ServiceStatusPayload {
@@ -40,14 +38,11 @@ export class ServiceClientError extends Error {
 
 function readSocketResponse(socketPath: string, request: ServiceWireRequest, timeoutMs = 15_000): Promise<string> {
   return new Promise((resolve, reject) => {
-    const socket = net.createConnection({ path: socketPath });
     let buffer = "";
     let settled = false;
 
     const finalize = (callback: () => void) => {
-      if (settled) {
-        return;
-      }
+      if (settled) return;
       settled = true;
       clearTimeout(timer);
       callback();
@@ -55,38 +50,40 @@ function readSocketResponse(socketPath: string, request: ServiceWireRequest, tim
 
     const timer = setTimeout(() => {
       finalize(() => {
-        socket.destroy();
         reject(new ServiceClientError(`Timed out waiting for service response at ${socketPath}.`, socketPath));
       });
     }, timeoutMs);
 
-    socket.setEncoding("utf8");
-    socket.on("connect", () => {
-      socket.end(`${JSON.stringify(request)}\n`);
-    });
-    socket.on("data", (chunk: string) => {
-      buffer += chunk;
-      const newlineIndex = buffer.indexOf("\n");
-      if (newlineIndex === -1) {
-        return;
-      }
+    Bun.connect<void>({
+      unix: socketPath,
+      socket: {
+        open(socket) {
+          socket.write(JSON.stringify(request) + "\n");
+        },
+        data(_socket, data) {
+          buffer += data.toString();
+          const newlineIndex = buffer.indexOf("\n");
+          if (newlineIndex === -1) return;
 
-      const rawResponse = buffer.slice(0, newlineIndex).trim();
-      finalize(() => {
-        socket.destroy();
-        resolve(rawResponse);
-      });
-    });
-    socket.on("error", (error) => {
-      finalize(() => reject(new ServiceClientError(`Could not connect to ${socketPath}.`, socketPath, error)));
-    });
-    socket.on("end", () => {
-      const rawResponse = buffer.trim();
-      if (!rawResponse) {
-        return;
-      }
-
-      finalize(() => resolve(rawResponse));
+          const rawResponse = buffer.slice(0, newlineIndex).trim();
+          finalize(() => resolve(rawResponse));
+        },
+        close() {
+          const rawResponse = buffer.trim();
+          if (!rawResponse) return;
+          finalize(() => resolve(rawResponse));
+        },
+        error(_socket, error) {
+          finalize(() =>
+            reject(new ServiceClientError(`Could not connect to ${socketPath}.`, socketPath, error)),
+          );
+        },
+        connectError(_socket, error) {
+          finalize(() =>
+            reject(new ServiceClientError(`Could not connect to ${socketPath}.`, socketPath, error)),
+          );
+        },
+      },
     });
   });
 }
