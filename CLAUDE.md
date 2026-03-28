@@ -3,18 +3,18 @@
 
 **Agent Bar Ubuntu**
 
-Agent Bar Ubuntu is a new Linux-native desktop product that surfaces AI provider usage for Ubuntu users in a way that feels similar in value to the provider visibility available around Claude, Codex, Copilot, and Cursor. It treats `CodexBar/` as a brownfield reference backend, reusing or mirroring the provider engine concepts from `CodexBarCore` and `CodexBarCLI` while building a new Ubuntu shell instead of porting the macOS app.
+Agent Bar Ubuntu is a Linux-native desktop product that surfaces AI provider usage (Copilot, Codex, Claude) for Ubuntu users through a Node.js/TypeScript backend and a GNOME Shell extension in GJS. v1.0 ships a working end-to-end stack: backend service running under systemd, GNOME top-bar indicator, provider snapshot polling, and `agent-bar auth copilot` for zero-friction Copilot setup.
 
 **Core Value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
 
 ### Constraints
 
-- **Platform**: Ubuntu-first, Linux-native shell — the product must feel native to Ubuntu instead of mimicking AppKit concepts
-- **Architecture**: Reuse backend ideas from `CodexBarCore`/`CodexBarCLI` — avoids rebuilding provider orchestration from scratch
-- **Scope**: v1 prioritizes Copilot, Codex CLI, and Claude CLI — these are the lowest-risk providers for Linux delivery
-- **Secrets**: Apple Keychain assumptions are invalid — Linux secret storage must be intentional, likely via libsecret/GNOME Keyring
-- **Portability**: Browser-cookie-dependent flows are secondary — Linux browser state is less uniform and more fragile
-- **Maintainability**: The backend/frontend contract must stay independent from GNOME-extension specifics — this keeps other Linux surfaces viable later
+- **Platform**: Ubuntu 24.04.4 LTS first, Linux-native shell
+- **Backend stack**: Bun + TypeScript (migrating from Node.js in v2.0)
+- **Frontend stack**: GNOME Shell extension in GJS
+- **Architecture**: Provider contract stays independent from GNOME-extension specifics
+- **Secrets**: Linux secret storage via libsecret/GNOME Keyring only
+- **Portability**: Browser-cookie-dependent flows remain secondary
 <!-- GSD:project-end -->
 
 <!-- GSD:stack-start source:codebase/STACK.md -->

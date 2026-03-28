@@ -80,12 +80,12 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| systemd timer for refresh | Over-engineering — setInterval inside the process is simpler and matches existing GNOME polling |
-| D-Bus interface | Massive complexity for a single consumer — Unix socket JSON protocol works |
+| systemd timer for refresh | Over-engineering -- setInterval inside the process is simpler and matches existing GNOME polling |
+| D-Bus interface | Massive complexity for a single consumer -- Unix socket JSON protocol works |
 | WebSocket push to extension | GJS WebSocket support is limited, risks GNOME Shell stability |
-| GUI settings in GNOME extension | GJS settings UI is fragile across versions — CLI TUI is more capable |
-| Automatic sudo dependency install | Security risk — setup should check and report, not install with privileges |
-| Browser cookie extraction | Linux browser state varies wildly — CLI-based auth is reliable |
+| GUI settings in GNOME extension | GJS settings UI is fragile across versions -- CLI TUI is more capable |
+| Automatic sudo dependency install | Security risk -- setup should check and report, not install with privileges |
+| Browser cookie extraction | Linux browser state varies wildly -- CLI-based auth is reliable |
 | macOS parity | Ubuntu product is intentionally Linux-native |
 | Monorepo flattening | User chose to keep monorepo structure |
 
@@ -95,38 +95,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RUNTIME-01 | — | Pending |
-| RUNTIME-02 | — | Pending |
-| RUNTIME-03 | — | Pending |
-| RUNTIME-04 | — | Pending |
-| CLI-01 | — | Pending |
-| CLI-02 | — | Pending |
-| CLI-03 | — | Pending |
-| LIFE-01 | — | Pending |
-| LIFE-02 | — | Pending |
-| LIFE-03 | — | Pending |
-| LIFE-04 | — | Pending |
-| PROV-01 | — | Pending |
-| PROV-02 | — | Pending |
-| PROV-03 | — | Pending |
-| PROV-04 | — | Pending |
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| DATA-04 | — | Pending |
-| TUI-01 | — | Pending |
-| TUI-02 | — | Pending |
-| TUI-03 | — | Pending |
-| TUI-04 | — | Pending |
-| QUAL-01 | — | Pending |
-| QUAL-02 | — | Pending |
-| QUAL-03 | — | Pending |
+| RUNTIME-01 | Phase 8 | Pending |
+| RUNTIME-02 | Phase 8 | Pending |
+| RUNTIME-03 | Phase 8 | Pending |
+| RUNTIME-04 | Phase 8 | Pending |
+| CLI-01 | Phase 10 | Pending |
+| CLI-02 | Phase 10 | Pending |
+| CLI-03 | Phase 10 | Pending |
+| LIFE-01 | Phase 9 | Pending |
+| LIFE-02 | Phase 9 | Pending |
+| LIFE-03 | Phase 9 | Pending |
+| LIFE-04 | Phase 9 | Pending |
+| PROV-01 | Phase 11 | Pending |
+| PROV-02 | Phase 11 | Pending |
+| PROV-03 | Phase 11 | Pending |
+| PROV-04 | Phase 11 | Pending |
+| DATA-01 | Phase 11 | Pending |
+| DATA-02 | Phase 11 | Pending |
+| DATA-03 | Phase 11 | Pending |
+| DATA-04 | Phase 9 | Pending |
+| TUI-01 | Phase 12 | Pending |
+| TUI-02 | Phase 12 | Pending |
+| TUI-03 | Phase 12 | Pending |
+| TUI-04 | Phase 12 | Pending |
+| QUAL-01 | Phase 10 | Pending |
+| QUAL-02 | Phase 12 | Pending |
+| QUAL-03 | Phase 12 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26 ⚠️
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-28*
-*Last updated: 2026-03-28 after initial definition*
+*Last updated: 2026-03-28 after roadmap creation*

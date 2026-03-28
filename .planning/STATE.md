@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Refactor & Polish
-status: Defining requirements
-stopped_at: null
+status: Ready to plan
+stopped_at: "Roadmap created, ready to plan Phase 8"
 last_updated: "2026-03-28T00:00:00-03:00"
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,19 +19,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** v2.0 Refactor & Polish — Bun migration, modular providers, CLI overhaul
+**Current focus:** Phase 8 -- Bun Runtime Migration
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-28 — Milestone v2.0 started
+Phase: 8 of 12 (Bun Runtime Migration)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-03-28 -- v2.0 roadmap created (5 phases, 26 requirements mapped)
+
+Progress: [██████████████░░░░░░░] 70% (phases 1-7 complete, 8-12 remaining)
 
 ## Performance Metrics
 
 **Velocity:**
-
 - Total plans completed: 12
 - Average duration: 24 min
 - Total execution time: 4.8 hours
@@ -44,14 +45,12 @@ Last activity: 2026-03-28 — Milestone v2.0 started
 | 2. Linux Config & Secrets | 3 | 114 min | 38 min |
 | 3. First-Wave Providers | 3 | 39 min | 13 min |
 | 4. Ubuntu Desktop Surface | 3 | 43 min | 14 min |
+| 6. Provider Reliability | 2 | -- | -- |
+| 7. GNOME UI Redesign | 3 | -- | -- |
 
 **Recent Trend:**
-
 - Last 5 plans: 5/5 complete
 - Trend: Improving
-
-| Phase 06-provider-reliability P01 | 10 | 5 tasks | 8 files |
-| Phase 06 P02 | 3 | 9 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -60,31 +59,12 @@ Last activity: 2026-03-28 — Milestone v2.0 started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Init]: Treat `CodexBar/` as a reference backend, not the Ubuntu shell
-- [Stack]: Rebuild the Ubuntu product without Swift
-- [Stack]: Use Node.js/TypeScript for the backend
-- [Stack]: Use a GNOME Shell extension in GJS for the frontend
-- [Init]: Prioritize Copilot, Codex CLI, and Claude CLI for v1
-- [Init]: Defer Cursor and browser-parity work until after the Linux contract is stable
-- [Phase 2]: Use XDG config persistence with JSON for v1
-- [Phase 2]: Use `secret-tool` as the primary persistent Linux secret-store boundary
-- [Phase 2]: Keep env-based secret resolution as explicit fallback for development and CI
-- [Phase 2]: Runtime provider selection now honors config order/enablement by default
-- [Phase 2]: Secret resolution happens before adapter execution with provider-level error isolation
-- [Phase 3]: Copilot path is an API-token adapter with env-first token resolution
-- [Phase 3]: Codex and Claude paths are CLI-backed adapters with structured failure mapping
-- [Phase 3]: Provider isolation behavior is explicitly validated and kept envelope-safe
-- [Phase 4]: Manual refresh is gated while a refresh is in flight so repeated clicks do not overlap backend requests.
-- [Phase 4]: The GNOME surface consumes normalized snapshot view models instead of reaching into subprocess or backend concerns.
-- [Phase 06-provider-reliability]: node-pty replaces script -qec: creates real kernel PTY via forkpty(), works from systemd with no controlling terminal
-- [Phase 06-provider-reliability]: PtyUnavailableError is non-retryable: surfaces clear build instructions when native addon compilation fails
-- [Phase 06-provider-reliability]: GitHub Device Flow: same flow as gh auth login — user gets a code, opens browser, authorizes, done
-- [Phase 06-provider-reliability]: systemd-env check is warn (not error): service can still work via env var fallbacks
-- [Phase 06-provider-reliability]: storeSecretViaSecretTool separate from SecretToolStore: write surface isolated from read path
-- [UI refresh]: GNOME topbar now uses a fixed Codex/Claude/Copilot mini-strip with centered icon + percentage readouts and a One Dark Pro-inspired palette
-- [Quick 260327-glx]: GitHub Device Flow stays form-encoded and accepts both `expired_token` and `token_expired` from GitHub polling
-- [Quick 260327-glx]: Claude honors explicit `cli` mode; only `auto` may prefer API and it falls back to CLI on API failure
-- [Quick 260327-glx]: Codex `app-server` is treated as CLI-backed and `auto` falls back to PTY when `app-server` fails
+- [v2.0 init]: Migrate runtime from Node.js to Bun (matches agent-bar-omarchy patterns)
+- [v2.0 init]: Remove Commander and Zod in favor of manual parsing and inline validation
+- [v2.0 init]: TypeScript-based lifecycle commands replace bash installer
+- [v2.0 roadmap]: Phase ordering follows dependency chain: runtime -> lifecycle -> CLI overhaul -> providers -> TUI
+- [v2.0 roadmap]: CLI overhaul (Commander/Zod removal) comes AFTER lifecycle commands exist as test surface
+- [v2.0 roadmap]: Provider independence and data infrastructure are co-delivered (cache/refresh/formatting support providers)
 
 ### Pending Todos
 
@@ -92,8 +72,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Provider token/session prerequisites may vary per machine and must map to structured provider-level failures
-- Browser-cookie-based parity work remains intentionally deferred
+- Dev machine is NOT Ubuntu -- GNOME extension, systemd, and secret-tool cannot be validated locally
+- node-pty is incompatible with Bun -- must be replaced with Bun.Terminal API in Phase 8
+- Unix socket permissions differ under Bun (oven-sh/bun#15686) -- must chmod 0600 after creation
+- Bun.Terminal API is relatively new (Dec 2025) -- edge cases possible
 
 ### Quick Tasks Completed
 
@@ -103,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T12:04:02-03:00
-Stopped at: Completed quick task 260327-glx restoring auth and provider fallback contracts
+Last session: 2026-03-28
+Stopped at: v2.0 roadmap created, ready to plan Phase 8
 Resume file: None
