@@ -7,7 +7,6 @@ Type=simple
 ExecStart=%h/.local/bin/agent-bar service run
 Restart=on-failure
 RestartSec=2
-Environment=NODE_ENV=production
 
 [Install]
 WantedBy=default.target

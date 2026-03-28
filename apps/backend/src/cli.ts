@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { Command, InvalidArgumentError } from "commander";
 import { providerIdSchema, type ProviderId } from "shared-contract";
 
@@ -77,7 +77,7 @@ registerConfigCommand(program);
 registerDoctorCommand(program);
 registerServiceCommand(program);
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   program.parseAsync(process.argv).catch((error: unknown) => {
     const message = formatConfigCommandError(error);
     process.stderr.write(`${message}\n`);
