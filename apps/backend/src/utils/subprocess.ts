@@ -1,6 +1,5 @@
-import { accessSync, constants } from "node:fs";
-import { spawn } from "node:child_process";
 import path from "node:path";
+import { accessSync, constants } from "node:fs";
 
 export interface SubprocessOptions {
   cwd?: string;
@@ -44,96 +43,61 @@ export async function runSubprocess(
   args: string[] = [],
   options: SubprocessOptions = {},
 ): Promise<SubprocessResult> {
-  return await new Promise((resolve, reject) => {
-    const startedAt = Date.now();
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: {
-        ...process.env,
-        ...options.env,
-      },
-      stdio: "pipe",
-    });
+  const startedAt = Date.now();
 
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-
-    const finish = (callback: () => void) => {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      callback();
-    };
-
-    const timeout = setTimeout(() => {
-      child.kill("SIGTERM");
-      finish(() => {
-        reject(
-          new SubprocessError(`Subprocess timed out: ${command}`, {
-            command,
-            args,
-            stdout,
-            stderr,
-            durationMs: Date.now() - startedAt,
-          }),
-        );
-      });
-    }, options.timeoutMs ?? 15_000);
-
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr?.on("data", (chunk) => {
-      stderr += chunk;
-    });
-
-    child.on("error", (error) => {
-      clearTimeout(timeout);
-      finish(() => {
-        reject(
-          new SubprocessError(error.message, {
-            command,
-            args,
-            stdout,
-            stderr,
-            durationMs: Date.now() - startedAt,
-          }),
-        );
-      });
-    });
-
-    child.on("close", (exitCode) => {
-      clearTimeout(timeout);
-      finish(() => {
-        const result: SubprocessResult = {
-          command,
-          args,
-          exitCode: exitCode ?? -1,
-          stdout,
-          stderr,
-          durationMs: Date.now() - startedAt,
-        };
-
-        if (result.exitCode === 0) {
-          resolve(result);
-          return;
-        }
-
-        reject(new SubprocessError(`Subprocess exited with code ${result.exitCode}: ${command}`, result));
-      });
-    });
-
-    if (options.input) {
-      child.stdin?.write(options.input);
-    }
-
-    child.stdin?.end();
+  const proc = Bun.spawn([command, ...args], {
+    cwd: options.cwd,
+    env: { ...process.env, ...options.env },
+    stdin: options.input ? "pipe" : "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
   });
+
+  if (options.input && proc.stdin) {
+    proc.stdin.write(options.input);
+    proc.stdin.flush();
+    proc.stdin.end();
+  }
+
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    proc.kill();
+  }, timeoutMs);
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+
+  clearTimeout(timeout);
+
+  if (timedOut) {
+    throw new SubprocessError(`Subprocess timed out: ${command}`, {
+      command,
+      args,
+      stdout,
+      stderr,
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
+  const result: SubprocessResult = {
+    command,
+    args,
+    exitCode,
+    stdout,
+    stderr,
+    durationMs: Date.now() - startedAt,
+  };
+
+  if (result.exitCode !== 0) {
+    throw new SubprocessError(`Subprocess exited with code ${result.exitCode}: ${command}`, result);
+  }
+
+  return result;
 }
 
 export function resolveCommandInPath(command: string, env: NodeJS.ProcessEnv = process.env): string | null {

@@ -7,13 +7,13 @@ export interface InteractiveCommandOptions {
   timeoutMs?: number;
 }
 
+/**
+ * @deprecated Bun.Terminal is always available -- this error is kept only for
+ * backward compatibility with provider error-handling branches that catch it.
+ */
 export class PtyUnavailableError extends Error {
-  constructor() {
-    super(
-      "node-pty is not available. Install build-essential and rebuild:\n" +
-        "  sudo apt install build-essential python3\n" +
-        "  pnpm install",
-    );
+  constructor(message = "PTY is not available.") {
+    super(message);
     this.name = "PtyUnavailableError";
   }
 }
@@ -23,77 +23,64 @@ export async function runInteractiveCommand(
   args: string[] = [],
   options: InteractiveCommandOptions = {},
 ): Promise<SubprocessResult> {
-  // Dynamic import: if node-pty failed to compile, give a clear error
-  let pty: typeof import("node-pty");
-  try {
-    pty = await import("node-pty");
-  } catch {
-    throw new PtyUnavailableError();
-  }
+  const startedAt = Date.now();
+  let output = "";
+  let settled = false;
 
-  return new Promise<SubprocessResult>((resolve, reject) => {
-    const startedAt = Date.now();
-    let output = "";
-    let settled = false;
-
-    const term = pty.spawn(command, args, {
+  const proc = Bun.spawn([command, ...args], {
+    cwd: options.cwd,
+    env: { ...process.env, ...options.env },
+    terminal: {
       cols: 120,
       rows: 30,
-      cwd: options.cwd,
-      env: { ...process.env, ...options.env },
-    });
-
-    const finish = (callback: () => void) => {
-      if (settled) return;
-      settled = true;
-      callback();
-    };
-
-    term.onData((chunk: string) => {
-      output += chunk;
-    });
-
-    const timeout = setTimeout(() => {
-      term.kill();
-      finish(() =>
-        reject(
-          new SubprocessError(`Subprocess timed out: ${command}`, {
-            command,
-            args,
-            stdout: output,
-            stderr: "",
-            durationMs: Date.now() - startedAt,
-          }),
-        ),
-      );
-    }, options.timeoutMs ?? 15_000);
-
-    // Delay input: CLI needs time to initialize its prompt before accepting input
-    if (options.input) {
-      setTimeout(() => {
-        if (!settled) {
-          term.write(options.input!);
-        }
-      }, 200);
-    }
-
-    term.onExit(({ exitCode }) => {
-      clearTimeout(timeout);
-      finish(() =>
-        resolve({
-          command,
-          args,
-          exitCode,
-          stdout: output,
-          stderr: "",
-          durationMs: Date.now() - startedAt,
-        }),
-      );
-    });
+      data(_terminal, data) {
+        output += data.toString();
+      },
+    },
   });
+
+  // Delay input: CLI needs time to initialize its prompt before accepting input
+  if (options.input) {
+    setTimeout(() => {
+      if (!settled) {
+        proc.terminal?.write(options.input!);
+      }
+    }, 200);
+  }
+
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  const timeout = setTimeout(() => {
+    settled = true;
+    proc.kill();
+  }, timeoutMs);
+
+  const exitCode = await proc.exited;
+  clearTimeout(timeout);
+
+  if (settled) {
+    // Timeout was reached
+    throw new SubprocessError(`Subprocess timed out: ${command}`, {
+      command,
+      args,
+      stdout: output,
+      stderr: "",
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
+  settled = true;
+
+  return {
+    command,
+    args,
+    exitCode,
+    stdout: output,
+    stderr: "",
+    durationMs: Date.now() - startedAt,
+  };
 }
 
-// Keep these unchanged — used by all parsers
+// Keep these unchanged -- used by all parsers
 export function stripAnsi(text: string): string {
   return text.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "");
 }
