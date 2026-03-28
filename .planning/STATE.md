@@ -1,12 +1,12 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: v1.0 milestone complete
-stopped_at: Completed quick task 260327-glx restoring auth and provider fallback contracts
-last_updated: "2026-03-27T12:04:02-03:00"
+milestone: v2.0
+milestone_name: Refactor & Polish
+status: Defining requirements
+stopped_at: null
+last_updated: "2026-03-28T00:00:00-03:00"
 progress:
-  total_phases: 5
+  total_phases: 0
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -16,15 +16,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25)
+See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Post-v1.0 UI polish — One Dark Pro GNOME topbar refresh
+**Current focus:** v2.0 Refactor & Polish — Bun migration, modular providers, CLI overhaul
 
 ## Current Position
 
-Phase: Post-v1.0 follow-up
-Plan: UI refresh implemented locally
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-28 — Milestone v2.0 started
 
 ## Performance Metrics
 
