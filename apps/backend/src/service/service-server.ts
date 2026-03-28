@@ -1,5 +1,4 @@
 import { access, mkdir, unlink } from "node:fs/promises";
-import net from "node:net";
 import path from "node:path";
 
 import { type SnapshotEnvelope } from "shared-contract";
@@ -41,7 +40,6 @@ export interface ServiceServerOptions {
 
 export interface AgentBarServiceRuntime {
   socketPath: string;
-  server: net.Server;
   start(): Promise<void>;
   stop(): Promise<void>;
   status(): ServiceStatusPayload;
@@ -73,13 +71,13 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
   let lastError: string | null = null;
   let lastSnapshotAt: string | null = null;
   let lastSnapshot: SnapshotEnvelope | null = null;
-  let server: net.Server | null = null;
+  let server: ReturnType<typeof Bun.listen> | null = null;
   const now = options.now ?? (() => new Date());
 
   const status = (): ServiceStatusPayload => ({
     mode: "service",
     socket_path: socketPath,
-    running: Boolean(server?.listening),
+    running: server !== null,
     last_error: lastError,
     last_snapshot_at: lastSnapshotAt,
   });
@@ -133,14 +131,8 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
 
   return {
     socketPath,
-    get server() {
-      if (!server) {
-        throw new Error("Service runtime has not been started.");
-      }
-      return server;
-    },
     async start() {
-      if (server?.listening) {
+      if (server !== null) {
         return;
       }
 
@@ -149,36 +141,35 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
         await unlink(socketPath).catch(() => undefined);
       }
 
-      server = net.createServer((socket) => {
-        let buffer = "";
-        let handled = false;
-        socket.setEncoding("utf8");
+      server = Bun.listen<{ buffer: string }>({
+        unix: socketPath,
+        socket: {
+          open(socket) {
+            socket.data = { buffer: "" };
+          },
+          data(socket, data) {
+            socket.data.buffer += data.toString();
+            const idx = socket.data.buffer.indexOf("\n");
+            if (idx === -1) return;
 
-        socket.on("data", async (chunk: string) => {
-          if (handled) {
-            return;
-          }
+            const rawRequest = socket.data.buffer.slice(0, idx);
+            socket.data.buffer = socket.data.buffer.slice(idx + 1);
 
-          buffer += chunk;
-          if (!buffer.includes("\n")) {
-            return;
-          }
-
-          handled = true;
-          const [rawRequest] = buffer.split("\n");
-          try {
-            const request = JSON.parse(rawRequest) as ServiceRequestPayload;
-            const response = await handleRequest(request);
-            socket.end(`${JSON.stringify(response)}\n`);
-          } catch (error) {
-            socket.end(`${JSON.stringify(toErrorResponse("unknown", error))}\n`);
-          }
-        });
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        server?.once("error", reject);
-        server?.listen(socketPath, resolve);
+            handleRequest(JSON.parse(rawRequest) as ServiceRequestPayload)
+              .then((response) => {
+                socket.write(JSON.stringify(response) + "\n");
+                socket.end();
+              })
+              .catch((error) => {
+                socket.write(JSON.stringify(toErrorResponse("unknown", error)) + "\n");
+                socket.end();
+              });
+          },
+          close() {},
+          error(_socket, error) {
+            console.error("Socket error:", error);
+          },
+        },
       });
 
       // Warm the cache so the first snapshot request is instant.
@@ -202,10 +193,7 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
       if (!server) {
         return;
       }
-
-      await new Promise<void>((resolve) => {
-        server?.close(() => resolve());
-      });
+      server.stop();
       server = null;
     },
     status,
