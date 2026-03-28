@@ -11,7 +11,7 @@ Requirements for the refactor & polish milestone. Each maps to roadmap phases.
 
 - [x] **RUNTIME-01**: Backend migrates from Node.js to Bun runtime
 - [ ] **RUNTIME-02**: PTY allocation uses Bun.Terminal API (replaces node-pty native addon)
-- [ ] **RUNTIME-03**: Service daemon uses Bun.serve({ unix }) for socket IPC (replaces net.createServer)
+- [x] **RUNTIME-03**: Service daemon uses Bun.serve({ unix }) for socket IPC (replaces net.createServer)
 - [x] **RUNTIME-04**: Backend runs .ts files directly in development (no build step required)
 
 ### CLI Overhaul
@@ -97,7 +97,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | RUNTIME-01 | Phase 8 | Complete |
 | RUNTIME-02 | Phase 8 | Pending |
-| RUNTIME-03 | Phase 8 | Pending |
+| RUNTIME-03 | Phase 8 | Complete |
 | RUNTIME-04 | Phase 8 | Complete |
 | CLI-01 | Phase 10 | Pending |
 | CLI-02 | Phase 10 | Pending |

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Refactor & Polish
-status: Ready to execute
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-28T22:23:02.518Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-03-28T22:36:36.109Z"
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 3
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 ## Current Position
 
 Phase: 08 (bun-runtime-migration) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -51,6 +51,8 @@ Plan: 2 of 3
 - Trend: Improving
 
 | Phase 08 P01 | 3min | 2 tasks | 11 files |
+| Phase 08 P02 | 8min | 2 tasks | 3 files |
+| Phase 08 P03 | 9min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -67,6 +69,10 @@ Recent decisions affecting current work:
 - [v2.0 roadmap]: Provider independence and data infrastructure are co-delivered (cache/refresh/formatting support providers)
 - [Phase 08]: Added bun-types as explicit devDep alongside @types/bun for workspace hoisting compatibility
 - [Phase 08]: Tracked bun.lock in git (removed from .gitignore) as part of Bun migration
+- [Phase 08]: Kept accessSync from node:fs for isExecutable -- Bun supports node:fs, avoids subprocess overhead for permission checks
+- [Phase 08]: Migrated service-runtime.test.ts from vitest to bun:test since Bun.listen/connect require Bun runtime
+- [Phase 08]: Removed server property from AgentBarServiceRuntime interface (net.Server type no longer applicable)
+- [Phase 08]: Kept PtyUnavailableError as deprecated export -- providers and tests reference it for error-handling branches
 
 ### Pending Todos
 
@@ -87,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-28T22:23:02.516Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-03-28T22:36:36.107Z
+Stopped at: Completed 08-02-PLAN.md
 Resume file: None

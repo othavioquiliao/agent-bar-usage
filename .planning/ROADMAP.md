@@ -56,8 +56,8 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 **Plans:** 3 plans
 Plans:
 - [x] 08-01-PLAN.md -- Runtime infrastructure: tsconfig, package.json, bunfig, shebang, shared-contract exports
-- [ ] 08-02-PLAN.md -- Subprocess and PTY migration: Bun.spawn for subprocess.ts, interactive-command.ts, codex-appserver-fetcher.ts
-- [ ] 08-03-PLAN.md -- IPC socket migration: Bun.listen/connect for service-server.ts and service-client.ts
+- [x] 08-02-PLAN.md -- Subprocess and PTY migration: Bun.spawn for subprocess.ts, interactive-command.ts, codex-appserver-fetcher.ts
+- [x] 08-03-PLAN.md -- IPC socket migration: Bun.listen/connect for service-server.ts and service-client.ts
 
 ### Phase 9: Lifecycle Commands
 **Goal**: Users can install, remove, update, and fully uninstall Agent Bar through interactive TypeScript commands that manage systemd, GNOME extension, and settings safely
