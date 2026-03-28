@@ -2,10 +2,14 @@
   "name": "agent-bar-usage",
   "private": true,
   "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "build:shared": "pnpm --filter shared-contract build",
-    "build:backend": "pnpm run build:shared && pnpm --filter backend build",
-    "test:backend": "pnpm --filter backend test",
+    "build:shared": "cd packages/shared-contract && bun x tsc -p tsconfig.build.json",
+    "build:backend": "bun run build:shared && cd apps/backend && bun x tsc -p tsconfig.build.json",
+    "test:backend": "cd apps/backend && bun run vitest run --config vitest.config.ts",
     "test:gnome": "pnpm --filter gnome-extension test",
     "install:ubuntu": "bash scripts/install-ubuntu.sh",
     "verify:ubuntu": "bash scripts/verify-ubuntu-install.sh"

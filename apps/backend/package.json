@@ -3,21 +3,22 @@
   "private": true,
   "type": "module",
   "bin": {
-    "agent-bar": "dist/cli.js"
+    "agent-bar": "src/cli.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "test": "vitest run --config vitest.config.ts"
+    "start": "bun run src/cli.ts",
+    "dev": "bun --watch run src/cli.ts",
+    "test": "bun run vitest run --config vitest.config.ts",
+    "typecheck": "bun x tsc --noEmit"
   },
   "dependencies": {
     "commander": "^14.0.2",
-    "node-pty": "^1.0.0",
     "shared-contract": "workspace:*",
     "zod": "^3.25.67"
   },
   "devDependencies": {
-    "@types/node": "^24.3.1",
-    "tsx": "^4.20.5",
+    "@types/bun": "latest",
+    "bun-types": "latest",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }
