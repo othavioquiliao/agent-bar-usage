@@ -39,7 +39,7 @@ Requirements for the refactor & polish milestone. Each maps to roadmap phases.
 - [ ] **DATA-01**: Backend auto-refreshes provider data periodically via configurable setInterval (default 150s)
 - [ ] **DATA-02**: File-based cache with TTL and fetch deduplication stored in XDG_CACHE_HOME
 - [ ] **DATA-03**: Date/time formatting is locale-aware using Intl.RelativeTimeFormat and Intl.DateTimeFormat
-- [ ] **DATA-04**: Settings are versioned with migration logic and atomic writes (temp file + rename)
+- [x] **DATA-04**: Settings are versioned with migration logic and atomic writes (temp file + rename)
 
 ### Terminal UI
 
@@ -113,7 +113,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-01 | Phase 11 | Pending |
 | DATA-02 | Phase 11 | Pending |
 | DATA-03 | Phase 11 | Pending |
-| DATA-04 | Phase 9 | Pending |
+| DATA-04 | Phase 9 | Complete |
 | TUI-01 | Phase 12 | Pending |
 | TUI-02 | Phase 12 | Pending |
 | TUI-03 | Phase 12 | Pending |

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Refactor & Polish
-status: Ready to plan
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-03-28T22:41:38.103Z"
+status: Ready to execute
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-29T00:24:40.062Z"
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 08 — bun-runtime-migration
+**Current focus:** Phase 09 — lifecycle-commands
 
 ## Current Position
 
-Phase: 9
-Plan: Not started
+Phase: 09 (lifecycle-commands) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Plan: Not started
 | Phase 08 P01 | 3min | 2 tasks | 11 files |
 | Phase 08 P02 | 8min | 2 tasks | 3 files |
 | Phase 08 P03 | 9min | 2 tasks | 4 files |
+| Phase 09 P01 | 4min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 08]: Migrated service-runtime.test.ts from vitest to bun:test since Bun.listen/connect require Bun runtime
 - [Phase 08]: Removed server property from AgentBarServiceRuntime interface (net.Server type no longer applicable)
 - [Phase 08]: Kept PtyUnavailableError as deprecated export -- providers and tests reference it for error-handling branches
+- [Phase 09]: Used bun:test instead of vitest for settings tests (Bun.file/Bun.write APIs require Bun runtime)
+- [Phase 09]: Settings spread order: { ...data, version: CURRENT_VERSION } ensures version override after migration
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-28T22:36:36.107Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-03-29T00:24:40.060Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None

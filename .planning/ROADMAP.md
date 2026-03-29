@@ -71,7 +71,7 @@ Plans:
   5. Settings file includes a version field and migrates automatically when the schema changes across updates
 **Plans:** 3 plans
 Plans:
-- [ ] 09-01-PLAN.md -- Foundation: @clack/prompts install, lifecycle paths, dependency check, versioned settings module
+- [x] 09-01-PLAN.md -- Foundation: @clack/prompts install, lifecycle paths, dependency check, versioned settings module
 - [ ] 09-02-PLAN.md -- Setup + Update commands: interactive install and update flows with @clack/prompts
 - [ ] 09-03-PLAN.md -- Remove + Uninstall + CLI wiring: destructive commands and Commander registration
 
