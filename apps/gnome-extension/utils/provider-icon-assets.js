@@ -1,8 +1,8 @@
 const PACKAGED_PROVIDER_ICON_RELATIVE_PATHS = {
-  claude: ['providers/claude.svg', 'claude-code-icon.png'],
-  claudecode: ['providers/claude.svg', 'claude-code-icon.png'],
-  codex: ['providers/codex.svg', 'codex-icon.png'],
-  copilot: ['providers/copilot.svg', 'copilot-icon.png'],
+  claude: ['claude-code-icon.png'],
+  claudecode: ['claude-code-icon.png'],
+  codex: ['codex-icon.png'],
+  copilot: ['copilot-icon.png'],
 };
 
 export function normalizeProviderId(providerId) {

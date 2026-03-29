@@ -8,6 +8,6 @@ describe('provider icon assets', () => {
   });
 
   it('prefers packaged copilot assets over fallback badges', () => {
-    expect(resolvePackagedProviderIconRelativePaths('copilot')).toContain('providers/copilot.svg');
+    expect(resolvePackagedProviderIconRelativePaths('copilot')).toEqual(['copilot-icon.png']);
   });
 });
