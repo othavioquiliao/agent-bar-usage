@@ -12,6 +12,7 @@
     "typecheck": "bun x tsc --noEmit"
   },
   "dependencies": {
+    "@clack/prompts": "^1.1.0",
     "commander": "^14.0.2",
     "shared-contract": "workspace:*",
     "zod": "^3.25.67"
