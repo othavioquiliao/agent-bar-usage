@@ -37,7 +37,7 @@ agent-bar doctor --json
 
 | Error | Cause | Fix |
 |---|---|---|
-| `copilot_token_missing` | No GitHub token in environment | Set `GITHUB_TOKEN` env var (see README) |
+| `copilot_token_missing` | No GitHub token available to the service | Run `agent-bar auth copilot`, or set `GITHUB_TOKEN` manually |
 | `claude_cli_removed` | Config usa `sourceMode: "cli"` (PTY removido) | Mude para `"auto"` ou `"api"` no config |
 | `codex_cli_deprecated` | Config usa `sourceMode: "cli"` (PTY depreciado) | Mude para `"auto"` no config |
 | `claude_cli_missing` | Credenciais OAuth ausentes | Rode qualquer comando `claude` para gerar `~/.claude/.credentials.json` |
@@ -60,6 +60,13 @@ systemctl --user restart agent-bar.service
 nano ~/.config/agent-bar/config.json
 systemctl --user restart agent-bar.service
 ```
+
+No v2.0, os defaults esperados sao:
+- `codex.sourceMode = "auto"`
+- `claude.sourceMode = "auto"` ou `"api"`
+
+Se quiser voltar rapidamente para os defaults atuais, apagar `~/.config/agent-bar/config.json`
+continua sendo o caminho mais simples.
 
 ## Extension doesn't appear in topbar
 
@@ -101,6 +108,23 @@ export PATH="$HOME/.local/bin:$PATH"
 # Reinstall
 pnpm install:ubuntu
 ```
+
+## Copilot auth still asks for old setup
+
+If you are following an older note or shell history entry that still uses:
+
+```bash
+agent-bar auth copilot --client-id <...>
+```
+
+update to:
+
+```bash
+agent-bar auth copilot
+```
+
+The current v2.0 build already ships with a default GitHub OAuth client ID for Device Flow.
+Keep `--client-id` only if you intentionally need to override it.
 
 ## Socket keeps disappearing
 

@@ -1,6 +1,6 @@
 # Agent Bar Ubuntu
 
-Linux-native desktop tool that surfaces AI provider usage (Copilot, Codex CLI, Claude CLI) for Ubuntu users through a GNOME Shell extension backed by a local Node.js service.
+Linux-native desktop tool that surfaces AI provider usage (Copilot, Codex CLI, Claude CLI) for Ubuntu users through a GNOME Shell extension backed by a local CLI and Unix socket service.
 
 ## What You Get
 
@@ -12,7 +12,7 @@ Linux-native desktop tool that surfaces AI provider usage (Copilot, Codex CLI, C
 ## Repository Layout
 
 ```
-apps/backend/           Node.js/TypeScript backend, CLI, and service runtime
+apps/backend/           TypeScript backend, CLI, and service runtime
 apps/gnome-extension/   GNOME Shell 46 extension (indicator, menu, polling)
 packages/shared-contract/  Zod schemas shared between backend and extension
 scripts/                Install and verification helpers
@@ -26,7 +26,8 @@ docs/                   Install, troubleshooting, and debugging guides
 |---|---|---|
 | Ubuntu | 24.04+ | GNOME-based desktop with Wayland or X11 |
 | GNOME Shell | 46 | Required for the extension |
-| Node.js | 20+ | LTS recommended |
+| Bun | 1.x | Required by the repo build/test scripts |
+| Node.js | 20+ | Current Ubuntu installer and installed CLI wrapper still use Node |
 | pnpm | 10+ | Pinned to 10.17.1 in `package.json` |
 | systemd --user | any | Standard on Ubuntu desktop |
 | secret-tool | optional | Install `libsecret-tools` for credential-backed providers |
@@ -63,20 +64,35 @@ git pull
 # 2. Reinstale
 pnpm install:ubuntu
 
-# 3. Atualize o config local (importante!)
+# 3. Revise o config local (importante)
 #    Versoes anteriores usavam sourceMode "cli" para Codex e Claude.
 #    Agora o padrao e "auto" (usa API/app-server em vez de PTY interativo).
-#    Se o seu config ainda tem "cli", atualize:
+#    Se o seu config ainda tem "cli", atualize ou apague o arquivo:
 cat ~/.config/agent-bar/config.json
-#    Mude "sourceMode": "cli" para "sourceMode": "auto" nos providers codex e claude.
+#    Mude "sourceMode": "cli" para "sourceMode": "auto" nos providers codex e claude
+#    ou delete ~/.config/agent-bar/config.json para voltar aos defaults.
 
 # 4. Reinicie o servico
 systemctl --user restart agent-bar.service
 
-# 5. Verifique
+# 5. Refaça a autenticacao do Copilot se necessario
+agent-bar auth copilot
+
+# 6. Verifique
 agent-bar doctor --json
 agent-bar usage
 ```
+
+### Checklist de migracao para v2.0
+
+Se voce esta vindo de `v1` ou `v1.1`, o caminho mais seguro e:
+
+1. Rode `pnpm install:ubuntu` no checkout atualizado.
+2. Confirme que `~/.config/agent-bar/config.json` nao ficou com `sourceMode: "cli"` para `codex` ou `claude`.
+3. Se quiser um reset limpo dos defaults de provider, delete `~/.config/agent-bar/config.json` e deixe o Agent Bar recria-lo.
+4. Rode `agent-bar auth copilot` se o `doctor` acusar `copilot_token_missing`.
+5. Reinicie o servico com `systemctl --user restart agent-bar.service`.
+6. Em Wayland, faca logout/login para recarregar a extensao GNOME.
 
 ### Por que atualizar o config?
 
@@ -118,10 +134,12 @@ vai ignorar esses caminhos novos e tentar o PTY antigo (que vai falhar).
 5. **Para Copilot, use o comando de auth:**
 
    ```bash
-   agent-bar auth copilot --client-id <github-oauth-client-id>
+   agent-bar auth copilot
    ```
 
-   O `client-id` vem de um GitHub OAuth App (`GitHub -> Settings -> Developer settings -> OAuth Apps`).
+   Desde a v2.0, o Agent Bar ja inclui um `client_id` padrao para o GitHub Device Flow.
+   Use `--client-id` apenas para testes ou para sobrescrever esse valor. Em ambientes
+   sem browser, tambem e possivel usar `agent-bar auth copilot --token ghp_SEU_TOKEN`.
 
 6. **Verifique que tudo funciona:**
 
@@ -135,7 +153,10 @@ vai ignorar esses caminhos novos e tentar o PTY antigo (que vai falhar).
 ### 1. Install system prerequisites
 
 ```bash
-# Node.js (via nvm or your preferred method)
+# Bun (required by the repo build/test scripts)
+# See: https://bun.sh/docs/installation
+
+# Node.js (currently still required by the Ubuntu installer/wrapper)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 nvm install --lts
 
@@ -251,7 +272,16 @@ The backend fetches usage data from three providers. Each needs its own setup.
 
 ### Copilot
 
-Requires a GitHub token accessible to the service. Set one of these environment variables in the systemd unit or shell profile:
+Recommended path: authenticate with the built-in Device Flow helper.
+
+```bash
+agent-bar auth copilot
+```
+
+Since v2.0, this command already includes the default GitHub OAuth client ID. Use
+`--client-id` only if you need to override it for testing, or `--token` for a manual/headless flow.
+
+You can still provide a GitHub token directly to the service through one of these environment variables:
 
 ```bash
 # Option A: environment variable

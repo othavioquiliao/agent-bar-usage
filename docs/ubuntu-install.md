@@ -7,10 +7,15 @@ Complete step-by-step installation of Agent Bar Ubuntu: backend service, CLI, an
 | Requirement | Check command | Install if missing |
 |---|---|---|
 | Ubuntu 24.04+ with GNOME | `gnome-shell --version` | - |
+| Bun 1.x | `bun --version` | Follow https://bun.sh/docs/installation |
 | Node.js 20+ | `node --version` | `nvm install --lts` |
 | pnpm 10+ | `pnpm --version` | `corepack enable && corepack prepare pnpm@10.17.1 --activate` |
 | systemd user session | `systemctl --user status` | Standard on Ubuntu desktop |
 | secret-tool (optional) | `which secret-tool` | `sudo apt install libsecret-tools` |
+
+> `Bun` e usado pelos scripts de build/teste do repositorio. O instalador Ubuntu atual ainda
+> gera um wrapper local que executa o backend compilado com `node`, entao migracoes e instalacoes
+> novas ainda precisam dos dois.
 
 ## Step 1: Clone the repo
 
@@ -37,6 +42,38 @@ This command does everything:
 8. Enables the extension
 
 If pnpm asks to approve builds (e.g., esbuild), press space to select, then confirm.
+
+## Migrating from older installs
+
+If you already had Agent Bar installed, `pnpm install:ubuntu` updates the service, CLI wrapper,
+and GNOME extension in place. You do not need to uninstall first.
+
+After reinstalling, check the local config:
+
+```bash
+cat ~/.config/agent-bar/config.json
+```
+
+If `codex` or `claude` still use `sourceMode: "cli"`, either:
+
+```bash
+# Option 1: reset to current defaults
+rm ~/.config/agent-bar/config.json
+
+# Option 2: edit manually and change "cli" -> "auto"
+nano ~/.config/agent-bar/config.json
+```
+
+Then restart the service and re-run auth if needed:
+
+```bash
+systemctl --user restart agent-bar.service
+agent-bar auth copilot
+agent-bar doctor --json
+```
+
+`agent-bar auth copilot` now ships with a default GitHub OAuth `client_id`. Use `--client-id`
+only to override it for testing, or `--token` for a manual/headless flow.
 
 ## Step 3: Restart GNOME Shell
 
@@ -66,7 +103,7 @@ pnpm verify:ubuntu
 
 | File | Purpose |
 |---|---|
-| `~/.local/bin/agent-bar` | CLI wrapper (calls Node.js with the built backend) |
+| `~/.local/bin/agent-bar` | CLI wrapper (currently calls Node.js with the built backend) |
 | `~/.config/systemd/user/agent-bar.service` | Systemd user unit for the background service |
 | `~/.config/user-tmpfiles.d/agent-bar.conf` | Protects the runtime socket directory |
 | `~/.local/share/gnome-shell/extensions/agent-bar-ubuntu@othavio.dev/` | GNOME Shell extension files |
@@ -102,6 +139,7 @@ Depois reinicie o servico:
 
 ```bash
 systemctl --user restart agent-bar.service
+agent-bar auth copilot   # se precisar reconfigurar o token do Copilot
 agent-bar usage   # Deve mostrar todos os providers com status ok
 ```
 
@@ -109,6 +147,7 @@ agent-bar usage   # Deve mostrar todos os providers com status ok
 - **Claude** agora usa API HTTP (`api.anthropic.com/api/oauth/usage`) — o fetcher PTY (`/usage`) foi removido
 - **Codex** agora usa `codex app-server` (JSON-RPC) — o fetcher PTY (`/status`) foi depreciado
 - **Copilot** continua usando API GitHub (sem mudanca)
+- **Auth Copilot** nao precisa mais de `--client-id` no fluxo padrao de device auth
 
 ## Troubleshooting
 
