@@ -1,5 +1,5 @@
-import path from "node:path";
-import { accessSync, constants } from "node:fs";
+import { accessSync, constants } from 'node:fs';
+import path from 'node:path';
 
 export interface SubprocessOptions {
   cwd?: string;
@@ -20,15 +20,15 @@ export interface SubprocessResult {
 export class SubprocessError extends Error {
   constructor(
     message: string,
-    readonly result: Omit<SubprocessResult, "exitCode"> & { exitCode?: number },
+    readonly result: Omit<SubprocessResult, 'exitCode'> & { exitCode?: number },
   ) {
     super(message);
-    this.name = "SubprocessError";
+    this.name = 'SubprocessError';
   }
 }
 
 export function describeSubprocessFailure(error: SubprocessError): string {
-  const exitCode = error.result.exitCode ?? "unknown";
+  const exitCode = error.result.exitCode ?? 'unknown';
   const stderr = error.result.stderr.trim();
 
   if (stderr.length > 0) {
@@ -48,9 +48,9 @@ export async function runSubprocess(
   const proc = Bun.spawn([command, ...args], {
     cwd: options.cwd,
     env: { ...process.env, ...options.env },
-    stdin: options.input ? "pipe" : "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
+    stdin: options.input ? 'pipe' : 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
   });
 
   if (options.input && proc.stdin) {
@@ -101,11 +101,11 @@ export async function runSubprocess(
 }
 
 export function resolveCommandInPath(command: string, env: NodeJS.ProcessEnv = process.env): string | null {
-  if (command.includes("/") || command.includes(path.sep)) {
+  if (command.includes('/') || command.includes(path.sep)) {
     return isExecutable(command) ? command : null;
   }
 
-  const pathValue = env.PATH ?? "";
+  const pathValue = env.PATH ?? '';
   const segments = pathValue.split(path.delimiter);
 
   for (const segment of segments) {

@@ -1,4 +1,4 @@
-import type { BackendConfig } from "./config-schema.js";
+import type { BackendConfig } from './config-schema.js';
 
 export function createDefaultConfig(): BackendConfig {
   return {
@@ -8,19 +8,19 @@ export function createDefaultConfig(): BackendConfig {
     },
     providers: [
       {
-        id: "copilot",
+        id: 'copilot',
         enabled: true,
-        sourceMode: "api",
+        sourceMode: 'api',
       },
       {
-        id: "codex",
+        id: 'codex',
         enabled: true,
-        sourceMode: "auto",
+        sourceMode: 'auto',
       },
       {
-        id: "claude",
+        id: 'claude',
         enabled: true,
-        sourceMode: "auto",
+        sourceMode: 'auto',
       },
     ],
   };

@@ -1,12 +1,12 @@
-import { isEnvSecretReference, type SecretReference } from "./secret-reference.js";
-import { SecretResolutionError, type SecretResolveContext, type SecretStore } from "./secret-store.js";
+import { isEnvSecretReference, type SecretReference } from './secret-reference.js';
+import { SecretResolutionError, type SecretResolveContext, type SecretStore } from './secret-store.js';
 
 export interface EnvSecretStoreOptions {
   env?: NodeJS.ProcessEnv;
 }
 
 export class EnvSecretStore implements SecretStore {
-  readonly store = "env" as const;
+  readonly store = 'env' as const;
   readonly #defaultEnv: NodeJS.ProcessEnv;
 
   constructor(options: EnvSecretStoreOptions = {}) {
@@ -16,7 +16,7 @@ export class EnvSecretStore implements SecretStore {
   async resolve(reference: SecretReference, context: SecretResolveContext = {}): Promise<string> {
     if (!isEnvSecretReference(reference)) {
       throw new SecretResolutionError(
-        "secret_store_unsupported",
+        'secret_store_unsupported',
         this.store,
         `EnvSecretStore cannot resolve reference type: ${reference.store}.`,
       );
@@ -27,7 +27,7 @@ export class EnvSecretStore implements SecretStore {
 
     if (!value || value.trim().length === 0) {
       throw new SecretResolutionError(
-        "secret_not_found",
+        'secret_not_found',
         this.store,
         `Environment variable ${reference.env} is missing or empty.`,
       );

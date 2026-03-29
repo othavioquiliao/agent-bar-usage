@@ -1,16 +1,12 @@
-import type { ProviderId, ProviderSourceMode } from "shared-contract";
+import type { ProviderId, ProviderSourceMode } from 'shared-contract';
 
-import type { BackendRequest } from "../config/backend-request.js";
-import type { BackendConfig, ProviderConfig } from "../config/config-schema.js";
-import { createDefaultConfig } from "../config/default-config.js";
-import {
-  SecretReferenceError,
-  toSecretReference,
-  type SecretStoreId,
-} from "../secrets/secret-reference.js";
-import { SecretResolutionError, SecretResolver } from "../secrets/secret-store.js";
-import type { ProviderAdapter, ProviderRuntimeMetadata, ResolvedProviderSecrets } from "./provider-adapter.js";
-import { ProviderRegistry } from "./provider-registry.js";
+import type { BackendRequest } from '../config/backend-request.js';
+import type { BackendConfig, ProviderConfig } from '../config/config-schema.js';
+import { createDefaultConfig } from '../config/default-config.js';
+import { SecretReferenceError, type SecretStoreId, toSecretReference } from '../secrets/secret-reference.js';
+import { SecretResolutionError, SecretResolver } from '../secrets/secret-store.js';
+import type { ProviderAdapter, ProviderRuntimeMetadata, ResolvedProviderSecrets } from './provider-adapter.js';
+import type { ProviderRegistry } from './provider-registry.js';
 
 export interface ProviderContextBuildOptions {
   registry: ProviderRegistry;
@@ -61,7 +57,7 @@ export class ProviderContextBuilder {
         providerConfig: provider.config,
         providerRuntime: {
           enabled: provider.config?.enabled ?? true,
-          preferredSourceMode: provider.config?.sourceMode ?? "auto",
+          preferredSourceMode: provider.config?.sourceMode ?? 'auto',
         },
         secrets: secretResult.secrets,
         secretError: secretResult.error,
@@ -101,16 +97,16 @@ export class ProviderContextBuilder {
     providerConfig: ProviderConfig | null,
     request: BackendRequest,
   ): ProviderSourceMode {
-    if (request.sourceMode !== "auto") {
+    if (request.sourceMode !== 'auto') {
       return request.sourceMode;
     }
 
     const configuredSourceMode = providerConfig?.sourceMode;
-    if (configuredSourceMode && configuredSourceMode !== "auto") {
+    if (configuredSourceMode && configuredSourceMode !== 'auto') {
       return configuredSourceMode;
     }
 
-    return adapterDefaultSourceMode ?? "auto";
+    return adapterDefaultSourceMode ?? 'auto';
   }
 
   async #resolveProviderSecret(
@@ -170,9 +166,9 @@ export class ProviderContextBuilder {
           store: resolveStoreHint(providerConfig.secretRef.store),
         },
         error: new SecretResolutionError(
-          "secret_store_failed",
+          'secret_store_failed',
           resolveStoreHint(providerConfig.secretRef.store),
-          "Unexpected secret resolution failure.",
+          'Unexpected secret resolution failure.',
           true,
           error,
         ),
@@ -181,6 +177,6 @@ export class ProviderContextBuilder {
   }
 }
 
-function resolveStoreHint(store: "secret-tool" | "env"): SecretStoreId {
-  return store === "env" ? "env" : "secret-tool";
+function resolveStoreHint(store: 'secret-tool' | 'env'): SecretStoreId {
+  return store === 'env' ? 'env' : 'secret-tool';
 }

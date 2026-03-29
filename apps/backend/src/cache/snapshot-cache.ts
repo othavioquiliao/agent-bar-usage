@@ -1,4 +1,9 @@
-import type { ProviderId, ProviderSnapshot, ProviderSourceMode } from "shared-contract";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { assertProviderSnapshot, type ProviderSnapshot, type ProviderSourceMode } from 'shared-contract';
+
+import { type ResolveCachePathOptions, resolveSnapshotCacheDir } from './cache-path.js';
 
 export const DEFAULT_SNAPSHOT_TTL_SECONDS = 30;
 
@@ -8,42 +13,96 @@ export interface SnapshotCacheEntry {
 }
 
 export interface SnapshotCacheKeyParts {
-  providerId: ProviderId;
+  cacheKey: string;
   sourceMode: ProviderSourceMode;
 }
 
 export class SnapshotCache {
   readonly #entries = new Map<string, SnapshotCacheEntry>();
+  readonly #inflight = new Map<string, Promise<ProviderSnapshot>>();
 
   constructor(
     private readonly options: {
       now?: () => number;
       defaultTtlSeconds?: number;
-    } = {},
+      cacheDir?: string;
+    } & ResolveCachePathOptions = {},
   ) {}
 
-  get(key: string, ttlSeconds = this.defaultTtlSeconds): ProviderSnapshot | null {
-    const entry = this.#entries.get(key);
+  async get(key: string, _ttlSeconds = this.defaultTtlSeconds): Promise<ProviderSnapshot | null> {
+    const memoryEntry = this.#entries.get(key);
 
-    if (!entry) {
-      return null;
+    if (memoryEntry && memoryEntry.expiresAtMs > this.now()) {
+      return memoryEntry.snapshot;
     }
 
-    if (entry.expiresAtMs <= this.now()) {
+    if (memoryEntry) {
       this.#entries.delete(key);
+    }
+
+    const filePath = this.filePathForKey(key);
+    if (!existsSync(filePath)) {
       return null;
     }
 
-    return entry.snapshot;
+    try {
+      const entry = JSON.parse(readFileSync(filePath, 'utf8')) as SnapshotCacheEntry;
+      if (entry.expiresAtMs <= this.now()) {
+        return null;
+      }
+
+      const snapshot = assertProviderSnapshot(entry.snapshot);
+      this.#entries.set(key, {
+        snapshot,
+        expiresAtMs: entry.expiresAtMs,
+      });
+      return snapshot;
+    } catch {
+      return null;
+    }
   }
 
-  set(key: string, snapshot: ProviderSnapshot, ttlSeconds = this.defaultTtlSeconds): ProviderSnapshot {
-    this.#entries.set(key, {
+  async set(key: string, snapshot: ProviderSnapshot, ttlSeconds = this.defaultTtlSeconds): Promise<ProviderSnapshot> {
+    const entry = {
       snapshot,
       expiresAtMs: this.now() + ttlSeconds * 1000,
-    });
+    } satisfies SnapshotCacheEntry;
+
+    this.ensureCacheDir();
+    this.#entries.set(key, entry);
+    writeFileSync(this.filePathForKey(key), `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
 
     return snapshot;
+  }
+
+  async getOrFetch(
+    key: string,
+    fetcher: () => Promise<ProviderSnapshot>,
+    ttlSeconds = this.defaultTtlSeconds,
+    options: {
+      forceRefresh?: boolean;
+    } = {},
+  ): Promise<ProviderSnapshot> {
+    if (!options.forceRefresh) {
+      const cached = await this.get(key, ttlSeconds);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    const existingFetch = this.#inflight.get(key);
+    if (existingFetch) {
+      return existingFetch;
+    }
+
+    const fetchPromise = fetcher()
+      .then(async (snapshot) => await this.set(key, snapshot, ttlSeconds))
+      .finally(() => {
+        this.#inflight.delete(key);
+      });
+
+    this.#inflight.set(key, fetchPromise);
+    return fetchPromise;
   }
 
   clear(): void {
@@ -57,8 +116,24 @@ export class SnapshotCache {
   private now(): number {
     return this.options.now?.() ?? Date.now();
   }
+
+  private cacheDir(): string {
+    return this.options.cacheDir ?? resolveSnapshotCacheDir(this.options);
+  }
+
+  private ensureCacheDir(): void {
+    mkdirSync(this.cacheDir(), { recursive: true });
+  }
+
+  private filePathForKey(key: string): string {
+    if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
+      throw new Error(`Invalid cache key: ${key}`);
+    }
+
+    return path.join(this.cacheDir(), `${key}.json`);
+  }
 }
 
-export function buildSnapshotCacheKey({ providerId, sourceMode }: SnapshotCacheKeyParts): string {
-  return `${providerId}:${sourceMode}`;
+export function buildSnapshotCacheKey({ cacheKey, sourceMode }: SnapshotCacheKeyParts): string {
+  return `${cacheKey}__${sourceMode}`;
 }

@@ -1,14 +1,9 @@
-import type {
-  ProviderError,
-  ProviderId,
-  ProviderSnapshot,
-  ProviderSourceMode,
-} from "shared-contract";
+import type { ProviderError, ProviderId, ProviderSnapshot, ProviderSourceMode } from 'shared-contract';
 
-import type { BackendRequest } from "../config/backend-request.js";
-import type { ProviderConfig } from "../config/config-schema.js";
-import type { SecretStoreId } from "../secrets/secret-reference.js";
-import type { runSubprocess } from "../utils/subprocess.js";
+import type { BackendRequest } from '../config/backend-request.js';
+import type { ProviderConfig } from '../config/config-schema.js';
+import type { SecretStoreId } from '../secrets/secret-reference.js';
+import type { runSubprocess } from '../utils/subprocess.js';
 
 export interface ProviderRuntimeMetadata {
   enabled: boolean;
@@ -34,9 +29,11 @@ export interface ProviderAdapterContext {
 
 export interface ProviderAdapter {
   id: ProviderId;
+  name: string;
+  cacheKey: string;
   defaultSourceMode?: ProviderSourceMode;
   isAvailable(context: ProviderAdapterContext): Promise<boolean>;
-  fetch(context: ProviderAdapterContext): Promise<ProviderSnapshot>;
+  getQuota(context: ProviderAdapterContext): Promise<ProviderSnapshot>;
 }
 
 export function createProviderError(code: string, message: string, retryable = false): ProviderError {
@@ -51,11 +48,11 @@ export function createUnavailableSnapshot(
   provider: ProviderId,
   source: ProviderSourceMode,
   updatedAt: string,
-  error = createProviderError("provider_unavailable", `${provider} is not available on this host.`),
+  error = createProviderError('provider_unavailable', `${provider} is not available on this host.`),
 ): ProviderSnapshot {
   return {
     provider,
-    status: "unavailable",
+    status: 'unavailable',
     source,
     updated_at: updatedAt,
     usage: null,
@@ -72,7 +69,7 @@ export function createErrorSnapshot(
 ): ProviderSnapshot {
   return {
     provider,
-    status: "error",
+    status: 'error',
     source,
     updated_at: updatedAt,
     usage: null,

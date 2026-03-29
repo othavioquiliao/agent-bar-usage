@@ -1,22 +1,22 @@
-import type { SecretReference, SecretStoreId } from "./secret-reference.js";
+import type { SecretReference, SecretStoreId } from './secret-reference.js';
 
 export type SecretResolutionErrorCode =
-  | "secret_reference_invalid"
-  | "secret_store_unsupported"
-  | "secret_store_unavailable"
-  | "secret_not_found"
-  | "secret_store_failed";
+  | 'secret_reference_invalid'
+  | 'secret_store_unsupported'
+  | 'secret_store_unavailable'
+  | 'secret_not_found'
+  | 'secret_store_failed';
 
 export class SecretResolutionError extends Error {
   constructor(
     readonly code: SecretResolutionErrorCode,
-    readonly store: SecretStoreId | "unknown",
+    readonly store: SecretStoreId | 'unknown',
     message: string,
     readonly retryable = false,
     readonly causeValue?: unknown,
   ) {
     super(message);
-    this.name = "SecretResolutionError";
+    this.name = 'SecretResolutionError';
   }
 }
 
@@ -43,7 +43,7 @@ export class SecretResolver {
 
     if (!store) {
       throw new SecretResolutionError(
-        "secret_store_unsupported",
+        'secret_store_unsupported',
         reference.store,
         `No secret store registered for ${reference.store}.`,
       );

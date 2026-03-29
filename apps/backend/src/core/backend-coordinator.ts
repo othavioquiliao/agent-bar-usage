@@ -1,27 +1,19 @@
 import {
-  providerSnapshotSchema,
-  snapshotEnvelopeSchema,
-  snapshotSchemaVersion,
+  assertProviderSnapshot,
+  assertSnapshotEnvelope,
   type ProviderSnapshot,
-  type SnapshotEnvelope,
   type ProviderSourceMode,
-} from "shared-contract";
-
-import type { BackendRequest } from "../config/backend-request.js";
-import { SnapshotCache, buildSnapshotCacheKey } from "../cache/snapshot-cache.js";
-import {
-  createErrorSnapshot,
-  createProviderError,
-  createUnavailableSnapshot,
-} from "./provider-adapter.js";
-import { ProviderRegistry } from "./provider-registry.js";
-import { runSubprocess } from "../utils/subprocess.js";
-import {
-  ProviderContextBuilder,
-  type ProviderExecutionContext,
-} from "./provider-context-builder.js";
-import type { BackendConfig } from "../config/config-schema.js";
-import { SecretResolver } from "../secrets/secret-store.js";
+  type SnapshotEnvelope,
+  snapshotSchemaVersion,
+} from 'shared-contract';
+import { buildSnapshotCacheKey, SnapshotCache } from '../cache/snapshot-cache.js';
+import type { BackendRequest } from '../config/backend-request.js';
+import type { BackendConfig } from '../config/config-schema.js';
+import type { SecretResolver } from '../secrets/secret-store.js';
+import { runSubprocess } from '../utils/subprocess.js';
+import { createErrorSnapshot, createProviderError, createUnavailableSnapshot } from './provider-adapter.js';
+import { ProviderContextBuilder, type ProviderExecutionContext } from './provider-context-builder.js';
+import type { ProviderRegistry } from './provider-registry.js';
 
 export interface BackendCoordinatorOptions {
   registry: ProviderRegistry;
@@ -65,7 +57,7 @@ export class BackendCoordinator {
         .sort()
         .at(-1) ?? this.#now().toISOString();
 
-    return snapshotEnvelopeSchema.parse({
+    return assertSnapshotEnvelope({
       schema_version: snapshotSchemaVersion,
       generated_at: generatedAt,
       providers,
@@ -79,96 +71,91 @@ export class BackendCoordinator {
     const adapter = providerContext.adapter;
     const sourceMode = providerContext.sourceMode;
     const cacheKey = buildSnapshotCacheKey({
-      providerId: adapter.id,
+      cacheKey: adapter.cacheKey,
       sourceMode,
     });
 
     if (!request.forceRefresh) {
-      const cachedSnapshot = this.#cache.get(cacheKey, request.ttlSeconds);
+      const cachedSnapshot = await this.#cache.get(cacheKey, request.ttlSeconds);
       if (cachedSnapshot) {
         return cachedSnapshot;
       }
     }
 
-    const updatedAt = this.#now().toISOString();
+    return await this.#cache.getOrFetch(
+      cacheKey,
+      async () => {
+        const updatedAt = this.#now().toISOString();
 
-    if (providerContext.secretError) {
-      return this.#cache.set(
-        cacheKey,
-        createErrorSnapshot(
-          adapter.id,
+        if (providerContext.secretError) {
+          return createErrorSnapshot(
+            adapter.id,
+            sourceMode,
+            updatedAt,
+            createProviderError(
+              providerContext.secretError.code,
+              providerContext.secretError.message,
+              providerContext.secretError.retryable,
+            ),
+          );
+        }
+
+        const context = {
+          request,
+          providerId: adapter.id,
           sourceMode,
-          updatedAt,
-          createProviderError(
-            providerContext.secretError.code,
-            providerContext.secretError.message,
-            providerContext.secretError.retryable,
-          ),
-        ),
-        request.ttlSeconds,
-      );
-    }
+          providerConfig: providerContext.providerConfig,
+          providerRuntime: providerContext.providerRuntime,
+          secrets: providerContext.secrets,
+          env: this.#env,
+          now: this.#now,
+          runSubprocess,
+        };
 
-    const context = {
-      request,
-      providerId: adapter.id,
-      sourceMode,
-      providerConfig: providerContext.providerConfig,
-      providerRuntime: providerContext.providerRuntime,
-      secrets: providerContext.secrets,
-      env: this.#env,
-      now: this.#now,
-      runSubprocess,
-    };
+        let isAvailable = false;
+        try {
+          isAvailable = await adapter.isAvailable(context);
+        } catch (error) {
+          return createErrorSnapshot(
+            adapter.id,
+            sourceMode,
+            updatedAt,
+            createProviderError(
+              'provider_availability_failed',
+              error instanceof Error ? error.message : 'Provider availability check failed.',
+              true,
+            ),
+          );
+        }
 
-    let isAvailable = false;
-    try {
-      isAvailable = await adapter.isAvailable(context);
-    } catch (error) {
-      return this.#cache.set(
-        cacheKey,
-        createErrorSnapshot(
-          adapter.id,
-          sourceMode,
-          updatedAt,
-          createProviderError(
-            "provider_availability_failed",
-            error instanceof Error ? error.message : "Provider availability check failed.",
-            true,
-          ),
-        ),
-        request.ttlSeconds,
-      );
-    }
+        if (!isAvailable) {
+          return createUnavailableSnapshot(
+            adapter.id,
+            sourceMode,
+            updatedAt,
+            createProviderError('provider_unavailable', `${adapter.id} is not available for ${sourceMode} mode.`),
+          );
+        }
 
-    if (!isAvailable) {
-      return this.#cache.set(
-        cacheKey,
-        createUnavailableSnapshot(
-          adapter.id,
-          sourceMode,
-          updatedAt,
-          createProviderError("provider_unavailable", `${adapter.id} is not available for ${sourceMode} mode.`),
-        ),
-        request.ttlSeconds,
-      );
-    }
-
-    try {
-      const snapshot = providerSnapshotSchema.parse({
-        ...normalizeSnapshot(await adapter.fetch(context), adapter.id, sourceMode, updatedAt),
-      });
-
-      return this.#cache.set(cacheKey, snapshot, request.ttlSeconds);
-    } catch (error) {
-      return this.#cache.set(cacheKey, toErrorSnapshot(adapter.id, sourceMode, updatedAt, error), request.ttlSeconds);
-    }
+        try {
+          return assertProviderSnapshot({
+            ...normalizeSnapshot(await adapter.getQuota(context), adapter.id, sourceMode, updatedAt),
+          });
+        } catch (error) {
+          return toErrorSnapshot(adapter.id, sourceMode, updatedAt, error);
+        }
+      },
+      request.ttlSeconds,
+      {
+        forceRefresh: request.forceRefresh,
+      },
+    );
   }
 }
 
 function normalizeSnapshot(
   snapshot: ProviderSnapshot,
-  providerId: ProviderSnapshot["provider"],
+  providerId: ProviderSnapshot['provider'],
   sourceMode: ProviderSourceMode,
   updatedAt: string,
 ): ProviderSnapshot {
@@ -182,7 +169,7 @@ function normalizeSnapshot(
 }
 
 function toErrorSnapshot(
-  providerId: ProviderSnapshot["provider"],
+  providerId: ProviderSnapshot['provider'],
   sourceMode: ProviderSourceMode,
   updatedAt: string,
   error: unknown,
@@ -192,7 +179,7 @@ function toErrorSnapshot(
       providerId,
       sourceMode,
       updatedAt,
-      createProviderError("provider_fetch_failed", error.message, true),
+      createProviderError('provider_fetch_failed', error.message, true),
     );
   }
 
@@ -200,6 +187,6 @@ function toErrorSnapshot(
     providerId,
     sourceMode,
     updatedAt,
-    createProviderError("provider_fetch_failed", "Unknown provider error.", true),
+    createProviderError('provider_fetch_failed', 'Unknown provider error.', true),
   );
 }

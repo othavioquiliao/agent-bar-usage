@@ -1,17 +1,16 @@
-import { access, readFile } from "node:fs/promises";
-import { constants } from "node:fs";
-import { ZodError } from "zod";
-
+import { constants } from 'node:fs';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { type ResolveConfigPathOptions, resolveBackendConfigPath } from './config-path.js';
 import {
-  backendConfigSchema,
-  sanitizeBackendConfig,
+  assertBackendConfig,
   type BackendConfig,
   type SanitizedBackendConfig,
-} from "./config-schema.js";
-import { resolveBackendConfigPath, type ResolveConfigPathOptions } from "./config-path.js";
-import { createDefaultConfig } from "./default-config.js";
+  sanitizeBackendConfig,
+} from './config-schema.js';
+import { createDefaultConfig } from './default-config.js';
 
-export type ConfigLoadErrorCode = "config_read_error" | "config_parse_error" | "config_validation_error";
+export type ConfigLoadErrorCode = 'config_read_error' | 'config_parse_error' | 'config_validation_error';
 
 export class ConfigLoadError extends Error {
   constructor(
@@ -21,13 +20,17 @@ export class ConfigLoadError extends Error {
     readonly causeValue?: unknown,
   ) {
     super(message);
-    this.name = "ConfigLoadError";
+    this.name = 'ConfigLoadError';
   }
 }
 
 export interface LoadBackendConfigOptions extends ResolveConfigPathOptions {
   readTextFile?: (filePath: string) => Promise<string>;
   fileExists?: (filePath: string) => Promise<boolean>;
+}
+
+export interface SaveBackendConfigOptions extends ResolveConfigPathOptions {
+  writeTextFile?: (filePath: string, text: string) => Promise<void>;
 }
 
 export interface LoadedBackendConfig {
@@ -65,9 +68,7 @@ export async function loadBackendConfig(options: LoadBackendConfigOptions = {}):
   };
 }
 
-export async function loadSanitizedBackendConfig(
-  options: LoadBackendConfigOptions = {},
-): Promise<DumpedBackendConfig> {
+export async function loadSanitizedBackendConfig(options: LoadBackendConfigOptions = {}): Promise<DumpedBackendConfig> {
   const loaded = await loadBackendConfig(options);
 
   return {
@@ -77,10 +78,27 @@ export async function loadSanitizedBackendConfig(
   };
 }
 
-async function doesFileExist(
-  filePath: string,
-  fileExists?: (filePath: string) => Promise<boolean>,
-): Promise<boolean> {
+export async function saveBackendConfig(
+  config: BackendConfig,
+  options: SaveBackendConfigOptions = {},
+): Promise<{ path: string }> {
+  const configPath = resolveBackendConfigPath(options);
+  const normalizedConfig = assertBackendConfig(config);
+  assertUniqueProviders(normalizedConfig, configPath);
+  const serialized = `${JSON.stringify(normalizedConfig, null, 2)}\n`;
+
+  await mkdir(dirname(configPath), { recursive: true });
+
+  if (options.writeTextFile) {
+    await options.writeTextFile(configPath, serialized);
+  } else {
+    await writeFile(configPath, serialized, 'utf8');
+  }
+
+  return { path: configPath };
+}
+
+async function doesFileExist(filePath: string, fileExists?: (filePath: string) => Promise<boolean>): Promise<boolean> {
   if (fileExists) {
     return await fileExists(filePath);
   }
@@ -102,10 +120,10 @@ async function readConfigText(
       return await readTextFile(configPath);
     }
 
-    return await readFile(configPath, "utf8");
+    return await readFile(configPath, 'utf8');
   } catch (error) {
     throw new ConfigLoadError(
-      "config_read_error",
+      'config_read_error',
       configPath,
       `Could not read backend config at ${configPath}.`,
       error,
@@ -118,7 +136,7 @@ function parseConfigJson(text: string, configPath: string): unknown {
     return JSON.parse(text);
   } catch (error) {
     throw new ConfigLoadError(
-      "config_parse_error",
+      'config_parse_error',
       configPath,
       `Backend config at ${configPath} is not valid JSON.`,
       error,
@@ -128,7 +146,7 @@ function parseConfigJson(text: string, configPath: string): unknown {
 
 function parseBackendConfig(input: unknown, configPath: string): BackendConfig {
   try {
-    const parsed = backendConfigSchema.parse(input);
+    const parsed = assertBackendConfig(input);
     assertUniqueProviders(parsed, configPath);
     return parsed;
   } catch (error) {
@@ -136,16 +154,12 @@ function parseBackendConfig(input: unknown, configPath: string): BackendConfig {
       throw error;
     }
 
-    if (error instanceof ZodError) {
-      throw new ConfigLoadError(
-        "config_validation_error",
-        configPath,
-        `Backend config at ${configPath} failed schema validation.`,
-        error.flatten(),
-      );
-    }
-
-    throw error;
+    throw new ConfigLoadError(
+      'config_validation_error',
+      configPath,
+      `Backend config at ${configPath} failed schema validation.`,
+      error,
+    );
   }
 }
 
@@ -155,7 +169,7 @@ function assertUniqueProviders(config: BackendConfig, configPath: string): void 
   for (const provider of config.providers) {
     if (seen.has(provider.id)) {
       throw new ConfigLoadError(
-        "config_validation_error",
+        'config_validation_error',
         configPath,
         `Backend config at ${configPath} contains duplicate provider id: ${provider.id}.`,
       );
@@ -170,7 +184,7 @@ function applyFileAwareDefaults(config: BackendConfig, rawConfig: unknown): Back
     return config;
   }
 
-  const hasProvidersField = Object.hasOwn(rawConfig, "providers");
+  const hasProvidersField = Object.hasOwn(rawConfig, 'providers');
 
   if (hasProvidersField) {
     return config;
@@ -183,5 +197,5 @@ function applyFileAwareDefaults(config: BackendConfig, rawConfig: unknown): Back
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -7,11 +7,18 @@
     "packages/*"
   ],
   "scripts": {
+    "biome:check": "bun x biome check .",
+    "biome:fix": "bun x biome check --write .",
     "build:shared": "cd packages/shared-contract && bun x tsc -p tsconfig.build.json",
     "build:backend": "bun run build:shared && cd apps/backend && bun x tsc -p tsconfig.build.json",
+    "format": "bun x biome format --write .",
+    "lint": "bun run biome:check",
     "test:backend": "cd apps/backend && bun run vitest run --config vitest.config.ts",
     "test:gnome": "pnpm --filter gnome-extension test",
     "install:ubuntu": "bash scripts/install-ubuntu.sh",
     "verify:ubuntu": "bash scripts/verify-ubuntu-install.sh"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.9"
   }
 }

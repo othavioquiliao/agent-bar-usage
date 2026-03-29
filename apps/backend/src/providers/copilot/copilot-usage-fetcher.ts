@@ -1,16 +1,15 @@
-import type { ProviderSnapshot, ProviderSourceMode, ResetWindow, UsageSnapshot } from "shared-contract";
+import type { ProviderSnapshot, ProviderSourceMode, ResetWindow, UsageSnapshot } from 'shared-contract';
 
 import {
-  createErrorSnapshot,
   createProviderError,
   createUnavailableSnapshot,
   type ProviderAdapterContext,
-} from "../../core/provider-adapter.js";
-import { normalizeLineEndings, stripAnsi } from "../shared/interactive-command.js";
-import { resolveCopilotToken } from "./copilot-token-resolver.js";
+} from '../../core/provider-adapter.js';
+import { normalizeLineEndings, stripAnsi } from '../shared/interactive-command.js';
+import { resolveCopilotToken } from './copilot-token-resolver.js';
 
-const COPILOT_ENDPOINT = "https://api.github.com/copilot_internal/user";
-const COPILOT_SOURCE: ProviderSourceMode = "api";
+const COPILOT_ENDPOINT = 'https://api.github.com/copilot_internal/user';
+const COPILOT_SOURCE: ProviderSourceMode = 'api';
 const REQUEST_TIMEOUT_MS = 15_000;
 
 interface CopilotQuotaSnapshot {
@@ -44,8 +43,8 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
       source,
       updatedAt,
       createProviderError(
-        "copilot_source_unsupported",
-        "Copilot usage is only available through the API source mode on Ubuntu.",
+        'copilot_source_unsupported',
+        'Copilot usage is only available through the API source mode on Ubuntu.',
       ),
     );
   }
@@ -56,11 +55,11 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
       context,
       source,
       updatedAt,
-      "copilot_token_missing",
-      "No Copilot token was found in the environment or resolved secret store.",
+      'copilot_token_missing',
+      'No Copilot token was found in the environment or resolved secret store.',
       false,
       startedAt,
-      "copilot.api",
+      'copilot.api',
       false,
     );
   }
@@ -75,11 +74,11 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
         context,
         source,
         updatedAt,
-        "copilot_auth_failed",
-        "Copilot token was rejected by the GitHub API.",
+        'copilot_auth_failed',
+        'Copilot token was rejected by the GitHub API.',
         false,
         startedAt,
-        "copilot.api",
+        'copilot.api',
         true,
       );
     }
@@ -89,11 +88,11 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
         context,
         source,
         updatedAt,
-        "copilot_fetch_failed",
+        'copilot_fetch_failed',
         `Copilot API returned HTTP ${response.status}.`,
         true,
         startedAt,
-        "copilot.api",
+        'copilot.api',
         true,
       );
     }
@@ -107,18 +106,18 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
         context,
         source,
         updatedAt,
-        "copilot_response_invalid",
-        "Copilot API payload did not contain quota snapshots.",
+        'copilot_response_invalid',
+        'Copilot API payload did not contain quota snapshots.',
         true,
         startedAt,
-        "copilot.api",
+        'copilot.api',
         true,
       );
     }
 
     return {
       provider: context.providerId,
-      status: "ok",
+      status: 'ok',
       source,
       updated_at: updatedAt,
       usage: mapped.usage,
@@ -127,7 +126,7 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
       diagnostics: {
         attempts: [
           {
-            strategy: "copilot.api",
+            strategy: 'copilot.api',
             available: true,
             duration_ms: Date.now() - startedAt,
             error: null,
@@ -140,18 +139,18 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
       context,
       source,
       updatedAt,
-      "copilot_fetch_failed",
-      error instanceof Error ? error.message : "Copilot API request failed.",
+      'copilot_fetch_failed',
+      error instanceof Error ? error.message : 'Copilot API request failed.',
       true,
       startedAt,
-      "copilot.api",
+      'copilot.api',
       true,
     );
   }
 }
 
 function normalizeSourceMode(sourceMode: ProviderSourceMode, defaultSource: ProviderSourceMode): ProviderSourceMode {
-  if (sourceMode === "auto") {
+  if (sourceMode === 'auto') {
     return defaultSource;
   }
 
@@ -160,22 +159,21 @@ function normalizeSourceMode(sourceMode: ProviderSourceMode, defaultSource: Prov
 
 function buildHeaders(token: string): HeadersInit {
   return {
-    Accept: "application/json",
+    Accept: 'application/json',
     Authorization: `token ${token}`,
-    "Editor-Version": "vscode/1.96.2",
-    "Editor-Plugin-Version": "copilot-chat/0.26.7",
-    "User-Agent": "GitHubCopilotChat/0.26.7",
-    "X-Github-Api-Version": "2025-04-01",
+    'Editor-Version': 'vscode/1.96.2',
+    'Editor-Plugin-Version': 'copilot-chat/0.26.7',
+    'User-Agent': 'GitHubCopilotChat/0.26.7',
+    'X-Github-Api-Version': '2025-04-01',
   };
 }
 
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs = REQUEST_TIMEOUT_MS,
-): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new DOMException("Copilot request timed out", "AbortError")), timeoutMs);
+  const timer = setTimeout(
+    () => controller.abort(new DOMException('Copilot request timed out', 'AbortError')),
+    timeoutMs,
+  );
 
   try {
     return await fetch(url, {
@@ -195,7 +193,10 @@ function tryParseJson(text: string): unknown {
   }
 }
 
-function mapCopilotUsage(payload: unknown, rawText: string): { usage: UsageSnapshot; resetWindow: ResetWindow | null } | null {
+function mapCopilotUsage(
+  payload: unknown,
+  rawText: string,
+): { usage: UsageSnapshot; resetWindow: ResetWindow | null } | null {
   const snapshotMap = extractQuotaSnapshots(payload);
   const prioritized = snapshotMap.premiumInteractions ?? snapshotMap.chat ?? firstSnapshot(snapshotMap);
   if (!prioritized) {
@@ -220,20 +221,20 @@ function mapCopilotUsage(payload: unknown, rawText: string): { usage: UsageSnaps
 
 function extractQuotaSnapshots(payload: unknown): Record<string, { key: string; snapshot: CopilotQuotaSnapshot }> {
   const record = new Map<string, { key: string; snapshot: CopilotQuotaSnapshot }>();
-  if (!payload || typeof payload !== "object") {
+  if (!payload || typeof payload !== 'object') {
     return Object.fromEntries(record);
   }
 
-  const objectPayload = payload as Record<string, unknown>;
+  const objectPayload = payload as CopilotUsageResponse & Record<string, unknown>;
   const sources = [objectPayload.quotaSnapshots, objectPayload.quota_snapshots];
 
   for (const source of sources) {
-    if (!source || typeof source !== "object") {
+    if (!source || typeof source !== 'object') {
       continue;
     }
 
     for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
-      if (!value || typeof value !== "object") {
+      if (!value || typeof value !== 'object') {
         continue;
       }
       record.set(key, { key, snapshot: value as CopilotQuotaSnapshot });
@@ -260,7 +261,7 @@ function buildUsageSnapshot(snapshot: CopilotQuotaSnapshot): UsageSnapshot | nul
   }
 
   return {
-    kind: "quota",
+    kind: 'quota',
     used,
     limit,
     percent_used: percentUsed,
@@ -268,7 +269,7 @@ function buildUsageSnapshot(snapshot: CopilotQuotaSnapshot): UsageSnapshot | nul
 }
 
 function normalizeUsed(snapshot: CopilotQuotaSnapshot, percentUsed: number | null): number | null {
-  if (typeof snapshot.used === "number") {
+  if (typeof snapshot.used === 'number') {
     return snapshot.used;
   }
 
@@ -280,7 +281,7 @@ function normalizeUsed(snapshot: CopilotQuotaSnapshot, percentUsed: number | nul
 }
 
 function normalizeLimit(snapshot: CopilotQuotaSnapshot, percentUsed: number | null): number | null {
-  if (typeof snapshot.limit === "number") {
+  if (typeof snapshot.limit === 'number') {
     return snapshot.limit;
   }
 
@@ -292,23 +293,23 @@ function normalizeLimit(snapshot: CopilotQuotaSnapshot, percentUsed: number | nu
 }
 
 function normalizePercentUsed(snapshot: CopilotQuotaSnapshot): number | null {
-  if (typeof snapshot.percentUsed === "number") {
+  if (typeof snapshot.percentUsed === 'number') {
     return clampPercent(snapshot.percentUsed);
   }
 
-  if (typeof snapshot.percent_used === "number") {
+  if (typeof snapshot.percent_used === 'number') {
     return clampPercent(snapshot.percent_used);
   }
 
-  if (typeof snapshot.percentRemaining === "number") {
+  if (typeof snapshot.percentRemaining === 'number') {
     return clampPercent(100 - snapshot.percentRemaining);
   }
 
-  if (typeof snapshot.percent_remaining === "number") {
+  if (typeof snapshot.percent_remaining === 'number') {
     return clampPercent(100 - snapshot.percent_remaining);
   }
 
-  if (typeof snapshot.used === "number" && typeof snapshot.limit === "number" && snapshot.limit > 0) {
+  if (typeof snapshot.used === 'number' && typeof snapshot.limit === 'number' && snapshot.limit > 0) {
     return clampPercent((snapshot.used / snapshot.limit) * 100);
   }
 
@@ -349,7 +350,7 @@ function buildErrorSnapshot(
 ): ProviderSnapshot {
   return {
     provider: context.providerId,
-    status: "error",
+    status: 'error',
     source,
     updated_at: updatedAt,
     usage: null,

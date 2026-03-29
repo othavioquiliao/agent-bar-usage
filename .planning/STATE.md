@@ -2,37 +2,37 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Refactor & Polish
-status: Ready to plan
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-03-29T00:35:04.796Z"
+status: Ready for next milestone
+stopped_at: Completed v2.0 milestone archive
+last_updated: "2026-03-29T15:41:27Z"
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 5
+  total_plans: 15
+  completed_plans: 15
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-28)
+See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 09 — lifecycle-commands
+**Current focus:** Planning the next milestone
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
+Phase: None
+Plan: Awaiting `$gsd-new-milestone`
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 12
+- Total plans completed: 15
 - Average duration: 24 min
-- Total execution time: 4.8 hours
+- Total execution time: 6.0 hours
 
 **By Phase:**
 
@@ -82,6 +82,20 @@ Recent decisions affecting current work:
 - [Phase 09]: runGit helper returns {ok, output} instead of throwing -- matches omarchy pattern for lifecycle commands
 - [Phase 09-lifecycle-commands]: initialValue:false for uninstall confirmation -- prevents accidental full data loss
 - [Phase 09-lifecycle-commands]: remove.ts is thin wrapper: force:true, preserveSecrets:true, preserveSettings:true
+- [Phase 10]: Shared-contract and backend config validation now use inline assertion helpers instead of Zod schemas
+- [Phase 10]: CLI routing is manual switch/case dispatch with Levenshtein typo suggestions and boxed help output
+- [Phase 10]: Biome is the active formatter/linter baseline for backend, shared-contract, and GNOME extension sources
+- [Phase 10]: packages/shared-contract/package.json also had to drop Zod to fully align manifests and lockfiles with the refactor
+- [Phase 11]: Provider contract now exposes `name`, `cacheKey`, `isAvailable()`, and `getQuota()` through a central built-in registry entrypoint
+- [Phase 11]: `agent-bar providers` is the single source of truth for GNOME topbar provider order/visibility by persisting `config.providers[]`
+- [Phase 11]: Snapshot caching is file-backed under XDG cache directories, deduplicated per provider/source key, and reused by both CLI and service flows
+- [Phase 11]: Service startup hydrates the last persisted aggregate snapshot before the first background refresh completes
+- [Phase 11]: CLI and GNOME user-facing timestamps now rely on locale-aware `Intl.RelativeTimeFormat` / `Intl.DateTimeFormat` helpers
+- [Phase 12]: Running `agent-bar` with no arguments opens the interactive menu only in real TTY contexts; non-interactive callers still receive deterministic help text
+- [Phase 12]: List All now renders ANSI provider cards with Unicode progress bars using a shared One Dark terminal palette
+- [Phase 12]: Provider Login is a guided submenu that reuses the existing Copilot device/token auth backend and launches native Claude/Codex CLIs
+- [Phase 12]: `agent-bar doctor` is TTY-aware and uses clack presentation while preserving JSON and plain-text fallback modes
+- [Phase 12]: GitHub OAuth App client ID updated to `Ov23lisTTc3tiqjyvwL6` and validated on 2026-03-29 via `POST https://github.com/login/device/code`, which returned HTTP 200 plus a valid `device_code` / `user_code`
 
 ### Pending Todos
 
@@ -89,10 +103,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- Dev machine is NOT Ubuntu -- GNOME extension, systemd, and secret-tool cannot be validated locally
-- node-pty is incompatible with Bun -- must be replaced with Bun.Terminal API in Phase 8
-- Unix socket permissions differ under Bun (oven-sh/bun#15686) -- must chmod 0600 after creation
-- Bun.Terminal API is relatively new (Dec 2025) -- edge cases possible
+- Dev machine is NOT Ubuntu -- GNOME extension, systemd, and secret-tool flows still benefit from manual verification on a real desktop
 
 ### Quick Tasks Completed
 
@@ -102,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-29T00:31:36.751Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-03-29T15:41:27Z
+Stopped at: Completed v2.0 milestone archive
 Resume file: None

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
-import { createPollingService } from "../services/polling-service.js";
-import { createInitialState } from "../state/extension-state.js";
+import { createPollingService } from '../services/polling-service.js';
+import { createInitialState } from '../state/extension-state.js';
 
 function createDeferred() {
   let resolve;
@@ -14,12 +14,12 @@ function createDeferred() {
   return { promise, resolve, reject };
 }
 
-describe("polling service", () => {
-  it("starts and stops the polling timer", () => {
+describe('polling service', () => {
+  it('starts and stops the polling timer', () => {
     const scheduler = {
       setInterval: vi.fn(() => 42),
       clearInterval: vi.fn(),
-      now: () => new Date("2026-03-25T17:00:00.000Z"),
+      now: () => new Date('2026-03-25T17:00:00.000Z'),
     };
     const backendClient = {
       fetchUsageSnapshot: vi.fn(),
@@ -43,12 +43,12 @@ describe("polling service", () => {
     expect(scheduler.clearInterval).toHaveBeenCalledWith(42);
   });
 
-  it("prevents overlapping refreshes and transitions to ready on success", async () => {
+  it('prevents overlapping refreshes and transitions to ready on success', async () => {
     const deferred = createDeferred();
     const scheduler = {
       setInterval: vi.fn(() => 7),
       clearInterval: vi.fn(),
-      now: () => new Date("2026-03-25T17:10:00.000Z"),
+      now: () => new Date('2026-03-25T17:10:00.000Z'),
     };
     const backendClient = {
       fetchUsageSnapshot: vi.fn(() => deferred.promise),
@@ -66,39 +66,39 @@ describe("polling service", () => {
     expect(secondRefresh).toBe(firstRefresh);
     expect(backendClient.fetchUsageSnapshot).toHaveBeenCalledTimes(1);
     expect(states[0]).toMatchObject({
-      status: "loading",
+      status: 'loading',
       isLoading: true,
       lastError: null,
     });
 
     deferred.resolve({
-      schema_version: "1",
-      generated_at: "2026-03-25T17:05:00.000Z",
+      schema_version: '1',
+      generated_at: '2026-03-25T17:05:00.000Z',
       providers: [],
     });
 
     await firstRefresh;
 
     expect(states.at(-1)).toMatchObject({
-      status: "ready",
+      status: 'ready',
       isLoading: false,
       lastUpdatedText: expect.stringMatching(/Last updated .*(5 minutes ago|há 5 minutos|5 min)/i),
     });
   });
 
-  it("logs structured error when snapshot fetch fails", async () => {
+  it('logs structured error when snapshot fetch fails', async () => {
     const errors = [];
     const originalError = console.error;
-    console.error = (...args) => errors.push(args.join(" "));
+    console.error = (...args) => errors.push(args.join(' '));
 
     const scheduler = {
       setInterval: vi.fn(() => 9),
       clearInterval: vi.fn(),
-      now: () => new Date("2026-03-25T17:10:00.000Z"),
+      now: () => new Date('2026-03-25T17:10:00.000Z'),
     };
-    const fetchError = new Error("connection refused");
-    fetchError.argv = ["/usr/bin/agent-bar", "service", "refresh", "--json"];
-    fetchError.stderr = "ECONNREFUSED";
+    const fetchError = new Error('connection refused');
+    fetchError.argv = ['/usr/bin/agent-bar', 'service', 'refresh', '--json'];
+    fetchError.stderr = 'ECONNREFUSED';
     const backendClient = {
       fetchUsageSnapshot: vi.fn(async () => {
         throw fetchError;
@@ -113,19 +113,19 @@ describe("polling service", () => {
 
     await service.refreshNow();
 
-    expect(errors.some((e) => e.includes("[agent-bar]") && e.includes("connection refused"))).toBe(true);
-    expect(errors.some((e) => e.includes("[agent-bar]") && e.includes("ECONNREFUSED"))).toBe(true);
+    expect(errors.some((e) => e.includes('[agent-bar]') && e.includes('connection refused'))).toBe(true);
+    expect(errors.some((e) => e.includes('[agent-bar]') && e.includes('ECONNREFUSED'))).toBe(true);
 
     console.error = originalError;
   });
 
-  it("retries with backoff after failure", async () => {
+  it('retries with backoff after failure', async () => {
     let callCount = 0;
     const backendClient = {
       fetchUsageSnapshot: async () => {
         callCount++;
-        if (callCount <= 2) throw new Error("connection refused");
-        return { schema_version: "1", generated_at: new Date().toISOString(), providers: [] };
+        if (callCount <= 2) throw new Error('connection refused');
+        return { schema_version: '1', generated_at: new Date().toISOString(), providers: [] };
       },
     };
 
@@ -147,13 +147,13 @@ describe("polling service", () => {
     expect(timeouts.length).toBeGreaterThanOrEqual(2); // 1 for start() timer + at least 1 for retry
   });
 
-  it("resets retry counter on success", async () => {
+  it('resets retry counter on success', async () => {
     let callCount = 0;
     const backendClient = {
       fetchUsageSnapshot: async () => {
         callCount++;
-        if (callCount === 1) throw new Error("transient failure");
-        return { schema_version: "1", generated_at: new Date().toISOString(), providers: [] };
+        if (callCount === 1) throw new Error('transient failure');
+        return { schema_version: '1', generated_at: new Date().toISOString(), providers: [] };
       },
     };
 
@@ -184,16 +184,16 @@ describe("polling service", () => {
     await retryTimeout.cb();
 
     // Second call succeeds — should land in ready state
-    expect(states.at(-1)).toMatchObject({ status: "ready", isLoading: false });
+    expect(states.at(-1)).toMatchObject({ status: 'ready', isLoading: false });
   });
 
-  it("clamps retry delay to last value in retryDelays array", async () => {
-    let callCount = 0;
+  it('clamps retry delay to last value in retryDelays array', async () => {
+    let _callCount = 0;
     let lastRefreshPromise = null;
     const backendClient = {
       fetchUsageSnapshot: async () => {
-        callCount++;
-        throw new Error("persistent failure");
+        _callCount++;
+        throw new Error('persistent failure');
       },
     };
 
@@ -233,10 +233,10 @@ describe("polling service", () => {
     expect(retry3Candidates.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("stop() clears retry state", async () => {
+  it('stop() clears retry state', async () => {
     const backendClient = {
       fetchUsageSnapshot: async () => {
-        throw new Error("fail");
+        throw new Error('fail');
       },
     };
 
@@ -256,15 +256,15 @@ describe("polling service", () => {
     expect(scheduler.clearInterval).toHaveBeenCalled();
   });
 
-  it("captures backend failures in state", async () => {
+  it('captures backend failures in state', async () => {
     const scheduler = {
       setInterval: vi.fn(() => 8),
       clearInterval: vi.fn(),
-      now: () => new Date("2026-03-25T17:10:00.000Z"),
+      now: () => new Date('2026-03-25T17:10:00.000Z'),
     };
     const backendClient = {
       fetchUsageSnapshot: vi.fn(async () => {
-        throw new Error("backend unavailable");
+        throw new Error('backend unavailable');
       }),
     };
     const states = [];
@@ -277,14 +277,13 @@ describe("polling service", () => {
     await service.refreshNow();
 
     expect(states[0]).toMatchObject({
-      status: "loading",
+      status: 'loading',
       isLoading: true,
     });
     expect(states.at(-1)).toMatchObject({
-      status: "error",
+      status: 'error',
       isLoading: false,
-      lastError: "backend unavailable",
+      lastError: 'backend unavailable',
     });
   });
 });
-

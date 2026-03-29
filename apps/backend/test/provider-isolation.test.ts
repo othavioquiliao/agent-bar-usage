@@ -1,23 +1,29 @@
-import { describe, expect, it } from "vitest";
-import type { ProviderId, ProviderSnapshot } from "shared-contract";
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { normalizeBackendRequest } from "../src/config/backend-request.js";
-import type { BackendConfig } from "../src/config/config-schema.js";
-import { BackendCoordinator } from "../src/core/backend-coordinator.js";
-import type { ProviderAdapter, ProviderAdapterContext } from "../src/core/provider-adapter.js";
-import { ProviderRegistry } from "../src/core/provider-registry.js";
-import { EnvSecretStore } from "../src/secrets/env-secret-store.js";
-import { SecretResolver } from "../src/secrets/secret-store.js";
-import { serializeSnapshotEnvelope } from "../src/serializers/snapshot-serializer.js";
+import type { ProviderId, ProviderSnapshot } from 'shared-contract';
+import { describe, expect, it } from 'vitest';
 
-describe("provider isolation", () => {
-  it("keeps the full envelope when availability checks fail for one provider", async () => {
-    const codex = createThrowingAvailabilityAdapter("codex");
-    const claude = createCaptureAdapter("claude", "cli");
-    const secretValue = "secret-value-123";
+import { SnapshotCache } from '../src/cache/snapshot-cache.js';
+import { normalizeBackendRequest } from '../src/config/backend-request.js';
+import type { BackendConfig } from '../src/config/config-schema.js';
+import { BackendCoordinator } from '../src/core/backend-coordinator.js';
+import type { ProviderAdapter, ProviderAdapterContext } from '../src/core/provider-adapter.js';
+import { ProviderRegistry } from '../src/core/provider-registry.js';
+import { EnvSecretStore } from '../src/secrets/env-secret-store.js';
+import { SecretResolver } from '../src/secrets/secret-store.js';
+import { serializeSnapshotEnvelope } from '../src/serializers/snapshot-serializer.js';
+
+describe('provider isolation', () => {
+  it('keeps the full envelope when availability checks fail for one provider', async () => {
+    const codex = createThrowingAvailabilityAdapter('codex');
+    const claude = createCaptureAdapter('claude', 'cli');
+    const secretValue = 'secret-value-123';
     const coordinator = new BackendCoordinator({
+      cache: createTestSnapshotCache(),
       registry: new ProviderRegistry([codex.adapter, claude.adapter]),
-      config: createBackendConfig(["codex", "claude"]),
+      config: createBackendConfig(['codex', 'claude']),
       secretResolver: new SecretResolver([
         new EnvSecretStore({
           env: {
@@ -38,25 +44,26 @@ describe("provider isolation", () => {
     const serializedJson = JSON.stringify(serialized);
 
     expect(envelope.providers).toHaveLength(2);
-    expect(envelope.providers[0]?.provider).toBe("codex");
-    expect(envelope.providers[0]?.status).toBe("error");
-    expect(envelope.providers[0]?.error?.code).toBe("provider_availability_failed");
-    expect(envelope.providers[1]?.provider).toBe("claude");
-    expect(envelope.providers[1]?.status).toBe("ok");
+    expect(envelope.providers[0]?.provider).toBe('codex');
+    expect(envelope.providers[0]?.status).toBe('error');
+    expect(envelope.providers[0]?.error?.code).toBe('provider_availability_failed');
+    expect(envelope.providers[1]?.provider).toBe('claude');
+    expect(envelope.providers[1]?.status).toBe('ok');
     expect(claude.lastContext()?.secrets?.primary).toBe(secretValue);
     expect(serializedJson).not.toContain(secretValue);
   });
 
-  it("keeps the full envelope when one provider throws during fetch", async () => {
-    const codex = createThrowingFetchAdapter("codex");
-    const claude = createCaptureAdapter("claude", "cli");
+  it('keeps the full envelope when one provider throws during fetch', async () => {
+    const codex = createThrowingFetchAdapter('codex');
+    const claude = createCaptureAdapter('claude', 'cli');
     const coordinator = new BackendCoordinator({
+      cache: createTestSnapshotCache(),
       registry: new ProviderRegistry([codex.adapter, claude.adapter]),
-      config: createBackendConfig(["codex", "claude"]),
+      config: createBackendConfig(['codex', 'claude']),
       secretResolver: new SecretResolver([
         new EnvSecretStore({
           env: {
-            CLAUDE_TOKEN: "secret-value-123",
+            CLAUDE_TOKEN: 'secret-value-123',
           },
         }),
       ]),
@@ -69,11 +76,11 @@ describe("provider isolation", () => {
     );
 
     expect(envelope.providers).toHaveLength(2);
-    expect(envelope.providers[0]?.provider).toBe("codex");
-    expect(envelope.providers[0]?.status).toBe("error");
-    expect(envelope.providers[0]?.error?.code).toBe("provider_fetch_failed");
-    expect(envelope.providers[1]?.provider).toBe("claude");
-    expect(envelope.providers[1]?.status).toBe("ok");
+    expect(envelope.providers[0]?.provider).toBe('codex');
+    expect(envelope.providers[0]?.status).toBe('error');
+    expect(envelope.providers[0]?.error?.code).toBe('provider_fetch_failed');
+    expect(envelope.providers[1]?.provider).toBe('claude');
+    expect(envelope.providers[1]?.status).toBe('ok');
   });
 });
 
@@ -83,12 +90,14 @@ function createThrowingAvailabilityAdapter(providerId: ProviderId): {
   return {
     adapter: {
       id: providerId,
-      defaultSourceMode: "cli",
+      name: providerId.charAt(0).toUpperCase() + providerId.slice(1),
+      cacheKey: `${providerId}-quota`,
+      defaultSourceMode: 'cli',
       async isAvailable() {
         throw new Error(`${providerId} availability exploded`);
       },
-      async fetch() {
-        throw new Error("fetch should not be called");
+      async getQuota() {
+        throw new Error('fetch should not be called');
       },
     },
   };
@@ -100,11 +109,13 @@ function createThrowingFetchAdapter(providerId: ProviderId): {
   return {
     adapter: {
       id: providerId,
-      defaultSourceMode: "cli",
+      name: providerId.charAt(0).toUpperCase() + providerId.slice(1),
+      cacheKey: `${providerId}-quota`,
+      defaultSourceMode: 'cli',
       async isAvailable() {
         return true;
       },
-      async fetch() {
+      async getQuota() {
         throw new Error(`${providerId} fetch exploded`);
       },
     },
@@ -113,7 +124,7 @@ function createThrowingFetchAdapter(providerId: ProviderId): {
 
 function createCaptureAdapter(
   providerId: ProviderId,
-  defaultSourceMode: ProviderSnapshot["source"],
+  defaultSourceMode: ProviderSnapshot['source'],
 ): {
   adapter: ProviderAdapter;
   lastContext: () => ProviderAdapterContext | null;
@@ -123,19 +134,21 @@ function createCaptureAdapter(
   return {
     adapter: {
       id: providerId,
+      name: providerId.charAt(0).toUpperCase() + providerId.slice(1),
+      cacheKey: `${providerId}-quota`,
       defaultSourceMode,
       async isAvailable() {
         return true;
       },
-      async fetch(context) {
+      async getQuota(context) {
         lastContext = context;
         return {
           provider: providerId,
-          status: "ok",
+          status: 'ok',
           source: context.sourceMode,
           updated_at: context.now().toISOString(),
           usage: {
-            kind: "quota",
+            kind: 'quota',
             used: 10,
             limit: 100,
             percent_used: 10,
@@ -158,14 +171,20 @@ function createBackendConfig(providerOrder: ProviderId[]): BackendConfig {
     providers: providerOrder.map((providerId) => ({
       id: providerId,
       enabled: true,
-      sourceMode: "cli",
+      sourceMode: 'cli',
       secretRef:
-        providerId === "claude"
+        providerId === 'claude'
           ? {
-              store: "env",
-              env: "CLAUDE_TOKEN",
+              store: 'env',
+              env: 'CLAUDE_TOKEN',
             }
           : undefined,
     })),
   };
+}
+
+function createTestSnapshotCache(): SnapshotCache {
+  return new SnapshotCache({
+    cacheDir: mkdtempSync(path.join(tmpdir(), 'agent-bar-provider-isolation-')),
+  });
 }

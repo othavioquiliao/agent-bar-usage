@@ -1,4 +1,4 @@
-import { refreshRequestSchema, type ProviderId, type ProviderSourceMode, type RefreshRequest } from "shared-contract";
+import { assertRefreshRequest, type ProviderId, type ProviderSourceMode, type RefreshRequest } from 'shared-contract';
 
 export const DEFAULT_TTL_SECONDS = 150;
 
@@ -11,7 +11,7 @@ export interface BackendRequest {
 }
 
 export function normalizeBackendRequest(input: Partial<RefreshRequest> = {}): BackendRequest {
-  const parsed = refreshRequestSchema.parse({
+  const parsed = assertRefreshRequest({
     ttl_seconds: DEFAULT_TTL_SECONDS,
     ...input,
   });

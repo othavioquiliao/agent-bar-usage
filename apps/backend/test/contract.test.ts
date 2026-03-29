@@ -1,77 +1,81 @@
-import { describe, expect, it } from "vitest";
+import { assertBackendUsageRequest, assertSnapshotEnvelope } from 'shared-contract';
+import { describe, expect, it } from 'vitest';
+import { runUsageCommand } from '../src/cli.js';
+import type { ProviderAdapter } from '../src/core/provider-adapter.js';
+import { ProviderRegistry } from '../src/core/provider-registry.js';
 
-import { backendUsageRequestSchema, snapshotEnvelopeSchema } from "shared-contract";
-import type { ProviderAdapter } from "../src/core/provider-adapter.js";
-import { ProviderRegistry } from "../src/core/provider-registry.js";
-import { runUsageCommand } from "../src/cli.js";
+describe('backend contract', () => {
+  it('emits the normalized JSON envelope', async () => {
+    const output = await runUsageCommand(
+      {
+        provider: ['codex'],
+        json: true,
+        pretty: false,
+        refresh: false,
+        diagnostics: true,
+      },
+      {
+        createProviderRegistry: createTestProviderRegistry,
+      },
+    );
 
-describe("backend contract", () => {
-  it("emits the normalized JSON envelope", async () => {
-    const output = await runUsageCommand({
-      provider: ["codex"],
-      json: true,
-      pretty: false,
-      refresh: false,
-      diagnostics: true,
-    }, {
-      createProviderRegistry: createTestProviderRegistry,
-    });
+    const payload = assertSnapshotEnvelope(JSON.parse(output));
 
-    const payload = snapshotEnvelopeSchema.parse(JSON.parse(output));
-
-    expect(payload.schema_version).toBe("1");
+    expect(payload.schema_version).toBe('1');
     expect(payload.generated_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(payload.providers).toHaveLength(1);
     expect(payload.providers[0]).toMatchObject({
-      provider: "codex",
-      source: "cli",
+      provider: 'codex',
+      source: 'cli',
     });
     expect(payload.providers[0].diagnostics?.attempts).toHaveLength(1);
   });
 
-  it("rejects invalid request fields through the shared schema", () => {
+  it('rejects invalid request fields through the shared schema', () => {
     expect(() =>
-      backendUsageRequestSchema.parse({
-        providers: ["claude"],
-        source_mode_override: "auto",
+      assertBackendUsageRequest({
+        providers: ['claude'],
+        source_mode_override: 'auto',
         force_refresh: false,
         include_diagnostics: false,
-        ttl_seconds: -1
-      })
+        ttl_seconds: -1,
+      }),
     ).toThrow();
 
     expect(() =>
-      backendUsageRequestSchema.parse({
-        providers: ["claude"],
-        source_mode_override: "auto",
+      assertBackendUsageRequest({
+        providers: ['claude'],
+        source_mode_override: 'auto',
         force_refresh: false,
         include_diagnostics: false,
         ttl_seconds: 30,
-        unexpected: true
-      })
+        unexpected: true,
+      }),
     ).toThrow();
   });
 });
 
 function createTestProviderRegistry(): ProviderRegistry {
-  return new ProviderRegistry([createProvider("codex", 35), createProvider("claude", 60)]);
+  return new ProviderRegistry([createProvider('codex', 35), createProvider('claude', 60)]);
 }
 
-function createProvider(providerId: ProviderAdapter["id"], used: number): ProviderAdapter {
+function createProvider(providerId: ProviderAdapter['id'], used: number): ProviderAdapter {
   return {
     id: providerId,
-    defaultSourceMode: "cli",
+    name: providerId.charAt(0).toUpperCase() + providerId.slice(1),
+    cacheKey: `${providerId}-quota`,
+    defaultSourceMode: 'cli',
     async isAvailable() {
       return true;
     },
-    async fetch(context) {
+    async getQuota(context) {
       return {
         provider: providerId,
-        status: "ok",
+        status: 'ok',
         source: context.sourceMode,
         updated_at: context.now().toISOString(),
         usage: {
-          kind: "quota",
+          kind: 'quota',
           used,
           limit: 100,
           percent_used: used,

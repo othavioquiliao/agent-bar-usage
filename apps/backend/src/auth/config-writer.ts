@@ -5,11 +5,11 @@
  * pointing at the token that was just stored in GNOME Keyring.
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 export interface SecretReference {
-  store: "secret-tool";
+  store: 'secret-tool';
   service: string;
   account: string;
 }
@@ -42,14 +42,11 @@ interface RawProviderEntry {
  *  3. File exists, copilot entry present but no secretRef → add secretRef
  *  4. File exists, copilot entry already has correct secretRef → no-op
  */
-export async function ensureCopilotSecretRef(
-  configPath: string,
-  secretRef: SecretReference,
-): Promise<void> {
+export async function ensureCopilotSecretRef(configPath: string, secretRef: SecretReference): Promise<void> {
   let config: RawConfig;
 
   try {
-    const text = await readFile(configPath, "utf8");
+    const text = await readFile(configPath, 'utf8');
     config = JSON.parse(text) as RawConfig;
   } catch {
     // File does not exist or is invalid JSON — start fresh.
@@ -59,7 +56,7 @@ export async function ensureCopilotSecretRef(
   }
 
   const providers: RawProviderEntry[] = Array.isArray(config.providers) ? config.providers : [];
-  const copilotIndex = providers.findIndex((p) => p.id === "copilot");
+  const copilotIndex = providers.findIndex((p) => p.id === 'copilot');
 
   if (copilotIndex === -1) {
     // No copilot provider at all — append one.
@@ -74,9 +71,9 @@ export async function ensureCopilotSecretRef(
 
   if (
     existingRef &&
-    existingRef["store"] === secretRef.store &&
-    existingRef["service"] === secretRef.service &&
-    existingRef["account"] === secretRef.account
+    existingRef.store === secretRef.store &&
+    existingRef.service === secretRef.service &&
+    existingRef.account === secretRef.account
   ) {
     // Already configured correctly — nothing to do.
     return;
@@ -94,22 +91,22 @@ function buildDefaultConfig(secretRef: SecretReference): RawConfig {
     defaults: { ttlSeconds: 30 },
     providers: [
       buildCopilotEntry(secretRef),
-      { id: "codex", enabled: true, sourceMode: "cli" },
-      { id: "claude", enabled: true, sourceMode: "cli" },
+      { id: 'codex', enabled: true, sourceMode: 'cli' },
+      { id: 'claude', enabled: true, sourceMode: 'cli' },
     ],
   };
 }
 
 function buildCopilotEntry(secretRef: SecretReference): RawProviderEntry {
   return {
-    id: "copilot",
+    id: 'copilot',
     enabled: true,
-    sourceMode: "api",
+    sourceMode: 'api',
     secretRef: { ...secretRef },
   };
 }
 
 async function persistConfig(configPath: string, config: RawConfig): Promise<void> {
   await mkdir(dirname(configPath), { recursive: true });
-  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }

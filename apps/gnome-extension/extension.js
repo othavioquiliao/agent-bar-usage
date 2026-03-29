@@ -1,12 +1,12 @@
-import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
-import Gio from "gi://Gio";
-import GLib from "gi://GLib";
-import St from "gi://St";
-import * as Main from "resource:///org/gnome/shell/ui/main.js";
-import { Indicator } from "./panel/indicator.js";
-import { createBackendClient } from "./services/backend-client.js";
-import { createPollingService } from "./services/polling-service.js";
-import { createInitialState } from "./state/extension-state.js";
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import St from 'gi://St';
+import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import { Indicator } from './panel/indicator.js';
+import { createBackendClient } from './services/backend-client.js';
+import { createPollingService } from './services/polling-service.js';
+import { createInitialState } from './state/extension-state.js';
 
 export default class AgentBarUbuntuExtension extends Extension {
   constructor(metadata) {
@@ -31,8 +31,8 @@ export default class AgentBarUbuntuExtension extends Extension {
 
       // GNOME Shell (Wayland) often has no PATH set.
       // Fall back to the well-known install location.
-      if (name === "agent-bar") {
-        const fallback = GLib.build_filenamev([GLib.get_home_dir(), ".local", "bin", "agent-bar"]);
+      if (name === 'agent-bar') {
+        const fallback = GLib.build_filenamev([GLib.get_home_dir(), '.local', 'bin', 'agent-bar']);
         if (GLib.file_test(fallback, GLib.FileTest.IS_EXECUTABLE)) {
           return fallback;
         }
@@ -95,7 +95,7 @@ export default class AgentBarUbuntuExtension extends Extension {
       return;
     }
 
-    const stylesheetFile = this.dir.get_child("stylesheet.css");
+    const stylesheetFile = this.dir.get_child('stylesheet.css');
     if (!stylesheetFile.query_exists(null)) {
       return;
     }

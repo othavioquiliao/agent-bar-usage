@@ -1,4 +1,4 @@
-import { snapshotEnvelopeSchema, type ProviderSnapshot, type SnapshotEnvelope } from "shared-contract";
+import { assertSnapshotEnvelope, type ProviderSnapshot, type SnapshotEnvelope } from 'shared-contract';
 
 export interface SnapshotSerializationOptions {
   includeDiagnostics?: boolean;
@@ -15,11 +15,9 @@ export function serializeSnapshotEnvelope(
 ): SnapshotEnvelope {
   const includeDiagnostics = options.includeDiagnostics ?? false;
 
-  const providers = envelope.providers.map((provider) =>
-    includeDiagnostics ? provider : stripDiagnostics(provider),
-  );
+  const providers = envelope.providers.map((provider) => (includeDiagnostics ? provider : stripDiagnostics(provider)));
 
-  return snapshotEnvelopeSchema.parse({
+  return assertSnapshotEnvelope({
     ...envelope,
     providers,
   });

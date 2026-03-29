@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Agent Bar Ubuntu is a Linux-native desktop product that surfaces AI provider usage (Copilot, Codex, Claude) for Ubuntu users through a Node.js/TypeScript backend and a GNOME Shell extension in GJS. v1.0 ships a working end-to-end stack: backend service running under systemd, GNOME top-bar indicator, provider snapshot polling, and `agent-bar auth copilot` for zero-friction Copilot setup.
+Agent Bar Ubuntu is a Linux-native desktop product that surfaces AI provider usage (Copilot, Codex, Claude) for Ubuntu users through a Bun/TypeScript backend and a GNOME Shell extension in GJS. It now ships a modular provider architecture, restart-safe cached usage snapshots, interactive lifecycle/TUI commands, and a validated GitHub Device Flow path for Copilot setup.
 
 ## Core Value
 
@@ -10,34 +10,18 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 
 ## Current State
 
-**Shipped:** v1.0 Ubuntu v1 MVP (2026-03-25), v1.1 Provider Reliability (2026-03-26)
+**Shipped:** v1.0 Ubuntu v1 MVP (2026-03-25), v1.1 Provider Reliability (2026-03-26), v2.0 Refactor & Polish (2026-03-29)
 
-- Backend: Node.js/TypeScript, running as a systemd user service
-- Providers: Copilot (GitHub API + Device Flow auth), Codex CLI, Claude CLI — all working from systemd via node-pty PTY
-- Frontend: GNOME Shell extension (GJS), top-bar indicator, details view, manual refresh
-- Frontend polish: One Dark Pro-inspired top-bar refresh with a centered 3-provider mini-strip and provider-specific visual assets
-- Config: XDG persistence + GNOME Keyring via `secret-tool`
-- Auth: `agent-bar auth copilot` — GitHub Device Flow OAuth, token stored in Keyring
-- Doctor: 8 prerequisite checks with actionable fix commands
+- Backend: Bun + TypeScript, running as a systemd user service with Bun-native subprocess and Unix socket IPC
+- Providers: Copilot, Codex CLI, and Claude CLI exposed through a registry-driven provider contract with no cross-provider imports
+- Data: restart-safe XDG cache, TTL/deduplicated snapshot persistence, service-owned auto-refresh, and locale-aware user-facing timestamps
+- Frontend: GNOME Shell extension (GJS), top-bar indicator, details view, dynamic provider ordering, packaged provider assets
+- CLI/TUI: manual command parsing, Biome baseline, interactive `setup/remove/update/uninstall`, provider selection, rich terminal quota cards, and TTY-aware doctor/menu/login flows
+- Auth: `agent-bar auth copilot` and Provider Login TUI backed by a validated GitHub OAuth App client ID plus GNOME Keyring storage
 
-**Known pre-release item:** `DEFAULT_CLIENT_ID` in `auth-command.ts` is a placeholder — requires a real GitHub OAuth App before public release.
+## Next Milestone
 
-## Current Milestone: v2.0 Refactor & Polish
-
-**Goal:** Refatorar o Agent Bar Ubuntu para uma arquitetura modular e eficiente inspirada no agent-bar-omarchy, migrando para Bun, eliminando code slop, e entregando uma experiência de onboarding/update/CLI de qualidade.
-
-**Target features:**
-- Migração do runtime de Node.js para Bun
-- Providers 100% independentes — sem acoplamento entre Copilot, Codex e Claude
-- CLI para escolher quais providers exibir na topbar do GNOME
-- Comandos `setup`, `remove` (mantém chaves), `update` (prioridade máxima)
-- Auto-refresh periódico dos dados de uso
-- Ícones existentes (SVG/PNG) integrados corretamente na extensão
-- UI melhorada: formatação de datas, horas, porcentagens
-- Remoção de Commander e Zod — CLI parsing manual, validação inline
-- Setup/remove/update em TypeScript (não bash monolítico)
-- Pesquisa de alternativas ao node-pty compatíveis com Bun
-- Fix de bugs óbvios e limpeza geral do código
+Not defined yet. Start with `$gsd-new-milestone` when you want to choose the next scope.
 
 **Reference codebase:** `/home/othavio/Work/agent-bar-omarchy/` — padrões a espelhar: cache com TTL, settings versionadas, @clack/prompts para TUI, Biome para lint, minimal deps
 
@@ -56,23 +40,16 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 - ✓ Diagnostics, install script, systemd service, independent debug paths — v1.0 (Phase 5)
 - ✓ Provider reliability from systemd: node-pty PTY, Device Flow auth, env capture — v1.0 (Phase 6)
 - ✓ GNOME extension UI redesign: packaged assets, compact rows, progress bars — v1.1 (Phase 7)
+- ✓ Bun runtime migration, Bun-native PTY/subprocess work, and Unix socket IPC — v2.0 (Phase 8)
+- ✓ TypeScript lifecycle commands for setup, remove, update, and uninstall — v2.0 (Phase 9)
+- ✓ Manual CLI parsing plus Biome baseline and inline validation — v2.0 (Phase 10)
+- ✓ Fully independent provider modules, provider selection CLI, file-backed cache, and locale-aware formatting — v2.0 (Phase 11)
+- ✓ Interactive TUI menu, rich terminal quota display, TTY-aware doctor/login flows, and real GitHub OAuth App registration — v2.0 (Phase 12)
 
-### Active (v2.0)
+### Active
 
-- [ ] Migrate runtime from Node.js to Bun
-- [ ] Fully independent provider modules — zero coupling between Copilot, Codex, Claude
-- [ ] CLI provider selection for GNOME topbar display
-- [ ] TypeScript-based `setup` command (replaces bash installer)
-- [ ] TypeScript-based `remove` command (removes code, preserves secrets/keys)
-- [ ] TypeScript-based `update` command (reliable version updates — highest priority)
-- [ ] Periodic auto-refresh of provider usage data
-- [ ] Proper icon integration from existing SVG/PNG assets
-- [ ] UI polish: date/time formatting, percentage display, data presentation
-- [ ] Remove Commander dependency — manual CLI parsing
-- [ ] Remove Zod dependency — inline validation
-- [ ] Research and implement Bun-compatible PTY alternative (replacing node-pty)
-- [ ] Fix obvious bugs and code quality issues throughout codebase
-- [ ] Register a real GitHub OAuth App and replace `DEFAULT_CLIENT_ID` placeholder
+- [ ] Define the next milestone scope
+- [ ] Decide whether the next priority is provider expansion, additional Linux surfaces, historical usage, or compiled distribution
 
 ### Out of Scope
 
@@ -93,9 +70,7 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 
 The product proved that the CLI-first backend architecture (Node.js + systemd) combined with a GNOME Shell extension in GJS is a viable Ubuntu-native stack. The Device Flow OAuth pattern is the right path for Copilot — no browser cookie hacks needed.
 
-**v2.0 direction:** The codebase has accumulated significant technical debt ("code slop"). The sibling project `agent-bar-omarchy` demonstrates a far cleaner architecture with the same goals: 2 production deps, Bun runtime, manual CLI parsing, file-based cache with TTL, versioned settings, @clack/prompts TUI, Biome linting. v2.0 will refactor agent-bar-usage to mirror these patterns while keeping its unique GNOME extension surface.
-
-**Key technical consideration:** node-pty (native Node.js addon for PTY) may not be compatible with Bun. v2.0 must research Bun-native PTY alternatives or hybrid solutions for Codex/Claude CLI execution from systemd.
+**v2.0 outcome:** The codebase now follows the intended architecture much more closely: Bun runtime, registry-driven providers, file-backed cache, versioned settings, @clack/prompts terminal UX, and Biome as the quality baseline. The GNOME extension remained the unique Ubuntu-native surface while the backend contract became cleaner and more restart-safe.
 
 **Development note:** Dev machine is NOT Ubuntu. Target platform is Ubuntu-only.
 
@@ -122,10 +97,13 @@ The product proved that the CLI-first backend architecture (Node.js + systemd) c
 | GitHub Device Flow OAuth for Copilot | No browser cookie dependency; same flow as `gh auth login`; works from any environment | ✓ Good |
 | Capture env vars in systemd override at install time | Service inherits user PATH, tokens, and DBUS_SESSION_BUS_ADDRESS without manual configuration | ✓ Good |
 | Use a fixed 3-provider mini-strip in the GNOME top bar for fast usage visibility | User preference favors at-a-glance percentages over an aggregated label; backend contract already exposes enough data | ✓ Good |
-| Register real GitHub OAuth App before public release | Placeholder client_id is acceptable for development but required before shipping | — Pending |
-| Migrate runtime from Node.js to Bun | Matches reference codebase patterns, faster runtime, fewer deps | — Pending |
-| Remove Commander and Zod | Manual CLI parsing + inline validation, like agent-bar-omarchy | — Pending |
-| TypeScript-based setup/remove/update commands | Bash installer is monolithic and untestable | — Pending |
+| Register real GitHub OAuth App before public release | Placeholder client_id is acceptable for development but required before shipping | ✓ Good |
+| Migrate runtime from Node.js to Bun | Matches reference codebase patterns, faster runtime, fewer deps | ✓ Good |
+| Remove Commander and Zod | Manual CLI parsing + inline validation, like agent-bar-omarchy | ✓ Good |
+| TypeScript-based setup/remove/update commands | Bash installer is monolithic and untestable | ✓ Good |
+| Centralize providers behind metadata-driven registry and config-backed selection | Reduces coupling and makes GNOME/CLI surfaces consume the same provider ordering truth | ✓ Good |
+| Persist snapshots to XDG cache and hydrate service state on startup | Avoids cold-start empty data and makes refresh behavior restart-safe | ✓ Good |
+| Use TTY-aware `@clack/prompts` flows for menu, doctor, and provider login | Gives CLI surfaces a higher-quality UX without regressing JSON/plain-text automation | ✓ Good |
 
 ## Evolution
 
@@ -144,4 +122,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-28 after milestone v2.0 initialization*
+*Last updated: 2026-03-29 after v2.0 milestone completion*

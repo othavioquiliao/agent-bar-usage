@@ -9,14 +9,10 @@
  *   (value piped via stdin)
  */
 
-import { runSubprocess, type SubprocessOptions, type SubprocessResult } from "../utils/subprocess.js";
+import { runSubprocess, type SubprocessOptions, type SubprocessResult } from '../utils/subprocess.js';
 
 export interface SecretToolWriterOptions {
-  runSubprocessFn?: (
-    command: string,
-    args: string[],
-    options?: SubprocessOptions,
-  ) => Promise<SubprocessResult>;
+  runSubprocessFn?: (command: string, args: string[], options?: SubprocessOptions) => Promise<SubprocessResult>;
 }
 
 /**
@@ -36,9 +32,7 @@ export async function storeSecretViaSecretTool(
   const run = options.runSubprocessFn ?? runSubprocess;
   const effectiveLabel = label ?? `${service}/${account}`;
 
-  await run(
-    "secret-tool",
-    ["store", `--label=${effectiveLabel}`, "service", service, "account", account],
-    { input: value },
-  );
+  await run('secret-tool', ['store', `--label=${effectiveLabel}`, 'service', service, 'account', account], {
+    input: value,
+  });
 }

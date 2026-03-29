@@ -1,14 +1,14 @@
-import type { ResetWindow, UsageSnapshot } from "shared-contract";
+import type { ResetWindow, UsageSnapshot } from 'shared-contract';
 
-import { normalizeLineEndings, stripAnsi } from "../shared/interactive-command.js";
+import { normalizeLineEndings, stripAnsi } from '../shared/interactive-command.js';
 
 export class CodexCliParseError extends Error {
   constructor(
-    readonly code: "codex_output_empty" | "codex_update_required" | "codex_parse_failed",
+    readonly code: 'codex_output_empty' | 'codex_update_required' | 'codex_parse_failed',
     message: string,
   ) {
     super(message);
-    this.name = "CodexCliParseError";
+    this.name = 'CodexCliParseError';
   }
 }
 
@@ -24,14 +24,14 @@ export interface CodexCliUsage {
 export function parseCodexUsage(text: string, now = new Date()): CodexCliUsage {
   const clean = stripAnsi(normalizeLineEndings(text)).trim();
   if (!clean) {
-    throw new CodexCliParseError("codex_output_empty", "Codex CLI returned no output.");
+    throw new CodexCliParseError('codex_output_empty', 'Codex CLI returned no output.');
   }
 
   const lower = clean.toLowerCase();
-  if (lower.includes("update available") && lower.includes("codex")) {
+  if (lower.includes('update available') && lower.includes('codex')) {
     throw new CodexCliParseError(
-      "codex_update_required",
-      "Codex CLI is showing an update prompt instead of usage output.",
+      'codex_update_required',
+      'Codex CLI is showing an update prompt instead of usage output.',
     );
   }
 
@@ -40,12 +40,12 @@ export function parseCodexUsage(text: string, now = new Date()): CodexCliUsage {
   const weeklyLine = firstMatchingLine(clean, /weekly limit/i);
   const fiveHourPercentLeft = parsePercentLeft(fiveHourLine);
   const weeklyPercentLeft = parsePercentLeft(weeklyLine);
-  const fiveHourResetWindow = fiveHourLine ? parseResetWindow(fiveHourLine, "5h limit", now) : null;
-  const weeklyResetWindow = weeklyLine ? parseResetWindow(weeklyLine, "weekly limit", now) : null;
+  const fiveHourResetWindow = fiveHourLine ? parseResetWindow(fiveHourLine, '5h limit', now) : null;
+  const weeklyResetWindow = weeklyLine ? parseResetWindow(weeklyLine, 'weekly limit', now) : null;
 
   if (credits == null && fiveHourPercentLeft == null && weeklyPercentLeft == null) {
     throw new CodexCliParseError(
-      "codex_parse_failed",
+      'codex_parse_failed',
       `Could not locate Codex usage fields in output: ${clean.slice(0, 240)}`,
     );
   }
@@ -68,7 +68,7 @@ export function mapCodexUsageToSnapshot(parsed: CodexCliUsage): {
     const used = clampPercent(100 - parsed.fiveHourPercentLeft);
     return {
       usage: {
-        kind: "quota",
+        kind: 'quota',
         used,
         limit: 100,
         percent_used: used,
@@ -81,7 +81,7 @@ export function mapCodexUsageToSnapshot(parsed: CodexCliUsage): {
     const used = clampPercent(100 - parsed.weeklyPercentLeft);
     return {
       usage: {
-        kind: "quota",
+        kind: 'quota',
         used,
         limit: 100,
         percent_used: used,
@@ -93,7 +93,7 @@ export function mapCodexUsageToSnapshot(parsed: CodexCliUsage): {
   if (parsed.credits != null) {
     return {
       usage: {
-        kind: "quota",
+        kind: 'quota',
         used: parsed.credits,
         limit: null,
         percent_used: null,
@@ -111,13 +111,13 @@ function parseCredits(text: string): number | null {
     return null;
   }
 
-  const normalized = match[1].replaceAll(",", "");
+  const normalized = match[1].replaceAll(',', '');
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function firstMatchingLine(text: string, pattern: RegExp): string | null {
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     if (pattern.test(line)) {
       return line.trim();
     }
@@ -142,9 +142,7 @@ function parsePercentLeft(line: string | null): number | null {
 
 function parseResetWindow(line: string, label: string, now: Date): ResetWindow | null {
   const candidate =
-    line.match(/\(([^)]+)\)/)?.[1]?.trim() ??
-    line.match(/(?:reset(?:s)?(?: at| on)?\s*)(.+)$/i)?.[1]?.trim() ??
-    null;
+    line.match(/\(([^)]+)\)/)?.[1]?.trim() ?? line.match(/(?:reset(?:s)?(?: at| on)?\s*)(.+)$/i)?.[1]?.trim() ?? null;
 
   if (!candidate) {
     return null;
@@ -162,9 +160,9 @@ function parseResetWindow(line: string, label: string, now: Date): ResetWindow |
 }
 
 function parseResetDatetime(raw: string, now: Date): string | null {
-  let value = raw.trim().replaceAll(/^[()]+|[()]+$/g, "");
-  value = value.replaceAll(/\s+/g, " ").trim();
-  value = value.replace(/^(?:resets?|reset)(?: at| on)?\s+/i, "").trim();
+  let value = raw.trim().replaceAll(/^[()]+|[()]+$/g, '');
+  value = value.replaceAll(/\s+/g, ' ').trim();
+  value = value.replace(/^(?:resets?|reset)(?: at| on)?\s+/i, '').trim();
   if (!value) {
     return null;
   }
@@ -174,7 +172,7 @@ function parseResetDatetime(raw: string, now: Date): string | null {
     return new Date(direct).toISOString();
   }
 
-  const calendar = new Intl.DateTimeFormat("en-US", {
+  const calendar = new Intl.DateTimeFormat('en-US', {
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     hour12: false,
   });
@@ -183,7 +181,7 @@ function parseResetDatetime(raw: string, now: Date): string | null {
   const withDayMonth = value.match(/^(\d{1,2}:\d{2}) on (\d{1,2} [A-Za-z]{3})$/);
   if (withDayMonth?.[1] && withDayMonth[2]) {
     const [time, dayMonth] = [withDayMonth[1], withDayMonth[2]];
-    const parsed = parseWithFormat(`${dayMonth} ${time}`, ["d MMM HH:mm", "d MMM H:mm"], now);
+    const parsed = parseWithFormat(`${dayMonth} ${time}`, ['d MMM HH:mm', 'd MMM H:mm'], now);
     if (parsed) {
       return parsed;
     }
@@ -192,7 +190,7 @@ function parseResetDatetime(raw: string, now: Date): string | null {
   const withMonthDay = value.match(/^(\d{1,2}:\d{2}) on ([A-Za-z]{3} \d{1,2})$/);
   if (withMonthDay?.[1] && withMonthDay[2]) {
     const [time, monthDay] = [withMonthDay[1], withMonthDay[2]];
-    const parsed = parseWithFormat(`${monthDay} ${time}`, ["MMM d HH:mm", "MMM d H:mm"], now);
+    const parsed = parseWithFormat(`${monthDay} ${time}`, ['MMM d HH:mm', 'MMM d H:mm'], now);
     if (parsed) {
       return parsed;
     }
@@ -240,32 +238,29 @@ function parseDateWithFormat(value: string, format: string, now: Date): string |
   }
 
   const monthMap = new Map([
-    ["Jan", 0],
-    ["Feb", 1],
-    ["Mar", 2],
-    ["Apr", 3],
-    ["May", 4],
-    ["Jun", 5],
-    ["Jul", 6],
-    ["Aug", 7],
-    ["Sep", 8],
-    ["Oct", 9],
-    ["Nov", 10],
-    ["Dec", 11],
+    ['Jan', 0],
+    ['Feb', 1],
+    ['Mar', 2],
+    ['Apr', 3],
+    ['May', 4],
+    ['Jun', 5],
+    ['Jul', 6],
+    ['Aug', 7],
+    ['Sep', 8],
+    ['Oct', 9],
+    ['Nov', 10],
+    ['Dec', 11],
   ]);
 
-  const dayMonthMatch =
-    format.startsWith("d MMM")
-      ? value.match(/^(\d{1,2}) ([A-Za-z]{3}) \d{1,2}:\d{2}$/)
-      : value.match(/^([A-Za-z]{3}) (\d{1,2}) \d{1,2}:\d{2}$/);
+  const dayMonthMatch = format.startsWith('d MMM')
+    ? value.match(/^(\d{1,2}) ([A-Za-z]{3}) \d{1,2}:\d{2}$/)
+    : value.match(/^([A-Za-z]{3}) (\d{1,2}) \d{1,2}:\d{2}$/);
   if (!dayMonthMatch) {
     return null;
   }
 
-  const monthIndex = format.startsWith("d MMM")
-    ? monthMap.get(dayMonthMatch[2])
-    : monthMap.get(dayMonthMatch[1]);
-  const day = Number(format.startsWith("d MMM") ? dayMonthMatch[1] : dayMonthMatch[2]);
+  const monthIndex = format.startsWith('d MMM') ? monthMap.get(dayMonthMatch[2]) : monthMap.get(dayMonthMatch[1]);
+  const day = Number(format.startsWith('d MMM') ? dayMonthMatch[1] : dayMonthMatch[2]);
   if (monthIndex == null || !Number.isFinite(day)) {
     return null;
   }

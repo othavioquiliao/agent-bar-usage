@@ -1,4 +1,4 @@
-import { SubprocessError, type SubprocessResult } from "../../utils/subprocess.js";
+import { SubprocessError, type SubprocessResult } from '../../utils/subprocess.js';
 
 export interface InteractiveCommandOptions {
   cwd?: string;
@@ -12,11 +12,14 @@ export interface InteractiveCommandOptions {
  * backward compatibility with provider error-handling branches that catch it.
  */
 export class PtyUnavailableError extends Error {
-  constructor(message = "PTY is not available.") {
+  constructor(message = 'PTY is not available.') {
     super(message);
-    this.name = "PtyUnavailableError";
+    this.name = 'PtyUnavailableError';
   }
 }
+
+// biome-ignore lint/complexity/useRegexLiterals: RegExp constructor avoids the ANSI escape false positive from noControlCharactersInRegex.
+const ANSI_ESCAPE_PATTERN = new RegExp(String.raw`\u001b\[[0-9;?]*[ -/]*[@-~]`, 'g');
 
 export async function runInteractiveCommand(
   command: string,
@@ -24,7 +27,7 @@ export async function runInteractiveCommand(
   options: InteractiveCommandOptions = {},
 ): Promise<SubprocessResult> {
   const startedAt = Date.now();
-  let output = "";
+  let output = '';
   let settled = false;
 
   const proc = Bun.spawn([command, ...args], {
@@ -63,7 +66,7 @@ export async function runInteractiveCommand(
       command,
       args,
       stdout: output,
-      stderr: "",
+      stderr: '',
       durationMs: Date.now() - startedAt,
     });
   }
@@ -75,16 +78,16 @@ export async function runInteractiveCommand(
     args,
     exitCode,
     stdout: output,
-    stderr: "",
+    stderr: '',
     durationMs: Date.now() - startedAt,
   };
 }
 
 // Keep these unchanged -- used by all parsers
 export function stripAnsi(text: string): string {
-  return text.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "");
+  return text.replace(ANSI_ESCAPE_PATTERN, '');
 }
 
 export function normalizeLineEndings(text: string): string {
-  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }

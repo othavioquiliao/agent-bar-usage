@@ -1,6 +1,6 @@
-import type { ProviderId } from "shared-contract";
+import type { ProviderId } from 'shared-contract';
 
-import type { ProviderAdapter } from "./provider-adapter.js";
+import type { ProviderAdapter } from './provider-adapter.js';
 
 export class ProviderRegistry {
   readonly #ordered: ProviderAdapter[] = [];

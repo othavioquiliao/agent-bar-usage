@@ -13,9 +13,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
-    "commander": "^14.0.2",
-    "shared-contract": "workspace:*",
-    "zod": "^3.25.67"
+    "shared-contract": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

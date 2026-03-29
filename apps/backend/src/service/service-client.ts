@@ -1,7 +1,7 @@
-import { snapshotEnvelopeSchema, type SnapshotEnvelope } from "shared-contract";
+import { assertSnapshotEnvelope, type SnapshotEnvelope } from 'shared-contract';
 
 export interface ServiceStatusPayload {
-  mode: "cli" | "service" | "unknown";
+  mode: 'cli' | 'service' | 'unknown';
   socket_path: string;
   running: boolean;
   last_error: string | null;
@@ -9,7 +9,7 @@ export interface ServiceStatusPayload {
 }
 
 export interface ServiceWireRequest {
-  type: "status" | "snapshot" | "refresh";
+  type: 'status' | 'snapshot' | 'refresh';
   request?: Record<string, unknown>;
 }
 
@@ -32,13 +32,13 @@ export class ServiceClientError extends Error {
     readonly causeValue?: unknown,
   ) {
     super(message);
-    this.name = "ServiceClientError";
+    this.name = 'ServiceClientError';
   }
 }
 
 function readSocketResponse(socketPath: string, request: ServiceWireRequest, timeoutMs = 15_000): Promise<string> {
   return new Promise((resolve, reject) => {
-    let buffer = "";
+    let buffer = '';
     let settled = false;
 
     const finalize = (callback: () => void) => {
@@ -58,11 +58,11 @@ function readSocketResponse(socketPath: string, request: ServiceWireRequest, tim
       unix: socketPath,
       socket: {
         open(socket) {
-          socket.write(JSON.stringify(request) + "\n");
+          socket.write(`${JSON.stringify(request)}\n`);
         },
         data(_socket, data) {
           buffer += data.toString();
-          const newlineIndex = buffer.indexOf("\n");
+          const newlineIndex = buffer.indexOf('\n');
           if (newlineIndex === -1) return;
 
           const rawResponse = buffer.slice(0, newlineIndex).trim();
@@ -74,14 +74,10 @@ function readSocketResponse(socketPath: string, request: ServiceWireRequest, tim
           finalize(() => resolve(rawResponse));
         },
         error(_socket, error) {
-          finalize(() =>
-            reject(new ServiceClientError(`Could not connect to ${socketPath}.`, socketPath, error)),
-          );
+          finalize(() => reject(new ServiceClientError(`Could not connect to ${socketPath}.`, socketPath, error)));
         },
         connectError(_socket, error) {
-          finalize(() =>
-            reject(new ServiceClientError(`Could not connect to ${socketPath}.`, socketPath, error)),
-          );
+          finalize(() => reject(new ServiceClientError(`Could not connect to ${socketPath}.`, socketPath, error)));
         },
       },
     });
@@ -107,14 +103,14 @@ async function sendServiceRequest<T = unknown>(
   }
 
   if (!parsed.ok) {
-    throw new ServiceClientError(parsed.error?.message ?? "Service request failed.", socketPath, parsed.error);
+    throw new ServiceClientError(parsed.error?.message ?? 'Service request failed.', socketPath, parsed.error);
   }
 
   return parsed;
 }
 
 export async function requestServiceStatus(socketPath: string, timeoutMs?: number): Promise<ServiceStatusPayload> {
-  const response = await sendServiceRequest<ServiceStatusPayload>(socketPath, { type: "status" }, timeoutMs);
+  const response = await sendServiceRequest<ServiceStatusPayload>(socketPath, { type: 'status' }, timeoutMs);
   if (!response.status) {
     throw new ServiceClientError(`Service status response missing status payload at ${socketPath}.`, socketPath);
   }
@@ -126,8 +122,8 @@ export async function requestServiceSnapshot(
   request: Record<string, unknown> = {},
   timeoutMs?: number,
 ): Promise<SnapshotEnvelope> {
-  const response = await sendServiceRequest<SnapshotEnvelope>(socketPath, { type: "snapshot", request }, timeoutMs);
-  return snapshotEnvelopeSchema.parse(response.snapshot);
+  const response = await sendServiceRequest<SnapshotEnvelope>(socketPath, { type: 'snapshot', request }, timeoutMs);
+  return assertSnapshotEnvelope(response.snapshot);
 }
 
 export async function requestServiceRefresh(
@@ -135,8 +131,8 @@ export async function requestServiceRefresh(
   request: Record<string, unknown> = {},
   timeoutMs?: number,
 ): Promise<SnapshotEnvelope> {
-  const response = await sendServiceRequest<SnapshotEnvelope>(socketPath, { type: "refresh", request }, timeoutMs);
-  return snapshotEnvelopeSchema.parse(response.snapshot);
+  const response = await sendServiceRequest<SnapshotEnvelope>(socketPath, { type: 'refresh', request }, timeoutMs);
+  return assertSnapshotEnvelope(response.snapshot);
 }
 
 export async function probeServiceStatus(socketPath: string, timeoutMs?: number): Promise<ServiceStatusPayload | null> {

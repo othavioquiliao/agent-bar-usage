@@ -1,15 +1,15 @@
-import { type ProviderId, type SnapshotEnvelope } from "shared-contract";
+import type { ProviderId, SnapshotEnvelope } from 'shared-contract';
 
-import { SnapshotCache } from "../cache/snapshot-cache.js";
-import { normalizeBackendRequest, type BackendRequest } from "../config/backend-request.js";
-import { loadBackendConfig } from "../config/config-loader.js";
-import { BackendCoordinator } from "./backend-coordinator.js";
-import { ProviderContextBuilder } from "./provider-context-builder.js";
-import { createProviderRegistry as createDefaultProviderRegistry } from "./provider-registry-factory.js";
-import { EnvSecretStore } from "../secrets/env-secret-store.js";
-import { SecretToolStore } from "../secrets/secret-tool-store.js";
-import { SecretResolver } from "../secrets/secret-store.js";
-import { serializeSnapshotEnvelope } from "../serializers/snapshot-serializer.js";
+import { SnapshotCache } from '../cache/snapshot-cache.js';
+import { type BackendRequest, normalizeBackendRequest } from '../config/backend-request.js';
+import { loadBackendConfig } from '../config/config-loader.js';
+import { EnvSecretStore } from '../secrets/env-secret-store.js';
+import { SecretResolver } from '../secrets/secret-store.js';
+import { SecretToolStore } from '../secrets/secret-tool-store.js';
+import { serializeSnapshotEnvelope } from '../serializers/snapshot-serializer.js';
+import { BackendCoordinator } from './backend-coordinator.js';
+import { ProviderContextBuilder } from './provider-context-builder.js';
+import { createProviderRegistry as createDefaultProviderRegistry } from './provider-registry-factory.js';
 
 export interface UsageCommandOptions {
   provider?: ProviderId | ProviderId[];
@@ -21,9 +21,10 @@ export interface UsageCommandOptions {
 
 export interface UsageCommandDependencies {
   createProviderRegistry?: typeof createDefaultProviderRegistry;
+  cache?: SnapshotCache;
 }
 
-function normalizeProviders(provider: UsageCommandOptions["provider"]): ProviderId[] | undefined {
+function normalizeProviders(provider: UsageCommandOptions['provider']): ProviderId[] | undefined {
   if (!provider) {
     return undefined;
   }
@@ -53,7 +54,7 @@ export async function createUsageSnapshot(
   const coordinator = new BackendCoordinator({
     registry,
     contextBuilder,
-    cache: new SnapshotCache(),
+    cache: dependencies.cache ?? new SnapshotCache(),
   });
 
   const snapshot = await coordinator.getSnapshot(request);

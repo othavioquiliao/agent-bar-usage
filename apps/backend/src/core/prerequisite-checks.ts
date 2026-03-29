@@ -1,13 +1,13 @@
-import { access } from "node:fs/promises";
-import path from "node:path";
+import { access } from 'node:fs/promises';
+import path from 'node:path';
 
-import type { DiagnosticsCheck, DiagnosticsReport } from "shared-contract";
+import type { DiagnosticsCheck, DiagnosticsReport } from 'shared-contract';
 
-import { loadBackendConfig } from "../config/config-loader.js";
-import { resolveBackendConfigPath } from "../config/config-path.js";
-import { resolveCommandInPath } from "../utils/subprocess.js";
-import { resolveServiceSocketPath } from "../service/socket-path.js";
-import { probeServiceStatus } from "../service/service-client.js";
+import { loadBackendConfig } from '../config/config-loader.js';
+import { resolveBackendConfigPath } from '../config/config-path.js';
+import { probeServiceStatus } from '../service/service-client.js';
+import { resolveServiceSocketPath } from '../service/socket-path.js';
+import { resolveCommandInPath } from '../utils/subprocess.js';
 
 export interface PrerequisiteChecksOptions {
   env?: NodeJS.ProcessEnv;
@@ -18,15 +18,15 @@ export interface PrerequisiteChecksOptions {
   resolveCommandInPathFn?: (command: string, env?: NodeJS.ProcessEnv) => string | null;
 }
 
-const checks: Array<Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">> = [
-  { id: "config", label: "Config", suggested_command: "agent-bar config validate" },
-  { id: "secret-tool", label: "secret-tool", suggested_command: "sudo apt install libsecret-tools" },
-  { id: "codex-cli", label: "Codex CLI", suggested_command: "npm install -g @openai/codex" },
-  { id: "claude-cli", label: "Claude CLI", suggested_command: "npm install -g @anthropic-ai/claude-code" },
-  { id: "copilot-token", label: "Copilot token", suggested_command: "agent-bar auth copilot" },
-  { id: "service-runtime", label: "Service runtime", suggested_command: "agent-bar service status --json" },
-  { id: "node-pty", label: "node-pty", suggested_command: "sudo apt install build-essential python3 && pnpm install" },
-  { id: "systemd-env", label: "Systemd env", suggested_command: "pnpm install:ubuntu" },
+const checks: Array<Pick<DiagnosticsCheck, 'id' | 'label' | 'suggested_command'>> = [
+  { id: 'config', label: 'Config', suggested_command: 'agent-bar config validate' },
+  { id: 'secret-tool', label: 'secret-tool', suggested_command: 'sudo apt install libsecret-tools' },
+  { id: 'codex-cli', label: 'Codex CLI', suggested_command: 'npm install -g @openai/codex' },
+  { id: 'claude-cli', label: 'Claude CLI', suggested_command: 'npm install -g @anthropic-ai/claude-code' },
+  { id: 'copilot-token', label: 'Copilot token', suggested_command: 'agent-bar auth copilot' },
+  { id: 'service-runtime', label: 'Service runtime', suggested_command: 'agent-bar service status --json' },
+  { id: 'node-pty', label: 'node-pty', suggested_command: 'sudo apt install build-essential python3 && pnpm install' },
+  { id: 'systemd-env', label: 'Systemd env', suggested_command: 'pnpm install:ubuntu' },
 ];
 
 function makeCheck(check: DiagnosticsCheck): DiagnosticsCheck {
@@ -34,39 +34,39 @@ function makeCheck(check: DiagnosticsCheck): DiagnosticsCheck {
 }
 
 function okCheck(
-  base: Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">,
+  base: Pick<DiagnosticsCheck, 'id' | 'label' | 'suggested_command'>,
   message: string,
-  details?: DiagnosticsCheck["details"],
+  details?: DiagnosticsCheck['details'],
 ): DiagnosticsCheck {
   return makeCheck({
     ...base,
-    status: "ok",
+    status: 'ok',
     message,
     ...(details ? { details } : {}),
   });
 }
 
 function warnCheck(
-  base: Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">,
+  base: Pick<DiagnosticsCheck, 'id' | 'label' | 'suggested_command'>,
   message: string,
-  details?: DiagnosticsCheck["details"],
+  details?: DiagnosticsCheck['details'],
 ): DiagnosticsCheck {
   return makeCheck({
     ...base,
-    status: "warn",
+    status: 'warn',
     message,
     ...(details ? { details } : {}),
   });
 }
 
 function errorCheck(
-  base: Pick<DiagnosticsCheck, "id" | "label" | "suggested_command">,
+  base: Pick<DiagnosticsCheck, 'id' | 'label' | 'suggested_command'>,
   message: string,
-  details?: DiagnosticsCheck["details"],
+  details?: DiagnosticsCheck['details'],
 ): DiagnosticsCheck {
   return makeCheck({
     ...base,
-    status: "error",
+    status: 'error',
     message,
     ...(details ? { details } : {}),
   });
@@ -85,13 +85,16 @@ async function doesFileExist(filePath: string, fileExists?: (filePath: string) =
   }
 }
 
-function hasConfiguredCopilotToken(config: Awaited<ReturnType<typeof loadBackendConfig>>["config"], env: NodeJS.ProcessEnv): boolean {
-  const envSources = ["COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"];
+function hasConfiguredCopilotToken(
+  config: Awaited<ReturnType<typeof loadBackendConfig>>['config'],
+  env: NodeJS.ProcessEnv,
+): boolean {
+  const envSources = ['COPILOT_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'];
   if (envSources.some((name) => Boolean(env[name]?.trim()))) {
     return true;
   }
 
-  const copilot = config.providers.find((provider) => provider.id === "copilot");
+  const copilot = config.providers.find((provider) => provider.id === 'copilot');
   return Boolean(copilot?.secretRef);
 }
 
@@ -111,21 +114,16 @@ export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions 
   const reportChecks: DiagnosticsCheck[] = [];
   reportChecks.push(
     loadedConfig.exists
-      ? okCheck(
-          checks[0],
-          `Config file loaded from ${configPath}.`,
-          { path: configPath, exists: true },
-        )
-      : warnCheck(
-          checks[0],
-          `No config file found at ${configPath}; defaults are active.`,
-          { path: configPath, exists: false },
-        ),
+      ? okCheck(checks[0], `Config file loaded from ${configPath}.`, { path: configPath, exists: true })
+      : warnCheck(checks[0], `No config file found at ${configPath}; defaults are active.`, {
+          path: configPath,
+          exists: false,
+        }),
   );
 
   for (const index of [1, 2, 3] as const) {
     const check = checks[index];
-    const commandName = check.id === "secret-tool" ? "secret-tool" : check.id === "codex-cli" ? "codex" : "claude";
+    const commandName = check.id === 'secret-tool' ? 'secret-tool' : check.id === 'codex-cli' ? 'codex' : 'claude';
     const resolved = resolveCommand(commandName, env);
     reportChecks.push(
       resolved
@@ -136,75 +134,47 @@ export async function buildDiagnosticsReport(options: PrerequisiteChecksOptions 
 
   reportChecks.push(
     hasConfiguredCopilotToken(loadedConfig.config, env)
-      ? okCheck(
-          checks[4],
-          "Copilot token source is configured.",
-          {
-            env_sources: ["COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"],
-          },
-        )
-      : warnCheck(
-          checks[4],
-          "Copilot token source is not configured.",
-          {
-            env_sources: ["COPILOT_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"],
-          },
-        ),
+      ? okCheck(checks[4], 'Copilot token source is configured.', {
+          env_sources: ['COPILOT_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'],
+        })
+      : warnCheck(checks[4], 'Copilot token source is not configured.', {
+          env_sources: ['COPILOT_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'],
+        }),
   );
 
   reportChecks.push(
     serviceStatus?.running
-      ? okCheck(
-          checks[5],
-          `Backend service is running at ${serviceSocketPath}.`,
-          {
-            socket_path: serviceSocketPath,
-            last_error: serviceStatus.last_error,
-          },
-        )
-      : warnCheck(
-          checks[5],
-          `Backend service is not running at ${serviceSocketPath}.`,
-          {
-            socket_path: serviceSocketPath,
-            last_error: serviceStatus?.last_error ?? null,
-          },
-        ),
+      ? okCheck(checks[5], `Backend service is running at ${serviceSocketPath}.`, {
+          socket_path: serviceSocketPath,
+          last_error: serviceStatus.last_error,
+        })
+      : warnCheck(checks[5], `Backend service is not running at ${serviceSocketPath}.`, {
+          socket_path: serviceSocketPath,
+          last_error: serviceStatus?.last_error ?? null,
+        }),
   );
 
-  // node-pty check: dynamic import to detect native module compilation failures
-  try {
-    await import("node-pty");
-    reportChecks.push(okCheck(checks[6], "node-pty native module is available."));
-  } catch {
-    reportChecks.push(
-      errorCheck(
-        checks[6],
-        "node-pty native module is not compiled. Codex and Claude providers require it.",
-      ),
-    );
-  }
+  reportChecks.push(
+    okCheck(checks[6], 'Bun runtime provides native terminal support; node-pty is no longer required.'),
+  );
 
   // systemd-env check: verify the install script wrote the environment override
   const overridePath = path.join(
-    options.homeDir ?? process.env.HOME ?? "",
-    ".config/systemd/user/agent-bar.service.d/env.conf",
+    options.homeDir ?? process.env.HOME ?? '',
+    '.config/systemd/user/agent-bar.service.d/env.conf',
   );
   const overrideExists = await doesFileExist(overridePath, options.fileExists);
   reportChecks.push(
     overrideExists
-      ? okCheck(checks[7], "Systemd environment override is configured.", { path: overridePath })
-      : warnCheck(
-          checks[7],
-          "Systemd environment override is missing. The service may not find CLI tools or tokens.",
-          { path: overridePath },
-        ),
+      ? okCheck(checks[7], 'Systemd environment override is configured.', { path: overridePath })
+      : warnCheck(checks[7], 'Systemd environment override is missing. The service may not find CLI tools or tokens.', {
+          path: overridePath,
+        }),
   );
 
   return {
     generated_at: (options.now ?? (() => new Date()))().toISOString(),
-    runtime_mode: serviceStatus?.running ? "service" : "cli",
+    runtime_mode: serviceStatus?.running ? 'service' : 'cli',
     checks: reportChecks,
   };
 }
-

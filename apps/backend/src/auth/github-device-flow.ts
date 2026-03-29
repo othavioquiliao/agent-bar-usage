@@ -8,9 +8,11 @@
  * a stub without hitting the network.
  */
 
-const DEVICE_CODE_URL = "https://github.com/login/device/code";
-const ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
-const DEVICE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
+const DEVICE_CODE_URL = 'https://github.com/login/device/code';
+const ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
+
+export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface DeviceCodeResponse {
   device_code: string;
@@ -43,12 +45,12 @@ interface TokenPollResponse {
 export async function requestDeviceCode(
   clientId: string,
   scope: string,
-  fetchFn: typeof fetch = fetch,
+  fetchFn: FetchLike = fetch,
 ): Promise<DeviceCodeResponse> {
   let response: Response;
   try {
     response = await fetchFn(DEVICE_CODE_URL, {
-      method: "POST",
+      method: 'POST',
       headers: createHeaders(),
       body: buildFormBody({
         client_id: clientId,
@@ -62,7 +64,7 @@ export async function requestDeviceCode(
   }
 
   if (!response.ok) {
-    throw new Error(formatGitHubHttpError("GitHub device code request failed", response, await readJsonBody(response)));
+    throw new Error(formatGitHubHttpError('GitHub device code request failed', response, await readJsonBody(response)));
   }
 
   return parseDeviceCodeResponse(await readJsonBody(response));
@@ -83,7 +85,7 @@ export async function pollForAccessToken(
   deviceCode: string,
   interval: number,
   expiresIn: number,
-  fetchFn: typeof fetch = fetch,
+  fetchFn: FetchLike = fetch,
 ): Promise<DeviceFlowResult> {
   const expiresAt = Date.now() + expiresIn * 1000;
   let currentInterval = interval;
@@ -94,7 +96,7 @@ export async function pollForAccessToken(
     let response: Response;
     try {
       response = await fetchFn(ACCESS_TOKEN_URL, {
-        method: "POST",
+        method: 'POST',
         headers: createHeaders(),
         body: buildFormBody({
           client_id: clientId,
@@ -109,7 +111,7 @@ export async function pollForAccessToken(
     }
 
     if (!response.ok) {
-      throw new Error(formatGitHubHttpError("GitHub token poll failed", response, await readJsonBody(response)));
+      throw new Error(formatGitHubHttpError('GitHub token poll failed', response, await readJsonBody(response)));
     }
 
     const data = parseTokenPollResponse(await readJsonBody(response));
@@ -117,36 +119,36 @@ export async function pollForAccessToken(
     if (data.access_token) {
       return {
         access_token: data.access_token,
-        token_type: data.token_type ?? "bearer",
-        scope: data.scope ?? "",
+        token_type: data.token_type ?? 'bearer',
+        scope: data.scope ?? '',
       };
     }
 
     switch (data.error) {
-      case "authorization_pending":
+      case 'authorization_pending':
         // Normal: user has not authorized yet — keep polling
         break;
 
-      case "slow_down":
+      case 'slow_down':
         // GitHub wants us to back off; it also adjusts the interval in the response
         currentInterval = (data.interval ?? currentInterval) + 5;
         break;
 
-      case "expired_token":
-      case "token_expired":
-        throw new Error("Device flow code expired. Please run the command again to get a new code.");
+      case 'expired_token':
+      case 'token_expired':
+        throw new Error('Device flow code expired. Please run the command again to get a new code.');
 
-      case "access_denied":
-        throw new Error("Authorization denied. The user cancelled the GitHub authorization.");
+      case 'access_denied':
+        throw new Error('Authorization denied. The user cancelled the GitHub authorization.');
 
       default:
         throw new Error(
-          `GitHub token poll returned unexpected error: ${data.error ?? "unknown"} — ${data.error_description ?? ""}`,
+          `GitHub token poll returned unexpected error: ${data.error ?? 'unknown'} — ${data.error_description ?? ''}`,
         );
     }
   }
 
-  throw new Error("Device flow timed out waiting for authorization. Please try again.");
+  throw new Error('Device flow timed out waiting for authorization. Please try again.');
 }
 
 function sleep(ms: number): Promise<void> {
@@ -155,8 +157,8 @@ function sleep(ms: number): Promise<void> {
 
 function createHeaders(): HeadersInit {
   return {
-    Accept: "application/json",
-    "Content-Type": "application/x-www-form-urlencoded",
+    Accept: 'application/json',
+    'Content-Type': 'application/x-www-form-urlencoded',
   };
 }
 
@@ -172,7 +174,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch (error) {
-    throw new Error("GitHub device flow returned a non-JSON response.", {
+    throw new Error('GitHub device flow returned a non-JSON response.', {
       cause: error,
     });
   }
@@ -182,11 +184,11 @@ function parseDeviceCodeResponse(payload: unknown): DeviceCodeResponse {
   const record = toRecord(payload);
 
   return {
-    device_code: readRequiredString(record.device_code, "device_code"),
-    user_code: readRequiredString(record.user_code, "user_code"),
-    verification_uri: readRequiredString(record.verification_uri, "verification_uri"),
-    expires_in: readPositiveInteger(record.expires_in, "expires_in"),
-    interval: readPositiveInteger(record.interval, "interval"),
+    device_code: readRequiredString(record.device_code, 'device_code'),
+    user_code: readRequiredString(record.user_code, 'user_code'),
+    verification_uri: readRequiredString(record.verification_uri, 'verification_uri'),
+    expires_in: readPositiveInteger(record.expires_in, 'expires_in'),
+    interval: readPositiveInteger(record.interval, 'interval'),
   };
 }
 
@@ -195,15 +197,15 @@ function parseTokenPollResponse(payload: unknown): TokenPollResponse {
 }
 
 function toRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object") {
-    throw new Error("GitHub device flow response did not match the expected object shape.");
+  if (!value || typeof value !== 'object') {
+    throw new Error('GitHub device flow response did not match the expected object shape.');
   }
 
   return value as Record<string, unknown>;
 }
 
 function readRequiredString(value: unknown, field: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`GitHub device flow response is missing ${field}.`);
   }
 
@@ -219,12 +221,10 @@ function readPositiveInteger(value: unknown, field: string): number {
 }
 
 function formatGitHubHttpError(prefix: string, response: Response, payload: unknown): string {
-  const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
-  const description = typeof record?.error_description === "string" ? record.error_description.trim() : "";
-  const errorCode = typeof record?.error === "string" ? record.error.trim() : "";
+  const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null;
+  const description = typeof record?.error_description === 'string' ? record.error_description.trim() : '';
+  const errorCode = typeof record?.error === 'string' ? record.error.trim() : '';
   const suffix = description || errorCode;
 
-  return suffix
-    ? `${prefix} with HTTP ${response.status}: ${suffix}`
-    : `${prefix} with HTTP ${response.status}`;
+  return suffix ? `${prefix} with HTTP ${response.status}: ${suffix}` : `${prefix} with HTTP ${response.status}`;
 }

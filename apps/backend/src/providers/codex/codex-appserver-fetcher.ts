@@ -1,6 +1,6 @@
-import type { ProviderSnapshot } from "shared-contract";
+import type { ProviderSnapshot } from 'shared-contract';
 
-import { resolveCommandInPath } from "../../utils/subprocess.js";
+import { resolveCommandInPath } from '../../utils/subprocess.js';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -22,7 +22,7 @@ interface RateLimitsResult {
 export function formatResetLabel(resetsAtUnix: number, now = Date.now()): string {
   const resetMs = resetsAtUnix * 1000;
   const diffMs = resetMs - now;
-  if (diffMs <= 0) return "Resets soon";
+  if (diffMs <= 0) return 'Resets soon';
   const hours = Math.floor(diffMs / 3_600_000);
   const minutes = Math.floor((diffMs % 3_600_000) / 60_000);
   if (hours >= 24) {
@@ -37,20 +37,17 @@ export function mapToSnapshot(result: RateLimitsResult, now = Date.now()): Provi
   const primary = result.rateLimits.primary;
   const usedPercent = primary?.usedPercent ?? null;
 
-  const status = usedPercent === null
-    ? "unavailable"
-    : usedPercent >= 90
-      ? "degraded"
-      : "ok";
+  const status = usedPercent === null ? 'unavailable' : usedPercent >= 90 ? 'degraded' : 'ok';
 
   return {
-    provider: "codex",
+    provider: 'codex',
     status,
-    source: "cli",
+    source: 'cli',
     updated_at: new Date(now).toISOString(),
-    usage: usedPercent !== null
-      ? { kind: "quota", used: Math.round(usedPercent), limit: 100, percent_used: Math.round(usedPercent) }
-      : null,
+    usage:
+      usedPercent !== null
+        ? { kind: 'quota', used: Math.round(usedPercent), limit: 100, percent_used: Math.round(usedPercent) }
+        : null,
     reset_window: primary?.resetsAt
       ? { label: formatResetLabel(primary.resetsAt, now), resets_at: new Date(primary.resetsAt * 1000).toISOString() }
       : null,
@@ -64,22 +61,20 @@ export interface AppServerDependencies {
   timeoutMs?: number;
 }
 
-export async function fetchCodexUsageViaAppServer(
-  dependencies: AppServerDependencies = {},
-): Promise<ProviderSnapshot> {
+export async function fetchCodexUsageViaAppServer(dependencies: AppServerDependencies = {}): Promise<ProviderSnapshot> {
   const env = dependencies.env ?? process.env;
-  const binary = dependencies.codexBinary ?? resolveCommandInPath("codex", env);
+  const binary = dependencies.codexBinary ?? resolveCommandInPath('codex', env);
   const timeoutMs = dependencies.timeoutMs ?? REQUEST_TIMEOUT_MS;
 
   if (!binary) {
     return {
-      provider: "codex",
-      status: "error",
-      source: "cli",
+      provider: 'codex',
+      status: 'error',
+      source: 'cli',
       updated_at: new Date().toISOString(),
       usage: null,
       reset_window: null,
-      error: { code: "codex_cli_missing", message: "Codex CLI not found on PATH.", retryable: false },
+      error: { code: 'codex_cli_missing', message: 'Codex CLI not found on PATH.', retryable: false },
     };
   }
 
@@ -94,32 +89,32 @@ export async function fetchCodexUsageViaAppServer(
       resolve(snapshot);
     };
 
-    const child = Bun.spawn([binary, "app-server"], {
+    const child = Bun.spawn([binary, 'app-server'], {
       env: { ...process.env, ...env },
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'pipe',
     });
 
-    let stdout = "";
+    let stdout = '';
     let initDone = false;
 
     const timer = setTimeout(() => {
       settle({
-        provider: "codex",
-        status: "error",
-        source: "cli",
+        provider: 'codex',
+        status: 'error',
+        source: 'cli',
         updated_at: new Date().toISOString(),
         usage: null,
         reset_window: null,
-        error: { code: "codex_cli_failed", message: "Codex app-server timed out.", retryable: true },
+        error: { code: 'codex_cli_failed', message: 'Codex app-server timed out.', retryable: true },
       });
     }, timeoutMs);
 
     function processChunk(chunk: string) {
       stdout += chunk;
-      const lines = stdout.split("\n");
-      stdout = lines.pop() ?? "";
+      const lines = stdout.split('\n');
+      stdout = lines.pop() ?? '';
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -135,9 +130,7 @@ export async function fetchCodexUsageViaAppServer(
         // Response to initialize (id=1)
         if (msg.id === 1 && !initDone) {
           initDone = true;
-          child.stdin.write(
-            '{"jsonrpc":"2.0","method":"account/rateLimits/read","id":2,"params":{}}\n',
-          );
+          child.stdin.write('{"jsonrpc":"2.0","method":"account/rateLimits/read","id":2,"params":{}}\n');
           child.stdin.flush();
         }
 
@@ -145,14 +138,14 @@ export async function fetchCodexUsageViaAppServer(
         if (msg.id === 2) {
           if (msg.error) {
             settle({
-              provider: "codex",
-              status: "error",
-              source: "cli",
+              provider: 'codex',
+              status: 'error',
+              source: 'cli',
               updated_at: new Date().toISOString(),
               usage: null,
               reset_window: null,
               error: {
-                code: "codex_cli_failed",
+                code: 'codex_cli_failed',
                 message: `Codex app-server error: ${JSON.stringify(msg.error)}`,
                 retryable: true,
               },
@@ -165,14 +158,14 @@ export async function fetchCodexUsageViaAppServer(
             settle(mapToSnapshot(result));
           } catch (e) {
             settle({
-              provider: "codex",
-              status: "error",
-              source: "cli",
+              provider: 'codex',
+              status: 'error',
+              source: 'cli',
               updated_at: new Date().toISOString(),
               usage: null,
               reset_window: null,
               error: {
-                code: "codex_cli_failed",
+                code: 'codex_cli_failed',
                 message: `Failed to parse rate limits: ${e instanceof Error ? e.message : String(e)}`,
                 retryable: true,
               },
@@ -201,13 +194,17 @@ export async function fetchCodexUsageViaAppServer(
     child.exited.then(() => {
       if (!settled) {
         settle({
-          provider: "codex",
-          status: "error",
-          source: "cli",
+          provider: 'codex',
+          status: 'error',
+          source: 'cli',
           updated_at: new Date().toISOString(),
           usage: null,
           reset_window: null,
-          error: { code: "codex_cli_failed", message: "Codex app-server exited before returning rate limits.", retryable: true },
+          error: {
+            code: 'codex_cli_failed',
+            message: 'Codex app-server exited before returning rate limits.',
+            retryable: true,
+          },
         });
       }
     });

@@ -1,8 +1,8 @@
-import os from "node:os";
-import path from "node:path";
+import os from 'node:os';
+import path from 'node:path';
 
-export const SERVICE_SOCKET_NAME = "service.sock";
-export const SERVICE_SOCKET_DIR_NAME = "agent-bar";
+export const SERVICE_SOCKET_NAME = 'service.sock';
+export const SERVICE_SOCKET_DIR_NAME = 'agent-bar';
 
 export interface ResolveServiceSocketPathOptions {
   env?: NodeJS.ProcessEnv;

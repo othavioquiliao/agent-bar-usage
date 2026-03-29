@@ -9,7 +9,7 @@ function parseTimestamp(value) {
     return Number.isNaN(value.getTime()) ? null : value;
   }
 
-  if (typeof value !== "string" || value.trim().length === 0) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
   }
 
@@ -20,8 +20,8 @@ function parseTimestamp(value) {
 function formatAbsoluteDate(date) {
   try {
     return new Intl.DateTimeFormat(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
+      dateStyle: 'medium',
+      timeStyle: 'short',
     }).format(date);
   } catch {
     return date.toLocaleString();
@@ -39,25 +39,25 @@ export function formatRelativeTimestamp(value, now = new Date()) {
   const diff = timestamp.getTime() - current.getTime();
   const absDiff = Math.abs(diff);
   const units = [
-    ["year", YEAR_MS],
-    ["month", MONTH_MS],
-    ["day", DAY_MS],
-    ["hour", HOUR_MS],
-    ["minute", MINUTE_MS],
-    ["second", 1000],
+    ['year', YEAR_MS],
+    ['month', MONTH_MS],
+    ['day', DAY_MS],
+    ['hour', HOUR_MS],
+    ['minute', MINUTE_MS],
+    ['second', 1000],
   ];
   const [unit, unitMs] = units.find(([, unitSize]) => absDiff >= unitSize) ?? units[units.length - 1];
   const numericValue = Math.round(diff / unitMs);
 
   try {
-    return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(numericValue, unit);
+    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(numericValue, unit);
   } catch {
     const absolute = formatAbsoluteDate(timestamp);
     return diff >= 0 ? `in ${absolute}` : `${absolute} ago`;
   }
 }
 
-export function formatTimestampLabel(value, { prefix = "Updated", now = new Date() } = {}) {
+export function formatTimestampLabel(value, { prefix = 'Updated', now = new Date() } = {}) {
   const relative = formatRelativeTimestamp(value, now);
 
   if (!relative) {
@@ -78,6 +78,5 @@ export function formatAbsoluteTimestamp(value) {
 }
 
 export function formatLastUpdatedText(value, now = new Date()) {
-  return formatTimestampLabel(value, { prefix: "Last updated", now });
+  return formatTimestampLabel(value, { prefix: 'Last updated', now });
 }
-

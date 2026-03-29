@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { mkdir, rename } from "node:fs/promises";
-import { type Settings, DEFAULT_SETTINGS, CURRENT_VERSION } from "./settings-schema.js";
-import { APP_NAME, getInstallPaths } from "../lifecycle/paths.js";
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, rename } from 'node:fs/promises';
+import { APP_NAME, getInstallPaths } from '../lifecycle/paths.js';
+import { CURRENT_VERSION, DEFAULT_SETTINGS, type Settings } from './settings-schema.js';
 
 /** Migrate settings from older schema versions. Currently a noop (v1 is the first version). */
 function migrateSettings(data: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
@@ -20,7 +20,7 @@ export function normalizeSettings(data: Partial<Settings> | undefined): Settings
   }
 
   const raw = data as Record<string, unknown>;
-  if (typeof raw.version === "number" && raw.version < CURRENT_VERSION) {
+  if (typeof raw.version === 'number' && raw.version < CURRENT_VERSION) {
     migrateSettings(raw, raw.version);
   }
 
@@ -57,7 +57,7 @@ export function loadSettingsSync(): Settings {
     if (!existsSync(settingsFile)) {
       return normalizeSettings(undefined);
     }
-    const data = JSON.parse(readFileSync(settingsFile, "utf-8"));
+    const data = JSON.parse(readFileSync(settingsFile, 'utf-8'));
     return normalizeSettings(data);
   } catch (err) {
     process.stderr.write(`[${APP_NAME}] Settings sync read error (using defaults): ${err}\n`);

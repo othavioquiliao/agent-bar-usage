@@ -7,8 +7,8 @@
  *  - preserveSettings: true (keep settings.json and cache)
  */
 
-import { APP_NAME } from "./paths.js";
-import { runUninstall } from "./uninstall.js";
+import { APP_NAME } from './paths.js';
+import { runUninstall } from './uninstall.js';
 
 export async function runRemove(): Promise<void> {
   await runUninstall({

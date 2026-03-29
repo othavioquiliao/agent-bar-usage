@@ -1,8 +1,8 @@
-import os from "node:os";
-import path from "node:path";
+import os from 'node:os';
+import path from 'node:path';
 
-export const CONFIG_DIR_NAME = "agent-bar";
-export const CONFIG_FILE_NAME = "config.json";
+export const CONFIG_DIR_NAME = 'agent-bar';
+export const CONFIG_FILE_NAME = 'config.json';
 
 export interface ResolveConfigPathOptions {
   env?: NodeJS.ProcessEnv;
@@ -20,7 +20,7 @@ export function resolveBackendConfigPath(options: ResolveConfigPathOptions = {})
   const configRoot =
     xdgConfigHome && xdgConfigHome.trim().length > 0
       ? xdgConfigHome
-      : path.join(options.homeDir ?? os.homedir(), ".config");
+      : path.join(options.homeDir ?? os.homedir(), '.config');
 
   return path.join(configRoot, CONFIG_DIR_NAME, CONFIG_FILE_NAME);
 }

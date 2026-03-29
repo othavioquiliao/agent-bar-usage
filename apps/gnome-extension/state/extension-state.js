@@ -1,6 +1,6 @@
 export function createInitialState() {
   return {
-    status: "idle",
+    status: 'idle',
     isLoading: false,
     snapshotEnvelope: null,
     schemaVersion: null,
@@ -15,7 +15,7 @@ export function createInitialState() {
 export function applyLoadingState(previousState = createInitialState()) {
   return {
     ...previousState,
-    status: "loading",
+    status: 'loading',
     isLoading: true,
     lastError: null,
     error: null,
@@ -29,7 +29,7 @@ export function applySnapshotSuccess(
 ) {
   return {
     ...previousState,
-    status: "ready",
+    status: 'ready',
     isLoading: false,
     snapshotEnvelope,
     schemaVersion: snapshotEnvelope?.schema_version ?? null,
@@ -44,7 +44,7 @@ export function applySnapshotSuccess(
 export function applySnapshotError(previousState = createInitialState(), error) {
   return {
     ...previousState,
-    status: "error",
+    status: 'error',
     isLoading: false,
     lastError: normalizeError(error),
     error: normalizeError(error),
@@ -57,7 +57,7 @@ function normalizeError(error) {
   }
 
   if (error === null || error === undefined) {
-    return "Unknown backend error";
+    return 'Unknown backend error';
   }
 
   return String(error);

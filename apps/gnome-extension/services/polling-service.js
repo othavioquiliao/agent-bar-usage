@@ -1,5 +1,10 @@
-import { applyLoadingState, applySnapshotError, applySnapshotSuccess, createInitialState } from "../state/extension-state.js";
-import { formatLastUpdatedText } from "../utils/time.js";
+import {
+  applyLoadingState,
+  applySnapshotError,
+  applySnapshotSuccess,
+  createInitialState,
+} from '../state/extension-state.js';
+import { formatLastUpdatedText } from '../utils/time.js';
 
 const DEFAULT_INTERVAL_MS = 150_000;
 
@@ -115,7 +120,7 @@ export function createPollingService({
 
         console.error(`[agent-bar] Snapshot fetch failed: ${error?.message ?? error}`);
         if (error?.argv) {
-          console.error(`[agent-bar]   command: ${error.argv.join(" ")}`);
+          console.error(`[agent-bar]   command: ${error.argv.join(' ')}`);
         }
         if (error?.stderr) {
           console.error(`[agent-bar]   stderr: ${error.stderr}`);

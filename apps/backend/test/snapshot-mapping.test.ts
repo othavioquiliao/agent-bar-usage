@@ -1,27 +1,34 @@
-import { describe, expect, it } from "vitest";
-import type { ProviderId, ProviderSnapshot } from "shared-contract";
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { normalizeBackendRequest } from "../src/config/backend-request.js";
-import { BackendCoordinator } from "../src/core/backend-coordinator.js";
-import type { ProviderAdapter } from "../src/core/provider-adapter.js";
-import { ProviderRegistry } from "../src/core/provider-registry.js";
-import { serializeSnapshotEnvelope } from "../src/serializers/snapshot-serializer.js";
+import type { ProviderSnapshot } from 'shared-contract';
+import { describe, expect, it } from 'vitest';
 
-describe("snapshot mapping", () => {
-  it("fills source and updated_at when adapter omits them", async () => {
-    const now = () => new Date("2026-03-25T17:00:00Z");
+import { SnapshotCache } from '../src/cache/snapshot-cache.js';
+import { normalizeBackendRequest } from '../src/config/backend-request.js';
+import { BackendCoordinator } from '../src/core/backend-coordinator.js';
+import type { ProviderAdapter } from '../src/core/provider-adapter.js';
+import { ProviderRegistry } from '../src/core/provider-registry.js';
+import { serializeSnapshotEnvelope } from '../src/serializers/snapshot-serializer.js';
+
+describe('snapshot mapping', () => {
+  it('fills source and updated_at when adapter omits them', async () => {
+    const now = () => new Date('2026-03-25T17:00:00Z');
     const adapter: ProviderAdapter = {
-      id: "codex",
-      defaultSourceMode: "cli",
+      id: 'codex',
+      name: 'Codex',
+      cacheKey: 'codex-quota',
+      defaultSourceMode: 'cli',
       async isAvailable() {
         return true;
       },
-      async fetch() {
+      async getQuota() {
         return {
-          provider: "codex",
-          status: "ok",
+          provider: 'codex',
+          status: 'ok',
           usage: {
-            kind: "quota",
+            kind: 'quota',
             used: 10,
             limit: 100,
             percent_used: 10,
@@ -33,64 +40,70 @@ describe("snapshot mapping", () => {
     };
 
     const coordinator = new BackendCoordinator({
+      cache: createTestSnapshotCache(),
       registry: new ProviderRegistry([adapter]),
       now,
     });
     const request = normalizeBackendRequest({
-      providers: ["codex"],
-      source_mode_override: "api",
+      providers: ['codex'],
+      source_mode_override: 'api',
     });
     const envelope = await coordinator.getSnapshot(request);
 
-    expect(envelope.providers[0]?.provider).toBe("codex");
-    expect(envelope.providers[0]?.source).toBe("api");
-    expect(envelope.providers[0]?.updated_at).toBe("2026-03-25T17:00:00.000Z");
+    expect(envelope.providers[0]?.provider).toBe('codex');
+    expect(envelope.providers[0]?.source).toBe('api');
+    expect(envelope.providers[0]?.updated_at).toBe('2026-03-25T17:00:00.000Z');
   });
 
-  it("maps adapter failures to structured provider errors", async () => {
-    const now = () => new Date("2026-03-25T17:30:00Z");
+  it('maps adapter failures to structured provider errors', async () => {
+    const now = () => new Date('2026-03-25T17:30:00Z');
     const adapter: ProviderAdapter = {
-      id: "claude",
-      defaultSourceMode: "cli",
+      id: 'claude',
+      name: 'Claude',
+      cacheKey: 'claude-quota',
+      defaultSourceMode: 'cli',
       async isAvailable() {
         return true;
       },
-      async fetch() {
-        throw new Error("adapter exploded");
+      async getQuota() {
+        throw new Error('adapter exploded');
       },
     };
 
     const coordinator = new BackendCoordinator({
+      cache: createTestSnapshotCache(),
       registry: new ProviderRegistry([adapter]),
       now,
     });
     const request = normalizeBackendRequest({
-      providers: ["claude"],
+      providers: ['claude'],
     });
     const envelope = await coordinator.getSnapshot(request);
 
-    expect(envelope.providers[0]?.status).toBe("error");
-    expect(envelope.providers[0]?.source).toBe("cli");
-    expect(envelope.providers[0]?.updated_at).toBe("2026-03-25T17:30:00.000Z");
-    expect(envelope.providers[0]?.error?.code).toBe("provider_fetch_failed");
-    expect(envelope.providers[0]?.error?.message).toContain("adapter exploded");
+    expect(envelope.providers[0]?.status).toBe('error');
+    expect(envelope.providers[0]?.source).toBe('cli');
+    expect(envelope.providers[0]?.updated_at).toBe('2026-03-25T17:30:00.000Z');
+    expect(envelope.providers[0]?.error?.code).toBe('provider_fetch_failed');
+    expect(envelope.providers[0]?.error?.message).toContain('adapter exploded');
   });
 
-  it("keeps diagnostics optional via serializer options", async () => {
+  it('keeps diagnostics optional via serializer options', async () => {
     const adapter: ProviderAdapter = {
-      id: "copilot",
-      defaultSourceMode: "api",
+      id: 'copilot',
+      name: 'Copilot',
+      cacheKey: 'copilot-quota',
+      defaultSourceMode: 'api',
       async isAvailable() {
         return true;
       },
-      async fetch(context) {
+      async getQuota(context) {
         return {
-          provider: "copilot",
-          status: "ok",
+          provider: 'copilot',
+          status: 'ok',
           source: context.sourceMode,
           updated_at: context.now().toISOString(),
           usage: {
-            kind: "quota",
+            kind: 'quota',
             used: 5,
             limit: 100,
             percent_used: 5,
@@ -100,7 +113,7 @@ describe("snapshot mapping", () => {
           diagnostics: {
             attempts: [
               {
-                strategy: "copilot-api",
+                strategy: 'copilot-api',
                 available: true,
                 duration_ms: 9,
                 error: null,
@@ -112,11 +125,12 @@ describe("snapshot mapping", () => {
     };
 
     const coordinator = new BackendCoordinator({
+      cache: createTestSnapshotCache(),
       registry: new ProviderRegistry([adapter]),
-      now: () => new Date("2026-03-25T18:00:00Z"),
+      now: () => new Date('2026-03-25T18:00:00Z'),
     });
     const request = normalizeBackendRequest({
-      providers: ["copilot"],
+      providers: ['copilot'],
       include_diagnostics: true,
     });
     const envelope = await coordinator.getSnapshot(request);
@@ -131,3 +145,9 @@ describe("snapshot mapping", () => {
     expect(withDiagnostics.providers[0]?.diagnostics?.attempts.length).toBe(1);
   });
 });
+
+function createTestSnapshotCache(): SnapshotCache {
+  return new SnapshotCache({
+    cacheDir: mkdtempSync(path.join(tmpdir(), 'agent-bar-snapshot-mapping-')),
+  });
+}

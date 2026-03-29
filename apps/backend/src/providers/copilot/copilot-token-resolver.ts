@@ -1,12 +1,12 @@
-import type { ProviderAdapterContext } from "../../core/provider-adapter.js";
+import type { ProviderAdapterContext } from '../../core/provider-adapter.js';
 
 export interface CopilotTokenResolution {
   token: string;
-  source: "env" | "secret";
+  source: 'env' | 'secret';
   key?: string;
 }
 
-const ENV_TOKEN_KEYS = ["COPILOT_API_TOKEN", "GITHUB_TOKEN", "GH_TOKEN", "COPILOT_TOKEN"];
+const ENV_TOKEN_KEYS = ['COPILOT_API_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN', 'COPILOT_TOKEN'];
 
 export function resolveCopilotToken(context: ProviderAdapterContext): CopilotTokenResolution | null {
   const fromEnv = resolveFromEnvironment(context.env);
@@ -18,7 +18,7 @@ export function resolveCopilotToken(context: ProviderAdapterContext): CopilotTok
   if (secret) {
     return {
       token: secret,
-      source: "secret",
+      source: 'secret',
     };
   }
 
@@ -31,7 +31,7 @@ function resolveFromEnvironment(env: NodeJS.ProcessEnv): CopilotTokenResolution 
     if (token) {
       return {
         token,
-        source: "env",
+        source: 'env',
         key,
       };
     }
