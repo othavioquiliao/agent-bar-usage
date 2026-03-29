@@ -6,6 +6,7 @@ import { registerAuthCommand } from "./commands/auth-command.js";
 import { formatConfigCommandError, registerConfigCommand } from "./commands/config-command.js";
 import { registerDoctorCommand } from "./commands/diagnostics-command.js";
 import { registerServiceCommand } from "./commands/service-command.js";
+import { registerLifecycleCommands } from "./commands/lifecycle-command.js";
 import {
   createUsageSnapshot,
   type UsageCommandDependencies,
@@ -76,6 +77,7 @@ registerAuthCommand(program);
 registerConfigCommand(program);
 registerDoctorCommand(program);
 registerServiceCommand(program);
+registerLifecycleCommands(program);
 
 if (import.meta.main) {
   program.parseAsync(process.argv).catch((error: unknown) => {
