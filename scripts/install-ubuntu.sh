@@ -259,6 +259,7 @@ systemctl --user restart agent-bar.service
 step_ok "agent-bar.service habilitado e iniciado."
 
 # --- GNOME Shell extension ---
+rm -rf "$gnome_ext_dir"
 mkdir -p "$gnome_ext_dir"
 
 # Copy extension source files (excluding tests, node_modules, and dev configs)

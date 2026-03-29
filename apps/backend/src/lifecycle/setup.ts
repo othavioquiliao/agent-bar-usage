@@ -15,6 +15,7 @@ import {
   cpSync as fsCpSync,
   type existsSync as fsExistsSync,
   mkdirSync as fsMkdirSync,
+  rmSync as fsRmSync,
   unlinkSync as fsUnlinkSync,
   writeFileSync as fsWriteFileSync,
 } from 'node:fs';
@@ -35,6 +36,7 @@ export interface SetupDependencies {
   cpSyncFn?: typeof fsCpSync;
   writeFileSyncFn?: typeof fsWriteFileSync;
   existsSyncFn?: typeof fsExistsSync;
+  rmSyncFn?: typeof fsRmSync;
   resolveFn?: typeof resolve;
 }
 
@@ -47,6 +49,7 @@ export async function runSetup(deps?: SetupDependencies): Promise<void> {
   const unlinkSync = deps?.unlinkSyncFn ?? fsUnlinkSync;
   const cpSync = deps?.cpSyncFn ?? fsCpSync;
   const writeFileSync = deps?.writeFileSyncFn ?? fsWriteFileSync;
+  const rmSync = deps?.rmSyncFn ?? fsRmSync;
   const resolvePath = deps?.resolveFn ?? resolve;
 
   console.clear();
@@ -149,6 +152,7 @@ export async function runSetup(deps?: SetupDependencies): Promise<void> {
 
     // Step 8: GNOME extension
     s.start('Installing GNOME extension...');
+    rmSync(paths.extensionDir, { recursive: true, force: true });
     mkdirSync(paths.extensionDir, { recursive: true });
     for (const item of EXT_ITEMS) {
       try {

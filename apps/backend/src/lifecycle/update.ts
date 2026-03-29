@@ -13,7 +13,7 @@
  *  9. Re-copy GNOME extension
  */
 
-import { cpSync as fsCpSync, mkdirSync as fsMkdirSync } from 'node:fs';
+import { cpSync as fsCpSync, mkdirSync as fsMkdirSync, rmSync as fsRmSync } from 'node:fs';
 import { join } from 'node:path';
 import * as p from '@clack/prompts';
 
@@ -26,6 +26,7 @@ export interface UpdateDependencies {
   runSubprocessFn?: typeof runSubprocess;
   cpSyncFn?: typeof fsCpSync;
   mkdirSyncFn?: typeof fsMkdirSync;
+  rmSyncFn?: typeof fsRmSync;
 }
 
 // MARK: - Git helper
@@ -52,6 +53,7 @@ export async function runUpdate(deps?: UpdateDependencies): Promise<void> {
   const run = deps?.runSubprocessFn ?? runSubprocess;
   const cpSync = deps?.cpSyncFn ?? fsCpSync;
   const mkdirSync = deps?.mkdirSyncFn ?? fsMkdirSync;
+  const rmSync = deps?.rmSyncFn ?? fsRmSync;
 
   console.clear();
   p.intro('agent-bar update');
@@ -160,6 +162,7 @@ export async function runUpdate(deps?: UpdateDependencies): Promise<void> {
   // Step 11: Re-copy GNOME extension
   s.start('Updating GNOME extension...');
   const paths = getInstallPaths();
+  rmSync(paths.extensionDir, { recursive: true, force: true });
   mkdirSync(paths.extensionDir, { recursive: true });
   for (const item of EXT_ITEMS) {
     try {
