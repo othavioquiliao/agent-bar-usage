@@ -1,4 +1,7 @@
 #!/usr/bin/env bun
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
 import { assertProviderId, assertSnapshotEnvelope, type ProviderId } from 'shared-contract';
 
 import {
@@ -47,6 +50,18 @@ export interface CliDependencies {
   runServiceRefreshCommandFn?: typeof runServiceRefreshCommand;
   runLifecycleCommandFn?: typeof runLifecycleCommand;
   isInteractiveTerminalFn?: () => boolean;
+}
+
+export interface BunRuntimeBootstrapDependencies {
+  bunBinary?: string;
+  bunGlobal?: unknown;
+  cliPath?: string;
+  spawnSyncFn?: (
+    command: string,
+    args: string[],
+    options: { env: NodeJS.ProcessEnv; stdio: 'inherit' },
+  ) => { error?: NodeJS.ErrnoException; status: number | null };
+  exitFn?: (code?: number) => never;
 }
 
 const HELP_WIDTH = 88;
@@ -330,6 +345,36 @@ function handleCliError(
   return 1;
 }
 
+export function ensureBunRuntime(
+  args: string[],
+  dependencies: BunRuntimeBootstrapDependencies = {},
+): void {
+  if ((dependencies.bunGlobal ?? globalThis.Bun) !== undefined) {
+    return;
+  }
+
+  const bunBinary = dependencies.bunBinary ?? process.env.BUN_BINARY ?? 'bun';
+  const cliPath = dependencies.cliPath ?? fileURLToPath(import.meta.url);
+  const spawnSyncFn = dependencies.spawnSyncFn ?? spawnSync;
+  const exitFn = dependencies.exitFn ?? process.exit;
+
+  const result = spawnSyncFn(bunBinary, [cliPath, ...args], {
+    env: process.env,
+    stdio: 'inherit',
+  });
+
+  const runtimeError = result.error;
+  if (runtimeError) {
+    const errorCode = 'code' in runtimeError ? runtimeError.code : undefined;
+    if (errorCode === 'ENOENT') {
+      throw new Error(`This command requires Bun, but '${bunBinary}' was not found in PATH.`);
+    }
+    throw new Error(`Failed to launch Bun runtime: ${runtimeError.message}`);
+  }
+
+  exitFn(result.status ?? 1);
+}
+
 export async function runCli(args: string[], dependencies: CliDependencies = {}): Promise<number> {
   const writeStdout =
     dependencies.writeStdout ??
@@ -468,5 +513,6 @@ export async function runCli(args: string[], dependencies: CliDependencies = {})
 }
 
 if (import.meta.main) {
+  ensureBunRuntime(process.argv.slice(2));
   await runCli(process.argv.slice(2));
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { runCli, showHelp, suggestCommand } from '../src/cli.js';
+import { ensureBunRuntime, runCli, showHelp, suggestCommand } from '../src/cli.js';
 
 describe('manual CLI parser', () => {
   let originalExitCode: typeof process.exitCode;
@@ -126,5 +126,38 @@ describe('manual CLI parser', () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain('agent-bar');
     expect(stdout).toContain('menu');
+  });
+
+  it('re-executes the CLI with Bun when launched from a stale Node wrapper', () => {
+    const spawnSyncFn = vi.fn(() => ({ status: 0 }));
+    const exitFn = vi.fn((code?: number) => {
+      throw new Error(`exit:${code ?? 0}`);
+    });
+
+    expect(() =>
+      ensureBunRuntime(['doctor', '--json'], {
+        bunGlobal: undefined,
+        cliPath: '/repo/apps/backend/dist/cli.js',
+        spawnSyncFn,
+        exitFn,
+      }),
+    ).toThrow('exit:0');
+
+    expect(spawnSyncFn).toHaveBeenCalledWith('bun', ['/repo/apps/backend/dist/cli.js', 'doctor', '--json'], {
+      env: process.env,
+      stdio: 'inherit',
+    });
+  });
+
+  it('surfaces a clear error when Bun is unavailable for runtime bootstrap', () => {
+    const missingBun = Object.assign(new Error('bun not found'), { code: 'ENOENT' }) as NodeJS.ErrnoException;
+
+    expect(() =>
+      ensureBunRuntime(['service', 'run'], {
+        bunGlobal: undefined,
+        cliPath: '/repo/apps/backend/dist/cli.js',
+        spawnSyncFn: () => ({ error: missingBun, status: null }),
+      }),
+    ).toThrow("requires Bun, but 'bun' was not found in PATH");
   });
 });

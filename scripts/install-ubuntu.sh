@@ -10,7 +10,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 backend_entry="$repo_root/apps/backend/dist/cli.js"
-node_binary="${NODE_BINARY:-}"
+bun_binary="${BUN_BINARY:-}"
 install_dir="${HOME}/.local/bin"
 systemd_dir="${HOME}/.config/systemd/user"
 wrapper_path="${install_dir}/agent-bar"
@@ -114,6 +114,22 @@ else
   fi
 fi
 
+# --- Bun ---
+if command -v bun >/dev/null 2>&1; then
+  bun_ver="$(bun --version 2>/dev/null || echo "?")"
+  step_ok "Bun encontrado: $bun_ver"
+else
+  step_warn "Bun nao encontrado (necessario para executar o agent-bar)."
+  if confirm_install "Instalar Bun?"; then
+    curl -fsSL https://bun.sh/install | bash
+    export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+    export PATH="$BUN_INSTALL/bin:$PATH"
+    step_ok "Bun instalado: $(bun --version 2>/dev/null || echo "ok")"
+  else
+    step_warn "Bun pulado — a instalacao provavelmente falhara."
+  fi
+fi
+
 # --- libsecret-tools ---
 if command -v secret-tool >/dev/null 2>&1; then
   step_ok "libsecret-tools encontrado."
@@ -164,17 +180,17 @@ echo "  Build & Install"
 echo "=========================================="
 echo ""
 
-# Resolve node binary
-if [[ -z "${node_binary}" ]]; then
-  node_binary="$(command -v node || true)"
+# Resolve bun binary
+if [[ -z "${bun_binary}" ]]; then
+  bun_binary="$(command -v bun || true)"
 fi
 
-if [[ -z "${node_binary}" ]]; then
-  step_fail "node e necessario para executar o agent-bar."
+if [[ -z "${bun_binary}" ]]; then
+  step_fail "bun e necessario para executar o agent-bar."
   exit 1
 fi
 
-step_ok "Usando node: $node_binary"
+step_ok "Usando bun: $bun_binary"
 
 # Build backend
 echo "Compilando backend..."
@@ -193,7 +209,7 @@ mkdir -p "$install_dir" "$systemd_dir"
 cat > "$wrapper_path" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-exec "$node_binary" "$backend_entry" "\$@"
+exec "$bun_binary" "$backend_entry" "\$@"
 EOF
 chmod +x "$wrapper_path"
 step_ok "Wrapper CLI instalado em $wrapper_path"
