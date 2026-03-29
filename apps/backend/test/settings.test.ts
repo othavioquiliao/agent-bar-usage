@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdtempSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -6,10 +6,9 @@ import { tmpdir } from "node:os";
 /**
  * Settings module tests — verifies normalizeSettings, loadSettings,
  * loadSettingsSync, and saveSettings with atomic writes and migration support.
+ *
+ * Uses bun:test because settings.ts relies on Bun.file and Bun.write APIs.
  */
-
-// We must mock getInstallPaths before importing settings, so the settings module
-// resolves paths to our temp directory instead of the real XDG paths.
 
 let tempDir: string;
 
@@ -35,10 +34,14 @@ function mockPaths(dir: string) {
 }
 
 // Mock the paths module so settings.ts uses our temp directory
-vi.mock("../src/lifecycle/paths.js", () => ({
+mock.module("../src/lifecycle/paths.js", () => ({
   APP_NAME: "agent-bar",
   getInstallPaths: () => mockPaths(tempDir),
 }));
+
+// Import after mocking
+import { normalizeSettings, loadSettings, loadSettingsSync, saveSettings } from "../src/settings/settings.js";
+import { DEFAULT_SETTINGS, CURRENT_VERSION } from "../src/settings/settings-schema.js";
 
 describe("settings", () => {
   beforeEach(() => {
@@ -50,24 +53,18 @@ describe("settings", () => {
   });
 
   describe("normalizeSettings", () => {
-    it("returns DEFAULT_SETTINGS when given undefined", async () => {
-      const { normalizeSettings, DEFAULT_SETTINGS } = await import("../src/settings/settings-schema.js");
-      const { normalizeSettings: normalize } = await import("../src/settings/settings.js");
-      const result = normalize(undefined);
+    it("returns DEFAULT_SETTINGS when given undefined", () => {
+      const result = normalizeSettings(undefined);
       expect(result).toEqual(DEFAULT_SETTINGS);
       expect(result.version).toBe(1);
     });
 
-    it("fills missing fields with defaults when given partial data", async () => {
-      const { normalizeSettings } = await import("../src/settings/settings.js");
-      const { CURRENT_VERSION } = await import("../src/settings/settings-schema.js");
+    it("fills missing fields with defaults when given partial data", () => {
       const result = normalizeSettings({ version: 1 });
       expect(result.version).toBe(CURRENT_VERSION);
     });
 
-    it("calls migrateSettings and returns current version when version < CURRENT_VERSION", async () => {
-      const { normalizeSettings } = await import("../src/settings/settings.js");
-      const { CURRENT_VERSION } = await import("../src/settings/settings-schema.js");
+    it("calls migrateSettings and returns current version when version < CURRENT_VERSION", () => {
       const result = normalizeSettings({ version: 0, extraField: "x" } as any);
       expect(result.version).toBe(CURRENT_VERSION);
     });
@@ -75,8 +72,6 @@ describe("settings", () => {
 
   describe("loadSettings", () => {
     it("returns defaults when file does not exist", async () => {
-      const { loadSettings } = await import("../src/settings/settings.js");
-      const { DEFAULT_SETTINGS } = await import("../src/settings/settings-schema.js");
       const result = await loadSettings();
       expect(result).toEqual(DEFAULT_SETTINGS);
     });
@@ -84,8 +79,6 @@ describe("settings", () => {
 
   describe("saveSettings", () => {
     it("writes JSON to temp file then renames (atomic write)", async () => {
-      const { saveSettings } = await import("../src/settings/settings.js");
-      const { DEFAULT_SETTINGS } = await import("../src/settings/settings-schema.js");
       await saveSettings(DEFAULT_SETTINGS);
 
       const settingsPath = join(tempDir, "agent-bar", "settings.json");
@@ -103,9 +96,6 @@ describe("settings", () => {
 
   describe("round-trip", () => {
     it("loadSettings round-trips through saveSettings correctly", async () => {
-      const { loadSettings, saveSettings } = await import("../src/settings/settings.js");
-      const { DEFAULT_SETTINGS } = await import("../src/settings/settings-schema.js");
-
       await saveSettings(DEFAULT_SETTINGS);
       const loaded = await loadSettings();
       expect(loaded).toEqual(DEFAULT_SETTINGS);
@@ -113,14 +103,9 @@ describe("settings", () => {
   });
 
   describe("loadSettingsSync", () => {
-    it("returns defaults when file does not exist", async () => {
-      const { loadSettingsSync } = await import("../src/settings/settings.js");
-      const { DEFAULT_SETTINGS } = await import("../src/settings/settings-schema.js");
+    it("returns defaults when file does not exist", () => {
       const result = loadSettingsSync();
       expect(result).toEqual(DEFAULT_SETTINGS);
     });
   });
 });
-
-// Import beforeEach at the top level
-import { beforeEach } from "vitest";
