@@ -23,9 +23,9 @@ Requirements for the refactor & polish milestone. Each maps to roadmap phases.
 ### Lifecycle Commands
 
 - [x] **LIFE-01**: `agent-bar setup` installs CLI symlink, systemd service, GNOME extension via TypeScript with @clack/prompts
-- [ ] **LIFE-02**: `agent-bar remove` removes all installed files but explicitly preserves GNOME Keyring secrets
+- [x] **LIFE-02**: `agent-bar remove` removes all installed files but explicitly preserves GNOME Keyring secrets
 - [x] **LIFE-03**: `agent-bar update` pulls latest code, rebuilds, restarts systemd service, re-copies GNOME extension (highest priority)
-- [ ] **LIFE-04**: `agent-bar uninstall` removes everything including GNOME Keyring secrets with explicit confirmation
+- [x] **LIFE-04**: `agent-bar uninstall` removes everything including GNOME Keyring secrets with explicit confirmation
 
 ### Provider Independence
 
@@ -103,9 +103,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLI-02 | Phase 10 | Pending |
 | CLI-03 | Phase 10 | Pending |
 | LIFE-01 | Phase 9 | Complete |
-| LIFE-02 | Phase 9 | Pending |
+| LIFE-02 | Phase 9 | Complete |
 | LIFE-03 | Phase 9 | Complete |
-| LIFE-04 | Phase 9 | Pending |
+| LIFE-04 | Phase 9 | Complete |
 | PROV-01 | Phase 11 | Pending |
 | PROV-02 | Phase 11 | Pending |
 | PROV-03 | Phase 11 | Pending |

@@ -73,7 +73,7 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md -- Foundation: @clack/prompts install, lifecycle paths, dependency check, versioned settings module
 - [x] 09-02-PLAN.md -- Setup + Update commands: interactive install and update flows with @clack/prompts
-- [ ] 09-03-PLAN.md -- Remove + Uninstall + CLI wiring: destructive commands and Commander registration
+- [x] 09-03-PLAN.md -- Remove + Uninstall + CLI wiring: destructive commands and Commander registration
 
 ### Phase 10: CLI Overhaul
 **Goal**: CLI routes commands through manual argument parsing with helpful error messages and the codebase uses Biome for consistent formatting and linting

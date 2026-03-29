@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Refactor & Polish
-status: Ready to execute
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-03-29T00:30:43.301Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-03-29T00:31:36.753Z"
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -55,6 +55,7 @@ Plan: 3 of 3
 | Phase 08 P03 | 9min | 2 tasks | 4 files |
 | Phase 09 P01 | 4min | 2 tasks | 8 files |
 | Phase 09 P02 | 3min | 2 tasks | 2 files |
+| Phase 09-lifecycle-commands P03 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase 09]: Settings spread order: { ...data, version: CURRENT_VERSION } ensures version override after migration
 - [Phase 09]: Used writeFileSync with mode 0o755 for CLI wrapper -- atomic and simpler than separate chmod
 - [Phase 09]: runGit helper returns {ok, output} instead of throwing -- matches omarchy pattern for lifecycle commands
+- [Phase 09-lifecycle-commands]: initialValue:false for uninstall confirmation -- prevents accidental full data loss
+- [Phase 09-lifecycle-commands]: remove.ts is thin wrapper: force:true, preserveSecrets:true, preserveSettings:true
 
 ### Pending Todos
 
@@ -99,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-29T00:30:43.299Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-03-29T00:31:36.751Z
+Stopped at: Completed 09-03-PLAN.md
 Resume file: None
