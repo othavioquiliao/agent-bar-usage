@@ -72,7 +72,7 @@ Plans:
 **Plans:** 3 plans
 Plans:
 - [x] 09-01-PLAN.md -- Foundation: @clack/prompts install, lifecycle paths, dependency check, versioned settings module
-- [ ] 09-02-PLAN.md -- Setup + Update commands: interactive install and update flows with @clack/prompts
+- [x] 09-02-PLAN.md -- Setup + Update commands: interactive install and update flows with @clack/prompts
 - [ ] 09-03-PLAN.md -- Remove + Uninstall + CLI wiring: destructive commands and Commander registration
 
 ### Phase 10: CLI Overhaul
