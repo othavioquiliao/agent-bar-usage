@@ -69,7 +69,11 @@ Plans:
   3. Running `agent-bar update` pulls latest code, rebuilds, and restarts the systemd service without manual intervention
   4. Running `agent-bar uninstall` removes everything including secrets after explicit user confirmation
   5. Settings file includes a version field and migrates automatically when the schema changes across updates
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 09-01-PLAN.md -- Foundation: @clack/prompts install, lifecycle paths, dependency check, versioned settings module
+- [ ] 09-02-PLAN.md -- Setup + Update commands: interactive install and update flows with @clack/prompts
+- [ ] 09-03-PLAN.md -- Remove + Uninstall + CLI wiring: destructive commands and Commander registration
 
 ### Phase 10: CLI Overhaul
 **Goal**: CLI routes commands through manual argument parsing with helpful error messages and the codebase uses Biome for consistent formatting and linting
@@ -122,7 +126,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11 -> 12
 | 6. Provider Reliability | v1.1 | 2/2 | Complete | 2026-03-26 |
 | 7. GNOME Extension UI Redesign | v1.1 | 3/3 | Complete | 2026-03-26 |
 | 8. Bun Runtime Migration | v2.0 | 0/3 | Not started | - |
-| 9. Lifecycle Commands | v2.0 | 0/TBD | Not started | - |
+| 9. Lifecycle Commands | v2.0 | 0/3 | Not started | - |
 | 10. CLI Overhaul | v2.0 | 0/TBD | Not started | - |
 | 11. Provider Independence & Data | v2.0 | 0/TBD | Not started | - |
 | 12. Terminal UI & Code Quality | v2.0 | 0/TBD | Not started | - |
