@@ -2,7 +2,10 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readClaudeCredentials } from '../../../src/providers/claude/claude-credentials.js';
+import {
+  readClaudeCredentials,
+  resolveClaudeConnectedAccount,
+} from '../../../src/providers/claude/claude-credentials.js';
 
 describe('readClaudeCredentials', () => {
   it('returns null when file does not exist', async () => {
@@ -16,12 +19,19 @@ describe('readClaudeCredentials', () => {
     await writeFile(
       path,
       JSON.stringify({
-        claudeAiOauth: { accessToken: 'sk-ant-test-123', expiresAt: '2026-12-31T00:00:00Z' },
+        claudeAiOauth: {
+          accessToken: 'sk-ant-test-123',
+          expiresAt: '2026-12-31T00:00:00Z',
+          email: 'jane@example.com',
+        },
       }),
     );
 
     const result = await readClaudeCredentials(path);
     expect(result).toEqual({ accessToken: 'sk-ant-test-123', expiresAt: '2026-12-31T00:00:00Z' });
+
+    const account = await resolveClaudeConnectedAccount(path);
+    expect(account).toEqual({ status: 'connected', label: 'jane@example.com' });
 
     await rm(dir, { recursive: true });
   });
@@ -76,6 +86,22 @@ describe('readClaudeCredentials', () => {
 
     const result = await readClaudeCredentials(path);
     expect(result).toEqual({ accessToken: 'sk-valid-token', expiresAt: null });
+
+    await rm(dir, { recursive: true });
+  });
+
+  it('returns connected without label when credentials exist but no identifier is available', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'claude-creds-'));
+    const path = join(dir, '.credentials.json');
+    await writeFile(
+      path,
+      JSON.stringify({
+        claudeAiOauth: { accessToken: 'sk-valid-token', expiresAt: null },
+      }),
+    );
+
+    const result = await resolveClaudeConnectedAccount(path);
+    expect(result).toEqual({ status: 'connected' });
 
     await rm(dir, { recursive: true });
   });

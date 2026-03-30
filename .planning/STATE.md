@@ -4,7 +4,7 @@ milestone: v2.0
 milestone_name: Refactor & Polish
 status: Ready for next milestone
 stopped_at: Completed v2.0 milestone archive
-last_updated: "2026-03-29T15:41:27Z"
+last_updated: "2026-03-29T21:38:30Z"
 progress:
   total_phases: 5
   completed_phases: 5
@@ -110,9 +110,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260327-glx | Restore GitHub Device Flow robustness and provider source/fallback contracts | 2026-03-27 | ea661b2 | [260327-glx-fix-regressions-after-install-ux-overhau](./quick/260327-glx-fix-regressions-after-install-ux-overhau/) |
+| 260329-paa | Refresh provider rows with connected account, usage bar, and reset info | 2026-03-29 | -- | [260329-paa-refresh-provider-rows-with-connected-acc](./quick/260329-paa-refresh-provider-rows-with-connected-acc/) |
 
 ## Session Continuity
 
-Last session: 2026-03-29T15:41:27Z
-Stopped at: Completed v2.0 milestone archive
+Last session: 2026-03-29T21:38:30Z
+Stopped at: Quick task 260329-paa completed
 Resume file: None

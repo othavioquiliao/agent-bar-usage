@@ -122,6 +122,27 @@
   background-color: rgba(40, 44, 52, 0.82);
 }
 
+.agent-bar-ubuntu-provider-row__content {
+  spacing: 4px;
+}
+
+.agent-bar-ubuntu-provider-row__header {
+  color: #e6edf3;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agent-bar-ubuntu-provider-row__usage {
+  color: #d7dae0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.agent-bar-ubuntu-provider-row__meta {
+  color: #9da5b4;
+  font-size: 11px;
+}
+
 .agent-bar-ubuntu-provider-row--codex {
   border-left: 3px solid #61afef;
 }
@@ -144,6 +165,43 @@
 
 .agent-bar-ubuntu-provider-row--unavailable {
   background-color: rgba(127, 132, 142, 0.08);
+}
+
+.agent-bar-ubuntu-progress {
+  height: 6px;
+  margin: 2px 0 1px;
+  border-radius: 999px;
+  background-color: rgba(171, 178, 191, 0.12);
+}
+
+.agent-bar-ubuntu-progress-fill {
+  border-radius: 999px;
+  background-color: rgba(171, 178, 191, 0.48);
+}
+
+.agent-bar-ubuntu-progress-fill--codex {
+  background-color: #61afef;
+}
+
+.agent-bar-ubuntu-progress-fill--claude {
+  background-color: #e5c07b;
+}
+
+.agent-bar-ubuntu-progress-fill--copilot {
+  background-color: #98c379;
+}
+
+.agent-bar-ubuntu-progress-fill--error {
+  background-color: #e06c75;
+}
+
+.agent-bar-ubuntu-progress-fill--degraded {
+  background-color: #e5c07b;
+}
+
+.agent-bar-ubuntu-progress-fill--unavailable,
+.agent-bar-ubuntu-progress-fill--unknown {
+  background-color: #7f848e;
 }
 
 .agent-bar-ubuntu-footer-item {

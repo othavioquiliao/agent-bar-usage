@@ -14,6 +14,10 @@ describe('provider view models', () => {
         status: 'ok',
         source: 'cli',
         updated_at: '2026-03-25T17:05:00.000Z',
+        connected_account: {
+          status: 'connected',
+          label: 'jane@example.com',
+        },
         usage: {
           kind: 'quota',
           used: 10,
@@ -34,12 +38,16 @@ describe('provider view models', () => {
     expect(row).toMatchObject({
       title: 'Codex',
       statusText: 'Healthy',
+      accountText: 'Account: jane@example.com',
       usageText: 'Usage: 10 / 100 (10%)',
+      quotaText: 'Usage: 10 / 100 (10%)',
       usagePercentText: '10%',
+      progressPercent: 10,
+      progressVisible: true,
       sourceText: 'Source: cli',
       errorText: null,
     });
-    expect(row.resetText).toMatch(/Reset: .*?(in |tomorrow|today|yesterday|ago|há |daqui a|amanhã|ontem)/i);
+    expect(row.resetText).toMatch(/Reset: .*?(in |tomorrow|today|yesterday|ago|há |daqui a|amanhã|ontem).*2026/i);
     expect(row.updatedAtText).toMatch(/Updated .*(5 minutes ago|há 5 minutos|5 min)/i);
   });
 
@@ -50,6 +58,9 @@ describe('provider view models', () => {
         status: 'error',
         source: 'cli',
         updated_at: '2026-03-25T17:02:00.000Z',
+        connected_account: {
+          status: 'missing',
+        },
         usage: null,
         reset_window: null,
         error: {
@@ -66,8 +77,13 @@ describe('provider view models', () => {
     expect(row).toMatchObject({
       title: 'Claude',
       statusText: 'Error',
-      usageText: 'Usage unavailable',
+      accountText: 'Account: Not connected',
+      usageText: 'Usage: Unavailable',
       usagePercentText: '--%',
+      quotaText: 'Usage: Unavailable',
+      progressPercent: null,
+      progressVisible: false,
+      resetText: 'Reset: Unavailable',
       errorText: 'adapter exploded',
       sourceText: 'Source: cli',
       diagnosticsSummaryText: 'Diagnostics: adapter exploded',
@@ -188,8 +204,10 @@ describe('provider view models', () => {
     expect(row).toMatchObject({
       title: 'Copilot',
       statusText: 'Unavailable',
-      usageText: 'Usage unavailable',
+      accountText: 'Account: Unavailable',
+      usageText: 'Usage: Unavailable',
       usagePercentText: '--%',
+      resetText: 'Reset: Unavailable',
       errorText: null,
     });
   });

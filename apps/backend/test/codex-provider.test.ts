@@ -12,9 +12,19 @@ vi.mock('../src/providers/codex/codex-appserver-fetcher.js', () => ({
   fetchCodexUsageViaAppServer: fetchCodexUsageViaAppServerMock,
 }));
 
+const { resolveCodexConnectedAccountMock } = vi.hoisted(() => ({
+  resolveCodexConnectedAccountMock: vi.fn(),
+}));
+
+vi.mock('../src/providers/codex/codex-credentials.js', () => ({
+  resolveCodexConnectedAccount: resolveCodexConnectedAccountMock,
+}));
+
 describe('Codex CLI provider', () => {
   beforeEach(() => {
     fetchCodexUsageViaAppServerMock.mockReset();
+    resolveCodexConnectedAccountMock.mockReset();
+    resolveCodexConnectedAccountMock.mockResolvedValue({ status: 'connected' });
     fetchCodexUsageViaAppServerMock.mockResolvedValue({
       provider: 'codex',
       status: 'error',
@@ -46,6 +56,7 @@ describe('Codex CLI provider', () => {
 
     expect(snapshot.status).toBe('ok');
     expect(snapshot.usage?.percent_used).toBe(18);
+    expect(snapshot.connected_account).toEqual({ status: 'connected' });
     expect(fetchCodexUsageViaAppServerMock).toHaveBeenCalledTimes(1);
   });
 

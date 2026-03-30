@@ -1,41 +1,20 @@
-function chooseSecondaryText(viewModel = {}) {
-  const candidates = [viewModel.resetText, viewModel.issueSummaryText, viewModel.secondaryText, viewModel.metadataText];
-
-  for (const candidate of candidates) {
-    if (typeof candidate !== 'string') {
-      continue;
-    }
-
-    const trimmed = candidate.trim();
-    if (!trimmed) {
-      continue;
-    }
-
-    if (/^Suggested command:/i.test(trimmed)) {
-      continue;
-    }
-
-    if (/^(Source:|Updated\b)/i.test(trimmed)) {
-      continue;
-    }
-
-    return trimmed;
-  }
-
-  return null;
-}
-
 export function buildProviderRowLayoutModel(viewModel = {}) {
   const quotaLine =
     typeof viewModel.quotaText === 'string' && viewModel.quotaText.trim()
       ? viewModel.quotaText.trim()
       : typeof viewModel.usageText === 'string' && viewModel.usageText.trim()
         ? viewModel.usageText.trim()
-        : null;
+        : 'Usage: Unavailable';
+  const accountText =
+    typeof viewModel.accountText === 'string' && viewModel.accountText.trim()
+      ? viewModel.accountText.trim()
+      : 'Account: Unavailable';
+  const resetText =
+    typeof viewModel.resetText === 'string' && viewModel.resetText.trim() ? viewModel.resetText.trim() : 'Reset: Unavailable';
   const progressPercent = Number.isFinite(viewModel.progressPercent)
     ? Math.max(0, Math.min(100, Math.round(viewModel.progressPercent)))
     : null;
-  const showProgressBar = Boolean(viewModel.progressVisible && quotaLine && progressPercent !== null);
+  const showProgressBar = Boolean(viewModel.progressVisible && progressPercent !== null);
   const providerKey = String(viewModel.iconKey ?? viewModel.providerId ?? '')
     .trim()
     .toLowerCase();
@@ -50,13 +29,13 @@ export function buildProviderRowLayoutModel(viewModel = {}) {
     title: viewModel.title ?? 'Provider',
     status: viewModel.status ?? 'unknown',
     statusText: viewModel.statusText ?? 'Unknown',
-    statusIconName: viewModel.statusIconName ?? 'dialog-information-symbolic',
-    iconKey: providerKey || null,
+    headerText: `${viewModel.title ?? 'Provider'} · ${viewModel.statusText ?? 'Unknown'}`,
+    accountText,
     quotaLine,
+    resetText,
     progressPercent,
     showProgressBar,
     showProgressFill: showProgressBar && progressPercent > 0,
-    secondaryText: chooseSecondaryText(viewModel),
     accentClass,
   };
 }

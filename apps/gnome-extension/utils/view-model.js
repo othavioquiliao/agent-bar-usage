@@ -1,4 +1,4 @@
-import { formatLastUpdatedText, formatRelativeTimestamp, formatTimestampLabel } from './time.js';
+import { formatAbsoluteTimestamp, formatLastUpdatedText, formatRelativeTimestamp, formatTimestampLabel } from './time.js';
 
 const INDICATOR_PROVIDER_META = {
   codex: {
@@ -37,7 +37,7 @@ function formatStatusText(status) {
 
 function formatUsageText(usage) {
   if (!usage || usage.kind !== 'quota') {
-    return 'Usage unavailable';
+    return 'Usage: Unavailable';
   }
 
   const used = usage.used ?? '?';
@@ -61,27 +61,56 @@ function formatUsagePercentText(usage) {
   return `${Math.round(percent)}%`;
 }
 
-function isRelativeResetLabel(label) {
-  return /^(?:resets?\b|today\b|tomorrow\b|yesterday\b|soon\b|in\b)/i.test(String(label ?? '').trim());
+function isMissingAccountError(code) {
+  return ['copilot_token_missing', 'copilot_auth_failed', 'claude_auth_expired', 'claude_cli_missing'].includes(
+    String(code ?? ''),
+  );
+}
+
+function formatConnectedAccountText(providerSnapshot) {
+  const connectedAccount = providerSnapshot?.connected_account ?? null;
+
+  if (connectedAccount?.status === 'connected') {
+    const label =
+      typeof connectedAccount.label === 'string' && connectedAccount.label.trim().length > 0
+        ? connectedAccount.label.trim()
+        : 'Connected';
+    return `Account: ${label}`;
+  }
+
+  if (connectedAccount?.status === 'missing' || isMissingAccountError(providerSnapshot?.error?.code)) {
+    return 'Account: Not connected';
+  }
+
+  if (providerSnapshot?.status === 'ok' || providerSnapshot?.status === 'degraded') {
+    return 'Account: Connected';
+  }
+
+  return 'Account: Unavailable';
 }
 
 function formatResetWindowText(resetWindow, { now = new Date() } = {}) {
   if (!resetWindow) {
-    return null;
+    return 'Reset: Unavailable';
   }
 
   const relative = formatRelativeTimestamp(resetWindow.resets_at, now);
-  const label = String(resetWindow.label ?? '').trim();
+  const absolute = formatAbsoluteTimestamp(resetWindow.resets_at);
 
-  if (!relative) {
-    return label ? `Reset: ${label}` : null;
+  if (relative && absolute) {
+    return `Reset: ${relative} · ${absolute}`;
   }
 
-  if (!label || isRelativeResetLabel(label)) {
+  if (relative) {
     return `Reset: ${relative}`;
   }
 
-  return `Reset: ${label} · ${relative}`;
+  if (absolute) {
+    return `Reset: ${absolute}`;
+  }
+
+  const label = String(resetWindow.label ?? '').trim();
+  return label ? `Reset: ${label}` : 'Reset: Unavailable';
 }
 
 function formatDiagnosticsSummary(providerSnapshot) {
@@ -150,6 +179,7 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
   const statusText = formatStatusText(status);
   const usageText = formatUsageText(providerSnapshot?.usage ?? null);
   const usagePercentText = formatUsagePercentText(providerSnapshot?.usage ?? null);
+  const accountText = formatConnectedAccountText(providerSnapshot);
   const resetText = formatResetWindowText(providerSnapshot?.reset_window ?? null, { now });
   const updatedAtText = providerSnapshot?.updated_at
     ? formatTimestampLabel(providerSnapshot.updated_at, { prefix: 'Updated', now })
@@ -164,8 +194,15 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
     title,
     status,
     statusText,
+    accountText,
     usageText,
+    quotaText: usageText,
     usagePercentText,
+    progressPercent:
+      typeof providerSnapshot?.usage?.percent_used === 'number' && Number.isFinite(providerSnapshot.usage.percent_used)
+        ? Math.round(providerSnapshot.usage.percent_used)
+        : null,
+    progressVisible: providerSnapshot?.usage?.kind === 'quota',
     resetText,
     updatedAtText,
     errorText,

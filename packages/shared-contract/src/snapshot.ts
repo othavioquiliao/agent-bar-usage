@@ -23,6 +23,14 @@ export interface ResetWindow {
   label: string;
 }
 
+export const CONNECTED_ACCOUNT_STATUSES = ['connected', 'missing'] as const;
+export type ConnectedAccountStatus = (typeof CONNECTED_ACCOUNT_STATUSES)[number];
+
+export interface ConnectedAccount {
+  status: ConnectedAccountStatus;
+  label?: string | null;
+}
+
 export interface ProviderAttempt {
   strategy: string;
   available: boolean;
@@ -39,6 +47,7 @@ export interface ProviderSnapshot {
   status: ProviderStatus;
   source: ProviderSourceMode;
   updated_at: string;
+  connected_account?: ConnectedAccount | null;
   usage?: UsageSnapshot | null;
   reset_window?: ResetWindow | null;
   error: ProviderError | null;
@@ -52,6 +61,7 @@ export interface SnapshotEnvelope {
 }
 
 const PROVIDER_STATUS_SET = new Set<string>(PROVIDER_STATUSES);
+const CONNECTED_ACCOUNT_STATUS_SET = new Set<string>(CONNECTED_ACCOUNT_STATUSES);
 const ISO_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function assertRecord(value: unknown, label: string): asserts value is Record<string, unknown> {
@@ -111,6 +121,28 @@ export function assertProviderError(value: unknown, label = 'error'): ProviderEr
     message: assertNonEmptyString(value.message, `${label}.message`),
     retryable: value.retryable,
   };
+}
+
+export function assertConnectedAccountStatus(value: unknown, label = 'connected_account.status'): ConnectedAccountStatus {
+  if (typeof value !== 'string' || !CONNECTED_ACCOUNT_STATUS_SET.has(value)) {
+    throw new TypeError(`${label} must be one of: ${CONNECTED_ACCOUNT_STATUSES.join(', ')}.`);
+  }
+  return value as ConnectedAccountStatus;
+}
+
+function assertConnectedAccount(value: unknown, label = 'connected_account'): ConnectedAccount {
+  assertRecord(value, label);
+  assertNoExtraKeys(value, ['status', 'label'], label);
+
+  const connectedAccount: ConnectedAccount = {
+    status: assertConnectedAccountStatus(value.status, `${label}.status`),
+  };
+
+  if (value.label !== undefined) {
+    connectedAccount.label = value.label === null ? null : assertNonEmptyString(value.label, `${label}.label`);
+  }
+
+  return connectedAccount;
 }
 
 function assertUsageSnapshot(value: unknown, label = 'usage'): UsageSnapshot {
@@ -185,7 +217,7 @@ export function assertProviderSnapshot(value: unknown, label = 'provider'): Prov
   assertRecord(value, label);
   assertNoExtraKeys(
     value,
-    ['provider', 'status', 'source', 'updated_at', 'usage', 'reset_window', 'error', 'diagnostics'],
+    ['provider', 'status', 'source', 'updated_at', 'connected_account', 'usage', 'reset_window', 'error', 'diagnostics'],
     label,
   );
 
@@ -198,6 +230,14 @@ export function assertProviderSnapshot(value: unknown, label = 'provider'): Prov
     status: assertProviderStatus(value.status, `${label}.status`),
     source: assertProviderSourceMode(value.source, `${label}.source`),
     updated_at: assertIsoDatetime(value.updated_at, `${label}.updated_at`),
+    ...(value.connected_account !== undefined
+      ? {
+          connected_account:
+            value.connected_account === null
+              ? null
+              : assertConnectedAccount(value.connected_account, `${label}.connected_account`),
+        }
+      : {}),
     ...(value.usage !== undefined
       ? { usage: value.usage === null ? null : assertUsageSnapshot(value.usage, `${label}.usage`) }
       : {}),

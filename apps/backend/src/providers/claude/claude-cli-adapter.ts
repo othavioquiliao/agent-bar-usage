@@ -1,7 +1,14 @@
+import type { ProviderSnapshot } from 'shared-contract';
+
 import type { ProviderAdapter, ProviderAdapterContext } from '../../core/provider-adapter.js';
-import { createErrorSnapshot, createProviderError, createUnavailableSnapshot } from '../../core/provider-adapter.js';
+import {
+  createConnectedAccount,
+  createErrorSnapshot,
+  createProviderError,
+  createUnavailableSnapshot,
+} from '../../core/provider-adapter.js';
 import { fetchClaudeUsageViaApi } from './claude-api-fetcher.js';
-import { readClaudeCredentials } from './claude-credentials.js';
+import { readClaudeCredentials, resolveClaudeConnectedAccount } from './claude-credentials.js';
 
 export function createClaudeCliAdapter(): ProviderAdapter {
   return {
@@ -14,15 +21,17 @@ export function createClaudeCliAdapter(): ProviderAdapter {
     },
     async getQuota(context: ProviderAdapterContext) {
       if (context.sourceMode === 'api' || context.sourceMode === 'auto') {
+        const connectedAccount = await resolveClaudeConnectedAccount();
         const credentials = context.sourceMode === 'auto' ? await readClaudeCredentials() : undefined;
-
-        return await fetchClaudeUsageViaApi(
+        const snapshot = await fetchClaudeUsageViaApi(
           context.sourceMode === 'auto'
             ? {
                 credentials,
               }
             : {},
         );
+
+        return withConnectedAccount(snapshot, connectedAccount);
       }
 
       if (context.sourceMode === 'cli') {
@@ -40,5 +49,20 @@ export function createClaudeCliAdapter(): ProviderAdapter {
 
       return createUnavailableSnapshot(context.providerId, context.sourceMode, context.now().toISOString());
     },
+  };
+}
+
+function withConnectedAccount(snapshot: ProviderSnapshot, connectedAccount: NonNullable<ProviderSnapshot['connected_account']>) {
+  const errorCode = snapshot.error?.code ?? null;
+  if (errorCode === 'claude_auth_expired' || errorCode === 'claude_cli_missing') {
+    return {
+      ...snapshot,
+      connected_account: createConnectedAccount('missing'),
+    };
+  }
+
+  return {
+    ...snapshot,
+    connected_account: connectedAccount,
   };
 }

@@ -4,13 +4,15 @@ import { normalizeBackendRequest } from '../src/config/backend-request.js';
 import type { ProviderAdapterContext } from '../src/core/provider-adapter.js';
 import { createClaudeCliAdapter } from '../src/providers/claude/claude-cli-adapter.js';
 
-const { readClaudeCredentialsMock, fetchClaudeUsageViaApiMock } = vi.hoisted(() => ({
+const { readClaudeCredentialsMock, resolveClaudeConnectedAccountMock, fetchClaudeUsageViaApiMock } = vi.hoisted(() => ({
   readClaudeCredentialsMock: vi.fn(),
+  resolveClaudeConnectedAccountMock: vi.fn(),
   fetchClaudeUsageViaApiMock: vi.fn(),
 }));
 
 vi.mock('../src/providers/claude/claude-credentials.js', () => ({
   readClaudeCredentials: readClaudeCredentialsMock,
+  resolveClaudeConnectedAccount: resolveClaudeConnectedAccountMock,
 }));
 
 vi.mock('../src/providers/claude/claude-api-fetcher.js', () => ({
@@ -20,8 +22,10 @@ vi.mock('../src/providers/claude/claude-api-fetcher.js', () => ({
 describe('Claude CLI provider', () => {
   beforeEach(() => {
     readClaudeCredentialsMock.mockReset();
+    resolveClaudeConnectedAccountMock.mockReset();
     fetchClaudeUsageViaApiMock.mockReset();
     readClaudeCredentialsMock.mockResolvedValue(null);
+    resolveClaudeConnectedAccountMock.mockResolvedValue({ status: 'missing' });
   });
 
   afterAll(() => {
@@ -45,12 +49,14 @@ describe('Claude CLI provider', () => {
 
     expect(snapshot.status).toBe('error');
     expect(snapshot.error?.code).toBe('claude_cli_missing');
+    expect(snapshot.connected_account).toEqual({ status: 'missing' });
     expect(fetchClaudeUsageViaApiMock).toHaveBeenCalledWith({ credentials: null });
   });
 
   it('calls API with credentials when available in auto mode', async () => {
     const creds = { accessToken: 'sk-ant-test', expiresAt: null };
     readClaudeCredentialsMock.mockResolvedValue(creds);
+    resolveClaudeConnectedAccountMock.mockResolvedValue({ status: 'connected', label: 'jane@example.com' });
     fetchClaudeUsageViaApiMock.mockResolvedValue({
       provider: 'claude',
       status: 'ok',
@@ -67,6 +73,7 @@ describe('Claude CLI provider', () => {
     expect(snapshot.status).toBe('ok');
     expect(snapshot.source).toBe('api');
     expect(snapshot.usage?.percent_used).toBe(22);
+    expect(snapshot.connected_account).toEqual({ status: 'connected', label: 'jane@example.com' });
     expect(fetchClaudeUsageViaApiMock).toHaveBeenCalledWith({ credentials: creds });
   });
 

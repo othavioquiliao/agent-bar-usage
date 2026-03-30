@@ -1,6 +1,7 @@
-import type { ProviderSnapshot, ProviderSourceMode, ResetWindow, UsageSnapshot } from 'shared-contract';
+import type { ConnectedAccount, ProviderSnapshot, ProviderSourceMode, ResetWindow, UsageSnapshot } from 'shared-contract';
 
 import {
+  createConnectedAccount,
   createProviderError,
   createUnavailableSnapshot,
   type ProviderAdapterContext,
@@ -28,8 +29,10 @@ interface CopilotQuotaSnapshot {
 }
 
 interface CopilotUsageResponse {
+  user?: Record<string, unknown> | null;
   quotaSnapshots?: Record<string, CopilotQuotaSnapshot | null | undefined>;
   quota_snapshots?: Record<string, CopilotQuotaSnapshot | null | undefined>;
+  [key: string]: unknown;
 }
 
 export async function fetchCopilotUsage(context: ProviderAdapterContext): Promise<ProviderSnapshot> {
@@ -61,6 +64,7 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
       startedAt,
       'copilot.api',
       false,
+      createConnectedAccount('missing'),
     );
   }
 
@@ -80,6 +84,7 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
         startedAt,
         'copilot.api',
         true,
+        createConnectedAccount('missing'),
       );
     }
 
@@ -94,6 +99,7 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
         startedAt,
         'copilot.api',
         true,
+        createConnectedAccount('connected'),
       );
     }
 
@@ -112,14 +118,18 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
         startedAt,
         'copilot.api',
         true,
+        createConnectedAccount('connected'),
       );
     }
+
+    const connectedAccount = resolveCopilotConnectedAccount(payload);
 
     return {
       provider: context.providerId,
       status: 'ok',
       source,
       updated_at: updatedAt,
+      connected_account: connectedAccount,
       usage: mapped.usage,
       reset_window: mapped.resetWindow,
       error: null,
@@ -145,6 +155,7 @@ export async function fetchCopilotUsage(context: ProviderAdapterContext): Promis
       startedAt,
       'copilot.api',
       true,
+      createConnectedAccount('connected'),
     );
   }
 }
@@ -191,6 +202,29 @@ function tryParseJson(text: string): unknown {
   } catch {
     return null;
   }
+}
+
+function resolveCopilotConnectedAccount(payload: unknown): ConnectedAccount {
+  if (!payload || typeof payload !== 'object') {
+    return createConnectedAccount('connected');
+  }
+
+  const record = payload as CopilotUsageResponse & Record<string, unknown>;
+  const user = record.user && typeof record.user === 'object' ? (record.user as Record<string, unknown>) : null;
+  const labelCandidates = [
+    user?.email,
+    user?.login,
+    user?.name,
+    record.email,
+    record.login,
+    record.username,
+    record.name,
+  ];
+  const label = labelCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+
+  return typeof label === 'string'
+    ? createConnectedAccount('connected', label.trim())
+    : createConnectedAccount('connected');
 }
 
 function mapCopilotUsage(
@@ -347,12 +381,14 @@ function buildErrorSnapshot(
   startedAt: number,
   strategy: string,
   available: boolean,
+  connectedAccount: ConnectedAccount,
 ): ProviderSnapshot {
   return {
     provider: context.providerId,
     status: 'error',
     source,
     updated_at: updatedAt,
+    connected_account: connectedAccount,
     usage: null,
     reset_window: null,
     error: createProviderError(code, message, retryable),

@@ -1,4 +1,4 @@
-import type { ProviderError, ProviderId, ProviderSnapshot, ProviderSourceMode } from 'shared-contract';
+import type { ConnectedAccount, ProviderError, ProviderId, ProviderSnapshot, ProviderSourceMode } from 'shared-contract';
 
 import type { BackendRequest } from '../config/backend-request.js';
 import type { ProviderConfig } from '../config/config-schema.js';
@@ -41,6 +41,13 @@ export function createProviderError(code: string, message: string, retryable = f
     code,
     message,
     retryable,
+  };
+}
+
+export function createConnectedAccount(status: ConnectedAccount['status'], label?: string | null): ConnectedAccount {
+  return {
+    status,
+    ...(label === undefined ? {} : { label }),
   };
 }
 

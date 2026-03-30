@@ -22,6 +22,7 @@ describe('Copilot provider', () => {
 
     expect(snapshot.status).toBe('error');
     expect(snapshot.error?.code).toBe('copilot_token_missing');
+    expect(snapshot.connected_account).toEqual({ status: 'missing' });
     expect(snapshot.usage).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -43,12 +44,16 @@ describe('Copilot provider', () => {
     expect(snapshot.status).toBe('error');
     expect(snapshot.error?.code).toBe('copilot_auth_failed');
     expect(snapshot.error?.retryable).toBe(false);
+    expect(snapshot.connected_account).toEqual({ status: 'missing' });
   });
 
   it('maps usage snapshots from the GitHub Copilot API', async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
+          user: {
+            login: 'octocat',
+          },
           quotaSnapshots: {
             premiumInteractions: {
               percentRemaining: 25,
@@ -89,6 +94,10 @@ describe('Copilot provider', () => {
     expect(snapshot.reset_window).toEqual({
       resets_at: '2026-03-25T16:00:00.000Z',
       label: 'premium interactions',
+    });
+    expect(snapshot.connected_account).toEqual({
+      status: 'connected',
+      label: 'octocat',
     });
     expect(snapshot.diagnostics?.attempts[0]?.strategy).toBe('copilot.api');
   });
