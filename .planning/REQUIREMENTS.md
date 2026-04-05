@@ -1,6 +1,89 @@
-# Requirements: Next Milestone TBD
+# Requirements: v2.1 Stability & Hardening
 
-**Status:** No active milestone requirements defined yet.
-**Previous milestone archive:** `.planning/milestones/v2.0-REQUIREMENTS.md`
+## Security
 
-Use `$gsd-new-milestone` to define the next milestone scope, requirements, and roadmap.
+- [ ] **SEC-01**: Fix shell injection em auth-command.ts — substituir exec(xdg-open) por Bun.spawn array
+- [ ] **SEC-02**: Fix silent error swallowing em service-server.ts — adicionar logging nos .catch()
+
+## Stability
+
+- [ ] **STAB-01**: Fix memory leak no GNOME indicator — destroy() actors antes de limpar
+- [ ] **STAB-02**: Fix race condition no snapshot-cache — atomic write (temp+rename no mesmo diretório)
+- [ ] **STAB-03**: Adicionar global error handlers no service runtime (unhandledRejection/uncaughtException)
+- [ ] **STAB-04**: Adicionar timeout ao subprocess do GNOME extension backend-client (GLib.timeout_add + force_exit)
+- [ ] **STAB-05**: Adicionar timeout global ao backend coordinator (Promise.race)
+- [ ] **STAB-06**: Adicionar timeout ao Codex appserver subprocess
+
+## Quality Gate
+
+- [ ] **QUAL-01**: Ativar Biome rules estritas (noExplicitAny, noNonNullAssertion, useNodejsImportProtocol)
+- [ ] **QUAL-02**: Criar .editorconfig para consistência de formatação
+
+## Production Hardening
+
+- [ ] **HARD-01**: Hardening do systemd service (MemoryMax, TasksMax, StartLimitBurst, log routing)
+- [ ] **HARD-02**: Object.freeze() nos config defaults para prevenir mutação
+- [ ] **HARD-03**: CSS theme awareness — detectar dark/light via GSettings color-scheme e adaptar estilos
+- [ ] **HARD-04**: Snapshot schema versioning com assertion na carga
+
+## Developer Experience
+
+- [ ] **DX-01**: Adicionar workspace scripts (dev, test, typecheck, clean)
+- [ ] **DX-02**: Criar CONTRIBUTING.md
+- [ ] **DX-03**: Criar CHANGELOG.md com v2.0 como baseline
+
+## Refactors
+
+- [ ] **REF-01**: Provider abstract helpers (createProviderErrorSnapshot, withTimeout, withRetry)
+- [ ] **REF-02**: Extrair buildErrorSnapshot builder comum (dedup do copilot-usage-fetcher)
+- [ ] **REF-03**: Remover campo error duplicado do extension-state.js (manter só lastError)
+
+## UX Polish
+
+- [ ] **UX-01**: i18n preparation (gettext-domain no metadata.json, extrair strings para constantes, wrap com _())
+- [ ] **UX-02**: Fix retry semantics (setInterval → setTimeout no polling-service.js)
+
+## Future Requirements (Deferred)
+
+- GitHub Actions CI pipeline (lint, test, typecheck) — defer to v2.2
+- Claude OAuth token refresh — feature, not stability fix
+- API version headers em config — low impact
+- Full i18n translation support — v2.1 only does string extraction prep
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Full test coverage gates | Anti-feature: adds more risk than it removes in a stability milestone |
+| TypeScript rewrite of GNOME extension | Major effort, not a hardening task |
+| Per-call retry logic in providers | Over-engineering — provider refresh cycle handles retries naturally |
+| Structured logging framework | Current console/oslog approach is adequate |
+| Sentry integration | Premature for a local desktop tool |
+| ProtectSystem/ProtectHome systemd | Does not work in user services — use resource limits instead |
+
+## Traceability
+
+| Requirement | Phase | Plan | Status |
+|-------------|-------|------|--------|
+| SEC-01 | — | — | Pending |
+| SEC-02 | — | — | Pending |
+| STAB-01 | — | — | Pending |
+| STAB-02 | — | — | Pending |
+| STAB-03 | — | — | Pending |
+| STAB-04 | — | — | Pending |
+| STAB-05 | — | — | Pending |
+| STAB-06 | — | — | Pending |
+| QUAL-01 | — | — | Pending |
+| QUAL-02 | — | — | Pending |
+| HARD-01 | — | — | Pending |
+| HARD-02 | — | — | Pending |
+| HARD-03 | — | — | Pending |
+| HARD-04 | — | — | Pending |
+| DX-01 | — | — | Pending |
+| DX-02 | — | — | Pending |
+| DX-03 | — | — | Pending |
+| REF-01 | — | — | Pending |
+| REF-02 | — | — | Pending |
+| REF-03 | — | — | Pending |
+| UX-01 | — | — | Pending |
+| UX-02 | — | — | Pending |
