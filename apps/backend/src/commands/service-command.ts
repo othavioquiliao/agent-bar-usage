@@ -85,16 +85,26 @@ export async function runServiceRunCommand(): Promise<void> {
     env: process.env,
   });
 
+  process.on('uncaughtException', (error) => {
+    console.error('[agent-bar] Fatal uncaught exception:', error);
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    console.error('[agent-bar] Fatal unhandled rejection:', reason);
+    process.exit(1);
+  });
+
   await runtime.start();
   process.stdout.write(`agent-bar service listening on ${runtime.socketPath}\n`);
 
   await new Promise<void>((resolve) => {
-    const stop = async () => {
+    const shutdown = async () => {
       await runtime.stop();
       resolve();
     };
 
-    process.once('SIGTERM', stop);
-    process.once('SIGINT', stop);
+    process.once('SIGTERM', shutdown);
+    process.once('SIGINT', shutdown);
   });
 }

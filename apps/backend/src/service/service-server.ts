@@ -278,13 +278,25 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
       });
     },
     async stop() {
-      if (!server) {
-        clearRefreshTimer();
-        return;
-      }
-      server.stop();
-      server = null;
       clearRefreshTimer();
+      if (server) {
+        server.stop();
+        server = null;
+      }
+      // Flush last snapshot to disk if present (per D-01)
+      if (lastSnapshot) {
+        try {
+          persistLatestSnapshot(snapshotStatePath, lastSnapshot);
+        } catch {
+          // Best-effort flush on shutdown
+        }
+      }
+      // Clean up socket file (per D-01)
+      try {
+        await unlink(socketPath);
+      } catch {
+        // Socket may already be removed
+      }
     },
     status,
   };
