@@ -19,9 +19,17 @@ Ubuntu users can reliably see the current usage state of their AI providers from
 - CLI/TUI: manual command parsing, Biome baseline, interactive `setup/remove/update/uninstall`, provider selection, rich terminal quota cards, and TTY-aware doctor/menu/login flows
 - Auth: `agent-bar auth copilot` and Provider Login TUI backed by a validated GitHub OAuth App client ID plus GNOME Keyring storage
 
-## Next Milestone
+## Current Milestone: v2.1 Stability & Hardening
 
-Not defined yet. Start with `$gsd-new-milestone` when you want to choose the next scope.
+**Goal:** Corrigir os 24 issues encontrados no audit do codebase — segurança, memory leaks, production hardening, CI/CD, e developer experience.
+
+**Target features:**
+- Fix 4 issues criticos: memory leak GNOME indicator, shell injection auth, race condition cache, global error handlers
+- Fix 3 issues high: subprocess timeouts (GNOME, backend coordinator, Codex appserver)
+- GitHub Actions CI (lint, test, typecheck)
+- Production hardening: systemd, config safety, theme awareness, schema versioning
+- DX: pnpm scripts, CONTRIBUTING.md, CHANGELOG.md
+- Refactors: provider abstract helpers, code dedup, state cleanup
 
 **Reference codebase:** `/home/othavio/Work/agent-bar-omarchy/` — padrões a espelhar: cache com TTL, settings versionadas, @clack/prompts para TUI, Biome para lint, minimal deps
 
@@ -48,8 +56,15 @@ Not defined yet. Start with `$gsd-new-milestone` when you want to choose the nex
 
 ### Active
 
-- [ ] Define the next milestone scope
-- [ ] Decide whether the next priority is provider expansion, additional Linux surfaces, historical usage, or compiled distribution
+- [ ] Fix memory leak in GNOME indicator (actors not destroyed on re-render)
+- [ ] Fix shell injection in auth-command (xdg-open via shell interpolation)
+- [ ] Fix race condition in snapshot-cache (non-atomic writes)
+- [ ] Add global error handlers to service runtime
+- [ ] Add subprocess timeouts (GNOME extension, backend coordinator, Codex appserver)
+- [ ] Set up GitHub Actions CI pipeline
+- [ ] Harden systemd service configuration
+- [ ] Add CSS theme awareness (dark/light detection)
+- [ ] Improve developer experience (scripts, docs, changelog)
 
 ### Out of Scope
 
@@ -122,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-29 after v2.0 milestone completion*
+*Last updated: 2026-04-05 after v2.1 milestone started*

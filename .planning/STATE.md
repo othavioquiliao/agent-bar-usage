@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Refactor & Polish
-status: Ready for next milestone
-stopped_at: Completed v2.0 milestone archive
-last_updated: "2026-03-29T21:38:30Z"
+milestone: v2.1
+milestone_name: Stability & Hardening
+status: Defining requirements
+stopped_at: Milestone v2.1 started
+last_updated: "2026-04-05T00:00:00Z"
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -23,8 +23,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: None
-Plan: Awaiting `$gsd-new-milestone`
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-05 — Milestone v2.1 started
 
 ## Performance Metrics
 
