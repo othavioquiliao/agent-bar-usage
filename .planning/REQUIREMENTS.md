@@ -16,13 +16,13 @@
 
 ## Quality Gate
 
-- [ ] **QUAL-01**: Ativar Biome rules estritas (noExplicitAny, noNonNullAssertion, useNodejsImportProtocol)
-- [ ] **QUAL-02**: Criar .editorconfig para consistencia de formatacao
+- [x] **QUAL-01**: Ativar Biome rules estritas (noExplicitAny, noNonNullAssertion, useNodejsImportProtocol)
+- [x] **QUAL-02**: Criar .editorconfig para consistencia de formatacao
 
 ## Production Hardening
 
 - [ ] **HARD-01**: Hardening do systemd service (MemoryMax, TasksMax, StartLimitBurst, log routing)
-- [ ] **HARD-02**: Object.freeze() nos config defaults para prevenir mutacao
+- [x] **HARD-02**: Object.freeze() nos config defaults para prevenir mutacao
 - [ ] **HARD-03**: CSS theme awareness — detectar dark/light via GSettings color-scheme e adaptar estilos
 - [ ] **HARD-04**: Snapshot schema versioning com assertion na carga
 

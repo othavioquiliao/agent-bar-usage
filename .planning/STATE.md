@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Stability & Hardening
 status: executing
-stopped_at: Phase 13 context gathered
-last_updated: "2026-04-05T20:17:40.437Z"
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-04-05T21:32:25.691Z"
 last_activity: 2026-04-05
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_plans: 6
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Ubuntu users can reliably see the current usage state of their AI providers from a Linux-native surface without depending on the macOS-specific CodexBar shell.
-**Current focus:** Phase 13 — Critical Security & Stability Fixes
+**Current focus:** Phase 14 — Quality Gate & Production Hardening
 
 ## Current Position
 
 Phase: 14
-Plan: Not started
-Status: Executing Phase 13
+Plan: 3 of 03 complete
+Status: Ready to execute
 Last activity: 2026-04-05
 
-Progress: [░░░░░░░░░░] 0% (v2.1 milestone)
+Progress: [████████░░] 83% (v2.1 milestone)
 
 ## Performance Metrics
 
@@ -57,6 +57,9 @@ Progress: [░░░░░░░░░░] 0% (v2.1 milestone)
 - Last 5 plans: 5/5 complete
 - Trend: Improving
 
+| Phase 14 P02 | 3 | 2 tasks | 3 files |
+| Phase 14 P01 | 4 | 3 tasks | 8 files |
+
 ## Accumulated Context
 
 ### Decisions
@@ -68,6 +71,10 @@ Recent decisions affecting current work:
 - [v2.1 Research]: Zero new production dependencies needed -- all fixes use existing stack APIs
 - [v2.1 Roadmap]: Phase 13 (security+stability) must complete before all others -- atomic write utility and error handlers are consumed downstream
 - [v2.1 Roadmap]: Phase 16 (UX polish) depends only on Phase 13, not on 14/15 -- can be parallelized if needed
+- [Phase 14]: StartLimitBurst/StartLimitIntervalSec in [Unit] per systemd 230+ (silently ignored in [Service])
+- [Phase 14]: CACHE_SCHEMA_VERSION independent from snapshotSchemaVersion -- cache format and API schema evolve on different timelines
+- [Phase 14]: Enable all 3 Biome rules as error directly — 9 violations fixed, zero warn transition needed
+- [Phase 14]: Object.freeze + Readonly<T> pattern established for config singletons and factories
 
 ### Pending Todos
 
@@ -87,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T19:28:41.315Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-critical-security-stability-fixes/13-CONTEXT.md
+Last session: 2026-04-05T21:32:25.689Z
+Stopped at: Completed 14-01-PLAN.md
+Resume file: None

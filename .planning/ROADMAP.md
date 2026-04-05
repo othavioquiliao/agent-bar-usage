@@ -84,9 +84,9 @@ Plans:
   4. Loading a snapshot cache file written by a previous schema version either migrates successfully or resets gracefully -- schema version is checked on every load
 **Plans**: 3 plans
 Plans:
-- [x] 13-01-PLAN.md — Atomic write utility, shell injection fix, silent catch fix (SEC-01, SEC-02, STAB-02)
-- [x] 13-02-PLAN.md — Global error handlers, graceful shutdown, provider timeouts (STAB-03, STAB-05, STAB-06)
-- [x] 13-03-PLAN.md — GNOME actor lifecycle fix, backend-client timeout (STAB-01, STAB-04)
+- [x] 14-01-PLAN.md — Strict Biome rules, lint fixes, .editorconfig, Object.freeze defaults (QUAL-01, QUAL-02, HARD-02)
+- [x] 14-02-PLAN.md — systemd hardening, snapshot cache schema versioning (HARD-01, HARD-04)
+- [ ] 14-03-PLAN.md — GNOME dual-stylesheet theme awareness (HARD-03)
 **UI hint**: yes
 
 ### Phase 15: Developer Experience & Refactors
@@ -137,6 +137,6 @@ Plans:
 | 11. Provider Independence & Data | v2.0 | 3/3 | Complete | 2026-03-29 |
 | 12. Terminal UI & Code Quality | v2.0 | 3/3 | Complete | 2026-03-29 |
 | 13. Critical Security & Stability Fixes | v2.1 | 3/3 | Complete    | 2026-04-05 |
-| 14. Quality Gate & Production Hardening | v2.1 | 0/? | Not started | - |
+| 14. Quality Gate & Production Hardening | v2.1 | 2/3 | In Progress|  |
 | 15. Developer Experience & Refactors | v2.1 | 0/? | Not started | - |
 | 16. UX Polish | v2.1 | 0/? | Not started | - |
