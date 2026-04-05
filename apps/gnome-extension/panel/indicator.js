@@ -128,6 +128,7 @@ export const Indicator = GObject.registerClass(
 
       for (const child of this._box.get_children?.() ?? []) {
         this._box.remove_child(child);
+        child.destroy();
       }
       this._providerActors.clear();
 
