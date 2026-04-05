@@ -21,10 +21,10 @@
 
 ## Production Hardening
 
-- [ ] **HARD-01**: Hardening do systemd service (MemoryMax, TasksMax, StartLimitBurst, log routing)
+- [x] **HARD-01**: Hardening do systemd service (MemoryMax, TasksMax, StartLimitBurst, log routing)
 - [x] **HARD-02**: Object.freeze() nos config defaults para prevenir mutacao
 - [ ] **HARD-03**: CSS theme awareness — detectar dark/light via GSettings color-scheme e adaptar estilos
-- [ ] **HARD-04**: Snapshot schema versioning com assertion na carga
+- [x] **HARD-04**: Snapshot schema versioning com assertion na carga
 
 ## Developer Experience
 
