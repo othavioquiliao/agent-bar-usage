@@ -2,7 +2,7 @@ import type { ProviderSnapshot } from 'shared-contract';
 
 import { resolveCommandInPath } from '../../utils/subprocess.js';
 
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 interface RateLimitPrimary {
   usedPercent: number;

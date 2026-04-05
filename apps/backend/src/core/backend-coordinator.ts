@@ -15,6 +15,8 @@ import { createErrorSnapshot, createProviderError, createUnavailableSnapshot } f
 import { ProviderContextBuilder, type ProviderExecutionContext } from './provider-context-builder.js';
 import type { ProviderRegistry } from './provider-registry.js';
 
+const PROVIDER_TIMEOUT_MS = 15_000;
+
 export interface BackendCoordinatorOptions {
   registry: ProviderRegistry;
   cache?: SnapshotCache;
@@ -138,8 +140,17 @@ export class BackendCoordinator {
         }
 
         try {
+          const quota = await Promise.race([
+            adapter.getQuota(context),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Provider ${adapter.id} timed out after ${PROVIDER_TIMEOUT_MS}ms`)),
+                PROVIDER_TIMEOUT_MS,
+              ),
+            ),
+          ]);
           return assertProviderSnapshot({
-            ...normalizeSnapshot(await adapter.getQuota(context), adapter.id, sourceMode, updatedAt),
+            ...normalizeSnapshot(quota, adapter.id, sourceMode, updatedAt),
           });
         } catch (error) {
           return toErrorSnapshot(adapter.id, sourceMode, updatedAt, error);
