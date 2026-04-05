@@ -1,5 +1,9 @@
+import GLib from 'gi://GLib';
+
 import { resolveBackendInvocation } from '../utils/backend-command.js';
 import { parseStrictJson } from '../utils/json.js';
+
+const BACKEND_TIMEOUT_SECONDS = 15;
 
 export class BackendClientError extends Error {
   constructor(message, details = {}) {
@@ -57,15 +61,46 @@ async function runGioSubprocess(argv, { Gio, cwd } = {}) {
 
   const subprocess = launcher.spawnv(argv);
 
-  const result = await new Promise((resolve, reject) => {
-    subprocess.communicate_utf8_async(null, null, (proc, asyncResult) => {
-      try {
-        resolve(normalizeCommunicateResult(proc, proc.communicate_utf8_finish(asyncResult)));
-      } catch (error) {
-        reject(error);
-      }
-    });
+  // Set up timeout: cancel the async operation AND kill the subprocess after BACKEND_TIMEOUT_SECONDS
+  const cancellable = new Gio.Cancellable();
+  const cancelId = cancellable.connect(() => {
+    try {
+      subprocess.force_exit();
+    } catch {
+      // Subprocess may have already exited
+    }
   });
+
+  const timeoutId = GLib.timeout_add_seconds(
+    GLib.PRIORITY_DEFAULT,
+    BACKEND_TIMEOUT_SECONDS,
+    () => {
+      cancellable.cancel();
+      return GLib.SOURCE_REMOVE;
+    },
+  );
+
+  let result;
+  try {
+    result = await new Promise((resolve, reject) => {
+      subprocess.communicate_utf8_async(null, cancellable, (proc, asyncResult) => {
+        try {
+          resolve(normalizeCommunicateResult(proc, proc.communicate_utf8_finish(asyncResult)));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+  } catch (error) {
+    // If the cancellable was triggered, this is a timeout
+    if (cancellable.is_cancelled()) {
+      throw new Error(`Backend subprocess timed out after ${BACKEND_TIMEOUT_SECONDS}s`);
+    }
+    throw error;
+  } finally {
+    GLib.Source.remove(timeoutId);
+    cancellable.disconnect(cancelId);
+  }
 
   return {
     argv,
