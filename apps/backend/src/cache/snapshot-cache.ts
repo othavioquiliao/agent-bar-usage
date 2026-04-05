@@ -8,7 +8,10 @@ import { type ResolveCachePathOptions, resolveSnapshotCacheDir } from './cache-p
 
 export const DEFAULT_SNAPSHOT_TTL_SECONDS = 30;
 
+export const CACHE_SCHEMA_VERSION = 1;
+
 export interface SnapshotCacheEntry {
+  cacheSchemaVersion: number;
   snapshot: ProviderSnapshot;
   expiresAtMs: number;
 }
@@ -48,12 +51,16 @@ export class SnapshotCache {
 
     try {
       const entry = JSON.parse(readFileSync(filePath, 'utf8')) as SnapshotCacheEntry;
+      if (entry.cacheSchemaVersion !== CACHE_SCHEMA_VERSION) {
+        return null;
+      }
       if (entry.expiresAtMs <= this.now()) {
         return null;
       }
 
       const snapshot = assertProviderSnapshot(entry.snapshot);
       this.#entries.set(key, {
+        cacheSchemaVersion: CACHE_SCHEMA_VERSION,
         snapshot,
         expiresAtMs: entry.expiresAtMs,
       });
@@ -65,6 +72,7 @@ export class SnapshotCache {
 
   async set(key: string, snapshot: ProviderSnapshot, ttlSeconds = this.defaultTtlSeconds): Promise<ProviderSnapshot> {
     const entry = {
+      cacheSchemaVersion: CACHE_SCHEMA_VERSION,
       snapshot,
       expiresAtMs: this.now() + ttlSeconds * 1000,
     } satisfies SnapshotCacheEntry;
