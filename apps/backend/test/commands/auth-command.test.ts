@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type MockInstance, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COPILOT_SETUP_GUIDE,
   runAuthClaudeCommand,
@@ -78,8 +78,8 @@ describe('defaultOpenBrowser security (SEC-01)', () => {
 });
 
 describe('runAuthClaudeCommand', () => {
-  let stdoutSpy: ReturnType<typeof vi.spyOn>;
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: MockInstance;
+  let stderrSpy: MockInstance;
   let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {
@@ -116,8 +116,8 @@ describe('runAuthClaudeCommand', () => {
 });
 
 describe('runAuthCodexCommand', () => {
-  let stdoutSpy: ReturnType<typeof vi.spyOn>;
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: MockInstance;
+  let stderrSpy: MockInstance;
   let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {
@@ -153,8 +153,8 @@ describe('runAuthCodexCommand', () => {
 });
 
 describe('runAuthCopilotCommand', () => {
-  let stdoutSpy: ReturnType<typeof vi.spyOn>;
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: MockInstance;
+  let stderrSpy: MockInstance;
   let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {

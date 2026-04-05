@@ -4,6 +4,6 @@ export interface Settings {
   version: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   version: CURRENT_VERSION,
-};
+});

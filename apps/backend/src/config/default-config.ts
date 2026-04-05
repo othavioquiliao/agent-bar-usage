@@ -1,6 +1,6 @@
 import type { BackendConfig } from './config-schema.js';
 
-export function createDefaultConfig(): BackendConfig {
+export function createDefaultConfig(): Readonly<BackendConfig> {
   return {
     schemaVersion: 1,
     defaults: {
