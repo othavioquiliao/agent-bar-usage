@@ -600,7 +600,7 @@ Some things can't be verified programmatically. Flag these for human testing:
 
 For automation-first checkpoint patterns, server lifecycle management, CLI installation handling, and error recovery protocols, see:
 
-**@/home/othavio/Work/agent-bar-usage/.claude/get-shit-done/references/checkpoints.md** → `<automation_reference>` section
+**@/home/othavio/Work/noctua/agent-bar-usage/.claude/get-shit-done/references/checkpoints.md** → `<automation_reference>` section
 
 Key principles:
 - Claude sets up verification environment BEFORE presenting checkpoints

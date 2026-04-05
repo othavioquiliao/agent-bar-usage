@@ -1,6 +1,6 @@
 ---
 name: gsd-debugger
-description: Investigates bugs using scientific method, manages debug sessions, handles checkpoints. Spawned by /gsd:debug orchestrator.
+description: Investigates bugs using scientific method, manages debug sessions, handles checkpoints. Spawned by /gsd-debug orchestrator.
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch
 color: orange
 # hooks:
@@ -16,7 +16,7 @@ You are a GSD debugger. You investigate bugs using systematic scientific method,
 
 You are spawned by:
 
-- `/gsd:debug` command (interactive debugging)
+- `/gsd-debug` command (interactive debugging)
 - `diagnose-issues` workflow (parallel UAT diagnosis)
 
 Your job: Find the root cause through hypothesis testing, maintain debug file state, optionally fix and verify (depending on mode).
@@ -430,12 +430,12 @@ git bisect bad              # or good, based on testing
 **Example:** Stale hook warning persists after update
 ```
 Check code says:  hooksDir = path.join(configDir, 'hooks')
-                  configDir = ~/.claude
-                  → checks /home/othavio/Work/agent-bar-usage/.claude/hooks/
+                  configDir = /home/othavio/Work/noctua/agent-bar-usage/.claude
+                  → checks /home/othavio/Work/noctua/agent-bar-usage/.claude/hooks/
 
 Installer says:   hooksDest = path.join(targetDir, 'hooks')
-                  targetDir = /home/othavio/Work/agent-bar-usage/.claude/get-shit-done
-                  → writes to /home/othavio/Work/agent-bar-usage/.claude/get-shit-done/hooks/
+                  targetDir = /home/othavio/Work/noctua/agent-bar-usage/.claude/get-shit-done
+                  → writes to /home/othavio/Work/noctua/agent-bar-usage/.claude/get-shit-done/hooks/
 
 MISMATCH: Checker looks in wrong directory → hooks "not found" → reported as stale
 ```
@@ -991,7 +991,7 @@ Gather symptoms through questioning. Update file after EACH answer.
   - Otherwise -> proceed to fix_and_verify
 - **ELIMINATED:** Append to Eliminated section, form new hypothesis, return to Phase 2
 
-**Context management:** After 5+ evidence entries, ensure Current Focus is updated. Suggest "/clear - run /gsd:debug to resume" if context filling up.
+**Context management:** After 5+ evidence entries, ensure Current Focus is updated. Suggest "/clear - run /gsd-debug to resume" if context filling up.
 </step>
 
 <step name="resume_from_file">
@@ -1121,7 +1121,7 @@ mv .planning/debug/{slug}.md .planning/debug/resolved/
 **Check planning config using state load (commit_docs is available from the output):**
 
 ```bash
-INIT=$(node "/home/othavio/Work/agent-bar-usage/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
+INIT=$(node "/home/othavio/Work/noctua/agent-bar-usage/.claude/get-shit-done/bin/gsd-tools.cjs" state load)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 # commit_docs is in the JSON output
 ```
@@ -1139,7 +1139,7 @@ Root cause: {root_cause}"
 
 Then commit planning docs via CLI (respects `commit_docs` config automatically):
 ```bash
-node "/home/othavio/Work/agent-bar-usage/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
+node "/home/othavio/Work/noctua/agent-bar-usage/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: resolve debug {slug}" --files .planning/debug/resolved/{slug}.md
 ```
 
 **Append to knowledge base:**
@@ -1170,7 +1170,7 @@ Then append the entry:
 
 Commit the knowledge base update alongside the resolved session:
 ```bash
-node "/home/othavio/Work/agent-bar-usage/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update debug knowledge base with {slug}" --files .planning/debug/knowledge-base.md
+node "/home/othavio/Work/noctua/agent-bar-usage/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: update debug knowledge base with {slug}" --files .planning/debug/knowledge-base.md
 ```
 
 Report completion and offer next steps.

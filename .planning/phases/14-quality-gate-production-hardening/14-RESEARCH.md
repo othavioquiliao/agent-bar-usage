@@ -387,17 +387,17 @@ Both `stylesheet-dark.css` and `stylesheet-light.css` use **identical selectors*
 | A2 | Ubuntu 24.04 default session mode uses `prefer-dark` colorScheme | Variant Resolution | MEDIUM -- if different, variant resolution logic differs. Verified against GNOME Shell 46 source; Ubuntu uses stock GNOME Shell session mode |
 | A3 | `#9a9996` placeholder text at 2.92:1 is acceptable for non-interactive text | Color Palette | LOW -- follows GNOME HIG precedent for insensitive/disabled state colors |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Ubuntu 24.04 Yaru Theme Panel Background**
+1. **Ubuntu 24.04 Yaru Theme Panel Background** (RESOLVED)
    - What we know: Default GNOME Shell light panel is near-white. Ubuntu may use Yaru theme which has a slightly different panel treatment.
    - What's unclear: Exact Yaru light panel background color on Ubuntu 24.04 (may be slightly warm-tinted rather than pure white).
-   - Recommendation: Our badge uses `rgba(255, 255, 255, 0.92)` which will look correct against any light background. Test on actual Ubuntu 24.04 to verify.
+   - Resolution: Using `rgba(255, 255, 255, 0.92)` which composites correctly against any light background. Visual verification deferred to manual testing on Ubuntu 24.04.
 
-2. **Session-Mode Variant Files**
+2. **Session-Mode Variant Files** (RESOLVED)
    - What we know: The resolution tries `user-dark.css` before `stylesheet-dark.css`.
    - What's unclear: Whether Ubuntu's session mode string differs from standard `'user'`.
-   - Recommendation: Stick with `stylesheet-dark.css` / `stylesheet-light.css` naming. The `user-*` prefix pattern is for specialized session modes (e.g., GNOME Classic).
+   - Resolution: Using `stylesheet-dark.css` / `stylesheet-light.css` naming. The `user-*` prefix pattern is for specialized session modes (e.g., GNOME Classic). Standard GNOME Shell on Ubuntu uses `'user'` session mode.
 
 ## Environment Availability
 
