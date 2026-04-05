@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { access, mkdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
 import { assertSnapshotEnvelope, type SnapshotEnvelope } from 'shared-contract';
 
 import { resolveLatestSnapshotPath } from '../cache/cache-path.js';
+import { atomicWriteFileSync } from '../utils/atomic-write.js';
 import { loadBackendConfig } from '../config/config-loader.js';
 import { createUsageSnapshot, type UsageCommandOptions } from '../core/usage-snapshot.js';
 import { resolveServiceSocketPath } from './socket-path.js';
@@ -99,7 +100,7 @@ function readLatestSnapshot(snapshotStatePath: string): SnapshotEnvelope | null 
 
 function persistLatestSnapshot(snapshotStatePath: string, snapshot: SnapshotEnvelope): void {
   mkdirSync(path.dirname(snapshotStatePath), { recursive: true });
-  writeFileSync(snapshotStatePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
+  atomicWriteFileSync(snapshotStatePath, `${JSON.stringify(snapshot, null, 2)}\n`);
 }
 
 export function createAgentBarServiceRuntime(options: ServiceServerOptions = {}): AgentBarServiceRuntime {
@@ -166,7 +167,9 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
   const startRefreshTimer = () => {
     clearRefreshTimer();
     refreshHandle = scheduler.setInterval(() => {
-      void refreshSnapshot(true).catch(() => undefined);
+      void refreshSnapshot(true).catch((err: unknown) => {
+        console.error('[agent-bar] Background refresh failed:', err instanceof Error ? err.message : err);
+      });
     }, refreshIntervalMs);
   };
 
@@ -217,7 +220,9 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
 
       await mkdir(socketDir, { recursive: true });
       if (await isSocketPresent(socketPath)) {
-        await unlink(socketPath).catch(() => undefined);
+        await unlink(socketPath).catch(() => {
+          // Best-effort: stale socket may already be gone
+        });
       }
 
       if (options.refreshIntervalMs === undefined) {
@@ -268,7 +273,9 @@ export function createAgentBarServiceRuntime(options: ServiceServerOptions = {})
       });
 
       startRefreshTimer();
-      void refreshSnapshot(true).catch(() => undefined);
+      void refreshSnapshot(true).catch((err: unknown) => {
+        console.error('[agent-bar] Initial refresh failed:', err instanceof Error ? err.message : err);
+      });
     },
     async stop() {
       if (!server) {

@@ -11,7 +11,6 @@
  *  7. Restart the agent-bar systemd service (best-effort).
  */
 
-import { exec } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import * as readline from 'node:readline';
@@ -222,9 +221,14 @@ export async function runAuthCommand(command: AuthProviderCommand, options: Auth
 }
 
 function defaultOpenBrowser(url: string): void {
-  exec(`xdg-open ${url}`, () => {
-    // Intentionally silent — xdg-open may not be available in all environments
-  });
+  try {
+    Bun.spawn(['xdg-open', url], {
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+  } catch {
+    // xdg-open may not be available in all environments
+  }
 }
 
 async function defaultWaitForEnter(): Promise<void> {

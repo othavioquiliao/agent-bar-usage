@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COPILOT_SETUP_GUIDE,
@@ -5,6 +8,74 @@ import {
   runAuthCodexCommand,
   runAuthCopilotCommand,
 } from '../../src/commands/auth-command.js';
+
+describe('defaultOpenBrowser security (SEC-01)', () => {
+  it('does not use exec from node:child_process (shell injection prevention)', () => {
+    const authCommandSource = readFileSync(
+      path.resolve(__dirname, '../../src/commands/auth-command.ts'),
+      'utf8',
+    );
+
+    // Must NOT contain exec-based shell interpolation
+    expect(authCommandSource).not.toMatch(/import\s*\{[^}]*exec[^}]*\}\s*from\s*['"]node:child_process['"]/);
+    expect(authCommandSource).not.toMatch(/exec\(`xdg-open/);
+
+    // Must use Bun.spawn array form for xdg-open
+    expect(authCommandSource).toMatch(/Bun\.spawn\(\['xdg-open',\s*url\]/);
+  });
+
+  it('injects openBrowser via dependency injection for testability', async () => {
+    const openBrowserSpy = vi.fn();
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+    vi.useFakeTimers();
+
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            device_code: 'dc-test',
+            user_code: 'TEST-1234',
+            verification_uri: 'https://github.com/login/device',
+            expires_in: 900,
+            interval: 1,
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: 'gho_test',
+            token_type: 'bearer',
+            scope: 'copilot',
+          }),
+        ),
+      );
+
+    const runPromise = runAuthCopilotCommand(
+      {},
+      {
+        fetchFn,
+        storeSecret: vi.fn().mockResolvedValue(undefined),
+        ensureConfigRef: vi.fn().mockResolvedValue(undefined),
+        resolveConfigPath: () => '/tmp/test.json',
+        restartService: vi.fn().mockResolvedValue(undefined),
+        waitForEnter: async () => undefined,
+        openBrowser: openBrowserSpy,
+      },
+    );
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await runPromise;
+
+    expect(openBrowserSpy).toHaveBeenCalledWith('https://github.com/login/device');
+
+    stdoutSpy.mockRestore();
+    vi.useRealTimers();
+  });
+});
 
 describe('runAuthClaudeCommand', () => {
   let stdoutSpy: any;

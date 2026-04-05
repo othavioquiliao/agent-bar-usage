@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { assertProviderSnapshot, type ProviderSnapshot, type ProviderSourceMode } from 'shared-contract';
 
+import { atomicWriteFileSync } from '../utils/atomic-write.js';
 import { type ResolveCachePathOptions, resolveSnapshotCacheDir } from './cache-path.js';
 
 export const DEFAULT_SNAPSHOT_TTL_SECONDS = 30;
@@ -70,7 +71,7 @@ export class SnapshotCache {
 
     this.ensureCacheDir();
     this.#entries.set(key, entry);
-    writeFileSync(this.filePathForKey(key), `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
+    atomicWriteFileSync(this.filePathForKey(key), `${JSON.stringify(entry, null, 2)}\n`);
 
     return snapshot;
   }
