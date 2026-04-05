@@ -8,7 +8,7 @@
 ## Stability
 
 - [ ] **STAB-01**: Fix memory leak no GNOME indicator — destroy() actors antes de limpar
-- [ ] **STAB-02**: Fix race condition no snapshot-cache — atomic write (temp+rename no mesmo diretório)
+- [ ] **STAB-02**: Fix race condition no snapshot-cache — atomic write (temp+rename no mesmo diretorio)
 - [ ] **STAB-03**: Adicionar global error handlers no service runtime (unhandledRejection/uncaughtException)
 - [ ] **STAB-04**: Adicionar timeout ao subprocess do GNOME extension backend-client (GLib.timeout_add + force_exit)
 - [ ] **STAB-05**: Adicionar timeout global ao backend coordinator (Promise.race)
@@ -17,12 +17,12 @@
 ## Quality Gate
 
 - [ ] **QUAL-01**: Ativar Biome rules estritas (noExplicitAny, noNonNullAssertion, useNodejsImportProtocol)
-- [ ] **QUAL-02**: Criar .editorconfig para consistência de formatação
+- [ ] **QUAL-02**: Criar .editorconfig para consistencia de formatacao
 
 ## Production Hardening
 
 - [ ] **HARD-01**: Hardening do systemd service (MemoryMax, TasksMax, StartLimitBurst, log routing)
-- [ ] **HARD-02**: Object.freeze() nos config defaults para prevenir mutação
+- [ ] **HARD-02**: Object.freeze() nos config defaults para prevenir mutacao
 - [ ] **HARD-03**: CSS theme awareness — detectar dark/light via GSettings color-scheme e adaptar estilos
 - [ ] **HARD-04**: Snapshot schema versioning com assertion na carga
 
@@ -36,12 +36,12 @@
 
 - [ ] **REF-01**: Provider abstract helpers (createProviderErrorSnapshot, withTimeout, withRetry)
 - [ ] **REF-02**: Extrair buildErrorSnapshot builder comum (dedup do copilot-usage-fetcher)
-- [ ] **REF-03**: Remover campo error duplicado do extension-state.js (manter só lastError)
+- [ ] **REF-03**: Remover campo error duplicado do extension-state.js (manter so lastError)
 
 ## UX Polish
 
 - [ ] **UX-01**: i18n preparation (gettext-domain no metadata.json, extrair strings para constantes, wrap com _())
-- [ ] **UX-02**: Fix retry semantics (setInterval → setTimeout no polling-service.js)
+- [ ] **UX-02**: Fix retry semantics (setInterval -> setTimeout no polling-service.js)
 
 ## Future Requirements (Deferred)
 
@@ -65,25 +65,25 @@
 
 | Requirement | Phase | Plan | Status |
 |-------------|-------|------|--------|
-| SEC-01 | — | — | Pending |
-| SEC-02 | — | — | Pending |
-| STAB-01 | — | — | Pending |
-| STAB-02 | — | — | Pending |
-| STAB-03 | — | — | Pending |
-| STAB-04 | — | — | Pending |
-| STAB-05 | — | — | Pending |
-| STAB-06 | — | — | Pending |
-| QUAL-01 | — | — | Pending |
-| QUAL-02 | — | — | Pending |
-| HARD-01 | — | — | Pending |
-| HARD-02 | — | — | Pending |
-| HARD-03 | — | — | Pending |
-| HARD-04 | — | — | Pending |
-| DX-01 | — | — | Pending |
-| DX-02 | — | — | Pending |
-| DX-03 | — | — | Pending |
-| REF-01 | — | — | Pending |
-| REF-02 | — | — | Pending |
-| REF-03 | — | — | Pending |
-| UX-01 | — | — | Pending |
-| UX-02 | — | — | Pending |
+| SEC-01 | Phase 13 | — | Pending |
+| SEC-02 | Phase 13 | — | Pending |
+| STAB-01 | Phase 13 | — | Pending |
+| STAB-02 | Phase 13 | — | Pending |
+| STAB-03 | Phase 13 | — | Pending |
+| STAB-04 | Phase 13 | — | Pending |
+| STAB-05 | Phase 13 | — | Pending |
+| STAB-06 | Phase 13 | — | Pending |
+| QUAL-01 | Phase 14 | — | Pending |
+| QUAL-02 | Phase 14 | — | Pending |
+| HARD-01 | Phase 14 | — | Pending |
+| HARD-02 | Phase 14 | — | Pending |
+| HARD-03 | Phase 14 | — | Pending |
+| HARD-04 | Phase 14 | — | Pending |
+| DX-01 | Phase 15 | — | Pending |
+| DX-02 | Phase 15 | — | Pending |
+| DX-03 | Phase 15 | — | Pending |
+| REF-01 | Phase 15 | — | Pending |
+| REF-02 | Phase 15 | — | Pending |
+| REF-03 | Phase 15 | — | Pending |
+| UX-01 | Phase 16 | — | Pending |
+| UX-02 | Phase 16 | — | Pending |
