@@ -51,7 +51,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 **Milestone Goal:** Corrigir os 24 issues encontrados no audit do codebase -- seguranca, memory leaks, production hardening, e developer experience. Zero novas dependencias.
 
 - [x] **Phase 13: Critical Security & Stability Fixes** - Fix all P0/P1 issues: memory leak, shell injection, atomic writes, error handlers, subprocess timeouts (completed 2026-04-05)
-- [ ] **Phase 14: Quality Gate & Production Hardening** - Stricter lint rules, systemd hardening, theme awareness, schema versioning
+- [x] **Phase 14: Quality Gate & Production Hardening** - Stricter lint rules, systemd hardening, theme awareness, schema versioning (completed 2026-04-05)
 - [ ] **Phase 15: Developer Experience & Refactors** - Workspace scripts, contributor docs, provider helpers, code dedup
 - [ ] **Phase 16: UX Polish** - i18n preparation and retry semantics fix
 
@@ -86,7 +86,7 @@ Plans:
 Plans:
 - [x] 14-01-PLAN.md — Strict Biome rules, lint fixes, .editorconfig, Object.freeze defaults (QUAL-01, QUAL-02, HARD-02)
 - [x] 14-02-PLAN.md — systemd hardening, snapshot cache schema versioning (HARD-01, HARD-04)
-- [ ] 14-03-PLAN.md — GNOME dual-stylesheet theme awareness (HARD-03)
+- [x] 14-03-PLAN.md — GNOME dual-stylesheet theme awareness (HARD-03)
 **UI hint**: yes
 
 ### Phase 15: Developer Experience & Refactors
@@ -137,6 +137,6 @@ Plans:
 | 11. Provider Independence & Data | v2.0 | 3/3 | Complete | 2026-03-29 |
 | 12. Terminal UI & Code Quality | v2.0 | 3/3 | Complete | 2026-03-29 |
 | 13. Critical Security & Stability Fixes | v2.1 | 3/3 | Complete    | 2026-04-05 |
-| 14. Quality Gate & Production Hardening | v2.1 | 2/3 | In Progress|  |
+| 14. Quality Gate & Production Hardening | v2.1 | 3/3 | Complete   | 2026-04-05 |
 | 15. Developer Experience & Refactors | v2.1 | 0/? | Not started | - |
 | 16. UX Polish | v2.1 | 0/? | Not started | - |
