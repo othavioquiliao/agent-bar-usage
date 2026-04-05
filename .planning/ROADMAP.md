@@ -67,7 +67,11 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   3. Killing the backend mid-write to `~/.cache/agent-bar/` and restarting produces a valid (or empty) cache file -- writes use temp+rename in the same directory
   4. The service process logs fatal errors to stderr/journal and exits cleanly on uncaughtException, unhandledRejection, and SIGTERM -- no silent deaths, socket file cleaned up
   5. A provider fetch that hangs indefinitely is killed within the configured timeout -- backend coordinator, GNOME extension backend-client, and Codex appserver subprocess all have enforced time limits
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 13-01-PLAN.md — Atomic write utility, shell injection fix, silent catch fix (SEC-01, SEC-02, STAB-02)
+- [ ] 13-02-PLAN.md — Global error handlers, graceful shutdown, provider timeouts (STAB-03, STAB-05, STAB-06)
+- [ ] 13-03-PLAN.md — GNOME actor lifecycle fix, backend-client timeout (STAB-01, STAB-04)
 
 ### Phase 14: Quality Gate & Production Hardening
 **Goal**: The codebase has stricter lint enforcement and the production service is resource-limited, theme-aware, and schema-safe
@@ -78,7 +82,11 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   2. The systemd user service has `MemoryMax`, `TasksMax`, and `StartLimitBurst` directives -- a runaway process is killed by systemd before it degrades the desktop
   3. The GNOME extension renders correctly on both Adwaita dark and Adwaita light themes -- CSS adapts based on `color-scheme` GSettings value
   4. Loading a snapshot cache file written by a previous schema version either migrates successfully or resets gracefully -- schema version is checked on every load
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 13-01-PLAN.md — Atomic write utility, shell injection fix, silent catch fix (SEC-01, SEC-02, STAB-02)
+- [ ] 13-02-PLAN.md — Global error handlers, graceful shutdown, provider timeouts (STAB-03, STAB-05, STAB-06)
+- [ ] 13-03-PLAN.md — GNOME actor lifecycle fix, backend-client timeout (STAB-01, STAB-04)
 **UI hint**: yes
 
 ### Phase 15: Developer Experience & Refactors
@@ -90,7 +98,11 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   2. A new contributor can read CONTRIBUTING.md and understand how to set up, lint, test, and submit changes
   3. Provider fetchers use shared `createProviderErrorSnapshot`, `withTimeout`, and `withRetry` helpers instead of duplicating error/timeout logic per provider
   4. The `extension-state.js` has a single error field (`lastError`) with no duplicated `error` property
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 13-01-PLAN.md — Atomic write utility, shell injection fix, silent catch fix (SEC-01, SEC-02, STAB-02)
+- [ ] 13-02-PLAN.md — Global error handlers, graceful shutdown, provider timeouts (STAB-03, STAB-05, STAB-06)
+- [ ] 13-03-PLAN.md — GNOME actor lifecycle fix, backend-client timeout (STAB-01, STAB-04)
 
 ### Phase 16: UX Polish
 **Goal**: The extension is prepared for future localization and polling retry behavior is correct
@@ -99,7 +111,11 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 **Success Criteria** (what must be TRUE):
   1. All user-facing strings in the GNOME extension are wrapped in `_()` with a gettext domain declared in `metadata.json` -- the extension is structurally ready for translation without functional change
   2. The polling service uses `setTimeout` instead of `setInterval` -- after a successful poll the next poll is scheduled from completion (not from start), preventing overlapping fetches on slow networks
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 13-01-PLAN.md — Atomic write utility, shell injection fix, silent catch fix (SEC-01, SEC-02, STAB-02)
+- [ ] 13-02-PLAN.md — Global error handlers, graceful shutdown, provider timeouts (STAB-03, STAB-05, STAB-06)
+- [ ] 13-03-PLAN.md — GNOME actor lifecycle fix, backend-client timeout (STAB-01, STAB-04)
 **UI hint**: yes
 
 ## Progress
