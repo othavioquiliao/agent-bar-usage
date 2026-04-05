@@ -385,22 +385,22 @@ const fetchWithTimeout = Promise.race([
 
 **NOTA sobre A3:** Inspecionei `service-server.ts:stop()` -- ele chama `server.stop()` e `clearRefreshTimer()`, mas NAO faz `unlink(socketPath)`. O `start()` faz `unlink` no inicio se o socket existe. Isso significa que entre crash e restart o socket orfao existe, mas e limpo no proximo start. O graceful shutdown (D-01) deveria adicionar `unlink` explicitamente no stop para hygiene, mas o sistema ja tolera o caso.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **SIGINT no service-command.ts**
    - What we know: `service-command.ts` ja tem `process.once('SIGINT', stop)` no `runServiceRunCommand`
    - What's unclear: Decisao D-01 menciona SIGTERM mas nao SIGINT explicitamente; Claude's Discretion inclui "Whether to add SIGINT handler alongside SIGTERM"
-   - Recommendation: Manter SIGINT que ja existe; e o padrao para `Ctrl+C` durante dev. Adicionar SIGTERM handler com a mesma logica.
+   - RESOLVED: Manter SIGINT que ja existe; e o padrao para `Ctrl+C` durante dev. Adicionar SIGTERM handler com a mesma logica. Implementado no Plan 02, Task 1.
 
 2. **Socket file cleanup no stop()**
    - What we know: `start()` faz `unlink` do socket antes de abrir; `stop()` nao faz `unlink`
    - What's unclear: Se D-01 espera que `stop()` delete o socket file ou se o `unlink` no proximo `start()` e suficiente
-   - Recommendation: Adicionar `unlink(socketPath)` no `stop()` como parte do graceful shutdown (D-01 diz "delete socket file")
+   - RESOLVED: Adicionar `unlink(socketPath)` no `stop()` como parte do graceful shutdown (D-01 diz "delete socket file"). Implementado no Plan 02, Task 1.
 
 3. **Flush do snapshot no graceful shutdown**
    - What we know: D-01 diz "flush last snapshot to disk"; `rememberSnapshot` ja faz `persistLatestSnapshot`
    - What's unclear: Se precisa flush explicitamente no shutdown ou se o ultimo `rememberSnapshot` ja e suficiente
-   - Recommendation: Se `lastSnapshot !== null`, chamar `persistLatestSnapshot` uma vez no shutdown antes de exit. Protege contra cenario onde snapshot esta em memoria mas nao foi persistido.
+   - RESOLVED: Se `lastSnapshot !== null`, chamar `persistLatestSnapshot` uma vez no shutdown antes de exit. Protege contra cenario onde snapshot esta em memoria mas nao foi persistido. Implementado no Plan 02, Task 1.
 
 ## Validation Architecture
 
