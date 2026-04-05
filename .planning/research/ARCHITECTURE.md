@@ -1,10 +1,10 @@
-# Architecture Research
+# Architecture Research: v2.1 Stability & Hardening Integration
 
-**Domain:** Linux-native AI provider usage monitor (Bun backend + GNOME Shell extension)
-**Researched:** 2026-03-28
+**Domain:** Linux-native AI provider usage monitor -- stability fixes across Bun/TS backend + GNOME Shell extension (GJS)
+**Researched:** 2026-04-05
 **Confidence:** HIGH
 
-## System Overview
+## Current Architecture (Baseline)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -16,672 +16,467 @@
 │         │                  │                         │                 │
 │         │    state push    │    fetchUsageSnapshot()  │                 │
 │         ├──────────────────┤                         │                 │
-│         │                  │                         │                 │
 ├─────────┴──────────────────┴─────────────────────────┴─────────────────┤
 │                       IPC Boundary                                     │
-│               Gio.Subprocess → `agent-bar usage --json`                │
-│               (stdout JSON pipe, no socket dependency)                 │
+│            Gio.Subprocess → `agent-bar service snapshot --json`         │
+│            or fallback `node --import tsx cli.ts usage --json`          │
 ├────────────────────────────────────────────────────────────────────────┤
 │                    Backend Service (Bun + TypeScript)                   │
-│                                                                        │
 │  ┌─────────────┐  ┌─────────────────────┐  ┌───────────────────────┐  │
-│  │  CLI Router  │  │  BackendCoordinator │  │  File-based Cache     │  │
-│  │  (manual     │  │  (orchestration)    │  │  (XDG_CACHE_HOME)     │  │
-│  │   parsing)   │  │                     │  │                       │  │
-│  └──────┬───────┘  └────────┬────────────┘  └───────────────────────┘  │
-│         │                   │                                          │
-│  ┌──────┴───────┐  ┌────────┴────────────────────────────────────────┐ │
-│  │  Lifecycle   │  │           Provider Registry                     │ │
-│  │  Commands    │  │                                                 │ │
-│  │  setup       │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐      │ │
-│  │  remove      │  │  │ Copilot  │  │  Codex   │  │  Claude  │      │ │
-│  │  update      │  │  │ (HTTP)   │  │ (PTY/API)│  │ (PTY/API)│      │ │
-│  │  doctor      │  │  └──────────┘  └──────────┘  └──────────┘      │ │
-│  │  auth        │  │                                                 │ │
-│  └──────────────┘  └────────────────────────────────────────────────┘  │
-│                                                                        │
-│  ┌──────────────────┐  ┌────────────────────┐  ┌───────────────────┐  │
-│  │  Settings         │  │  Secret Store      │  │  Config Loader   │  │
-│  │  (XDG, versioned) │  │  (secret-tool/env) │  │  (XDG)           │  │
-│  └──────────────────┘  └────────────────────┘  └───────────────────┘  │
-├────────────────────────────────────────────────────────────────────────┤
-│                    systemd User Service                                │
-│              ExecStart=~/.local/bin/agent-bar service run              │
-│              (long-running daemon with Unix socket server)             │
+│  │  CLI Router  │  │  BackendCoordinator │  │  SnapshotCache        │  │
+│  │  (cli.ts)    │  │  (orchestration)    │  │  (XDG file-backed)    │  │
+│  └──────┬───────┘  └──────────┬──────────┘  └───────────┬───────────┘  │
+│         │                     │                         │              │
+│  ┌──────┴───────┐  ┌─────────┴────────────────────┐    │              │
+│  │ ServiceServer│  │  Provider Registry            │    │              │
+│  │ (Bun.listen  │  │  ┌─────────┐ ┌──────┐ ┌─────┐│    │              │
+│  │  Unix socket)│  │  │ Copilot │ │Codex │ │Claude││    │              │
+│  └──────────────┘  │  └─────────┘ └──────┘ └─────┘│    │              │
+│                    └───────────────────────────────┘    │              │
+├────────────────────────────────────────────────────────┴──────────────┤
+│              Persistence: XDG cache + config + GNOME Keyring           │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Responsibilities
+## v2.1 Integration Map: Issues to Architecture Points
 
-| Component | Responsibility | Implementation |
-|-----------|----------------|----------------|
-| CLI Router | Parse argv, dispatch to command handlers | Manual switch/case parsing (no Commander) |
-| BackendCoordinator | Orchestrate provider fetch, cache, envelope assembly | Stateless coordinator, receives registry + cache |
-| Provider Registry | Register and resolve provider adapters | Map-backed ordered collection |
-| Provider Adapter | Self-contained fetch logic per AI provider | Each provider is a standalone module with `isAvailable()` + `getQuota()` |
-| File-based Cache | Per-provider TTL cache with deduplication | JSON files in XDG_CACHE_HOME, Bun.file() API |
-| Settings | User preferences with version migration | JSON in XDG_CONFIG_HOME, normalize-on-read |
-| Secret Store | Resolve provider credentials | secret-tool (Keyring) or env var lookup |
-| Service Server | Long-running daemon with Unix socket | Bun.serve() with unix option or net.createServer |
-| Lifecycle Commands | setup / remove / update / doctor / auth | TypeScript modules, @clack/prompts TUI |
-| GNOME Extension | Top-bar indicator, polling, detail menu | GJS, Gio.Subprocess, St widgets |
-| BackendClient | Extension's bridge to backend CLI | Gio.SubprocessLauncher + communicate_utf8_async |
-| PollingService | Timer-based auto-refresh with retry backoff | setInterval + exponential retry delays |
+The 24 audit issues map to **6 distinct integration zones** in the architecture. Understanding these zones determines build order.
 
-## Recommended Project Structure
+### Zone 1: GNOME Indicator Actor Lifecycle (CRITICAL)
 
+**Current problem:** `indicator.js` `_render()` removes children from `_box` without calling `.destroy()` on them. GJS actors hold C-side references -- removing from parent does NOT free them. Each re-render leaks `St.BoxLayout`, `St.Bin`, `St.Icon`, and `St.Label` actors.
+
+**File:** `apps/gnome-extension/panel/indicator.js`
+
+**Integration point:** `_render()` method (lines 125-167)
+
+**Current flow:**
 ```
-agent-bar-usage/
-├── apps/
-│   ├── backend/                    # Bun + TypeScript backend
-│   │   ├── src/
-│   │   │   ├── cli.ts              # Manual CLI router (entry point)
-│   │   │   ├── providers/
-│   │   │   │   ├── types.ts        # Provider + ProviderQuota interfaces
-│   │   │   │   ├── registry.ts     # Provider registration + resolution
-│   │   │   │   ├── copilot/
-│   │   │   │   │   ├── index.ts    # CopilotProvider class (self-contained)
-│   │   │   │   │   └── token.ts    # Token resolution (secret-tool/env)
-│   │   │   │   ├── codex/
-│   │   │   │   │   ├── index.ts    # CodexProvider class (self-contained)
-│   │   │   │   │   └── parser.ts   # CLI output parser
-│   │   │   │   └── claude/
-│   │   │   │       ├── index.ts    # ClaudeProvider class (self-contained)
-│   │   │   │       ├── api.ts      # HTTP API fetcher
-│   │   │   │       └── parser.ts   # CLI output parser
-│   │   │   ├── cache.ts            # File-based cache with TTL + deduplication
-│   │   │   ├── config.ts           # Static config (paths, timeouts, thresholds)
-│   │   │   ├── settings.ts         # User settings with version migration
-│   │   │   ├── coordinator.ts      # Fetch orchestration across providers
-│   │   │   ├── service/
-│   │   │   │   ├── server.ts       # Unix socket service daemon
-│   │   │   │   ├── client.ts       # Socket client for CLI → daemon queries
-│   │   │   │   └── socket-path.ts  # XDG_RUNTIME_DIR path resolution
-│   │   │   ├── commands/
-│   │   │   │   ├── setup.ts        # TypeScript-based installer
-│   │   │   │   ├── remove.ts       # Uninstall (preserves secrets)
-│   │   │   │   ├── update.ts       # Version update
-│   │   │   │   ├── auth.ts         # GitHub Device Flow OAuth
-│   │   │   │   └── doctor.ts       # Prerequisite checks
-│   │   │   ├── formatters/
-│   │   │   │   ├── json.ts         # --json output
-│   │   │   │   └── text.ts         # Human-readable terminal output
-│   │   │   ├── secrets/
-│   │   │   │   ├── store.ts        # SecretResolver interface + orchestration
-│   │   │   │   ├── secret-tool.ts  # GNOME Keyring via secret-tool
-│   │   │   │   └── env.ts          # Environment variable fallback
-│   │   │   └── utils/
-│   │   │       ├── subprocess.ts   # Bun.spawn() wrapper
-│   │   │       └── pty.ts          # Bun.Terminal wrapper for interactive CLIs
-│   │   ├── test/                   # bun:test test files
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   └── gnome-extension/            # GNOME Shell extension (GJS)
-│       ├── panel/                   # Top-bar UI components
-│       │   ├── indicator.js
-│       │   ├── provider-row.js
-│       │   └── progress-bar.js
-│       ├── services/
-│       │   ├── backend-client.js    # Gio.Subprocess → CLI bridge
-│       │   └── polling-service.js   # Auto-refresh timer
-│       ├── state/
-│       │   └── extension-state.js   # Immutable state transitions
-│       ├── utils/
-│       │   ├── backend-command.js   # CLI invocation builder
-│       │   ├── json.js
-│       │   ├── time.js
-│       │   └── view-model.js
-│       ├── assets/                  # SVG/PNG provider icons
-│       └── test/                    # Vitest tests
-│
-├── packaging/
-│   ├── systemd/user/
-│   │   └── agent-bar.service       # systemd user service unit
-│   └── tmpfiles.d/
-│       └── agent-bar.conf          # Runtime directory creation
-│
-├── package.json                     # Workspace root
-├── pnpm-workspace.yaml             # Workspace members
-└── tsconfig.base.json              # Shared compiler options
+_render() → _box.remove_child(child) → _providerActors.clear()
+             ^--- LEAK: child actors not destroyed
 ```
 
-### Structure Rationale
+**Required change:** Destroy actor hierarchy before removal.
 
-- **`apps/backend/src/providers/<name>/`:** Each provider is a directory containing everything it needs. No provider imports from another provider. The `types.ts` at `providers/` level defines the contract, individual providers implement it. This is the core architectural change from v1.
-- **`apps/backend/src/commands/`:** Lifecycle commands (setup, remove, update, auth, doctor) are standalone modules that import from shared utilities but never from each other. Each is a self-contained script with its own CLI entry behavior.
-- **`apps/backend/src/service/`:** The daemon layer stays separate from the CLI command layer. The service wraps the coordinator, the CLI can either invoke the coordinator directly or communicate with the service through the socket.
-- **No `packages/shared-contract`:** The shared-contract package with Zod schemas is eliminated. The backend defines plain TypeScript interfaces; the GNOME extension consumes JSON output through subprocess stdout. The contract boundary is the CLI JSON output format, not a shared npm package.
+**New flow:**
+```
+_render() → for each child: child.destroy() → _providerActors.clear() → rebuild
+```
 
-## Architectural Patterns
+**New component needed:** None. This is a fix within the existing `_render()` method.
 
-### Pattern 1: Self-Contained Provider Module
+**Pattern to follow:** Per GJS memory management best practices, every `St.Widget` or `Clutter.Actor` must have `.destroy()` called before its reference is dropped. The existing `destroy()` method at line 169 does call `this.menu?.removeAll()` but the `_render()` path skips actor destruction entirely.
 
-**What:** Each provider is a class implementing a minimal interface (`Provider`) with `id`, `name`, `cacheKey`, `isAvailable()`, and `getQuota()`. The provider owns its own credential lookup, HTTP/PTY fetching, response parsing, and error handling. Zero imports from other providers.
+**Specific fix:**
+```javascript
+// In _render(), before clearing providerActors:
+for (const [_id, slot] of this._providerActors) {
+  slot.container.destroy();  // destroys icon, iconBox, usageLabel children too
+}
+this._providerActors.clear();
 
-**When to use:** Always. This is the foundational pattern for provider independence.
+// For orphan children already in _box that are NOT tracked in _providerActors:
+for (const child of this._box.get_children?.() ?? []) {
+  child.destroy();
+}
+```
 
-**Trade-offs:**
-- PRO: Adding or removing a provider is a single directory add/delete + one line in the registry.
-- PRO: Provider bugs are fully isolated -- a Claude API change cannot break Copilot.
-- CON: Some duplication across providers (timeout handling, error wrapping). This is acceptable -- shared utilities exist for cross-cutting concerns, but each provider decides whether to use them.
+**Dependencies:** None. Fully self-contained.
 
-**Example:**
+### Zone 2: Shell Injection in Auth Command (CRITICAL)
+
+**Current problem:** `auth-command.ts` line 225 uses `exec(\`xdg-open ${url}\`)` which interpolates the URL into a shell string. A crafted verification URL could inject arbitrary shell commands.
+
+**File:** `apps/backend/src/commands/auth-command.ts`
+
+**Integration point:** `defaultOpenBrowser()` function (line 224-227)
+
+**Current flow:**
+```
+defaultOpenBrowser(url) → exec(`xdg-open ${url}`) → shell interpolation
+```
+
+**Required change:** Replace `exec` with `execFile` or `Bun.spawn` which pass arguments as arrays, bypassing shell interpolation entirely.
+
+**New flow:**
+```
+defaultOpenBrowser(url) → Bun.spawn(['xdg-open', url]) → no shell interpolation
+```
+
+**New component needed:** None. Single-function fix.
+
+**Specific fix:**
 ```typescript
-// providers/types.ts -- the ONLY shared contract
-export interface QuotaWindow {
-  remaining: number;       // 0-100 percentage remaining
-  resetsAt: string | null; // ISO timestamp
-}
-
-export interface ProviderQuota {
-  provider: string;
-  displayName: string;
-  available: boolean;
-  error?: string;
-  primary?: QuotaWindow;
-  secondary?: QuotaWindow;
-  meta?: Record<string, string>;
-}
-
-export interface Provider {
-  readonly id: string;
-  readonly name: string;
-  readonly cacheKey: string;
-  isAvailable(): Promise<boolean>;
-  getQuota(): Promise<ProviderQuota>;
-}
-
-// providers/copilot/index.ts -- self-contained
-import type { Provider, ProviderQuota } from '../types';
-import { resolveToken } from './token';
-
-export class CopilotProvider implements Provider {
-  readonly id = 'copilot';
-  readonly name = 'Copilot';
-  readonly cacheKey = 'copilot-usage';
-
-  async isAvailable(): Promise<boolean> {
-    return (await resolveToken()) !== null;
-  }
-
-  async getQuota(): Promise<ProviderQuota> {
-    // All Copilot-specific logic is here
-    // No imports from claude/ or codex/
+function defaultOpenBrowser(url: string): void {
+  try {
+    Bun.spawn(['xdg-open', url], {
+      stdout: 'ignore',
+      stderr: 'ignore',
+      stdin: 'ignore',
+    });
+  } catch {
+    // Intentionally silent — xdg-open may not be available
   }
 }
 ```
 
-### Pattern 2: File-Based Cache with TTL + Deduplication
+**Dependencies:** None. Fully self-contained.
 
-**What:** Cache entries are individual JSON files stored in `$XDG_CACHE_HOME/agent-bar/`. Each file contains `{ data, fetchedAt, expiresAt }`. A `getOrFetch()` method prevents duplicate concurrent requests for the same provider.
+### Zone 3: Snapshot Cache Race Condition (CRITICAL)
 
-**When to use:** For all provider data. The cache sits between the coordinator and providers, not inside providers.
+**Current problem:** `snapshot-cache.ts` line 73 uses `writeFileSync()` directly. If the process crashes mid-write or two concurrent writes overlap, the JSON file becomes corrupted. The `getOrFetch()` inflight deduplication (lines 93-106) mitigates concurrent fetches within a single process, but does NOT protect the file write itself.
 
-**Trade-offs:**
-- PRO: Cache survives process restarts (critical for systemd service restart behavior).
-- PRO: Easy to inspect/debug (`cat ~/.cache/agent-bar/claude-usage.json`).
-- PRO: No in-memory state to leak across requests.
-- CON: Slightly slower than in-memory Map cache for high-frequency access. Irrelevant here -- refresh interval is 2.5-5 minutes.
+**File:** `apps/backend/src/cache/snapshot-cache.ts`
 
-**Example:**
+**Integration point:** `set()` method (lines 65-76) and `persistLatestSnapshot()` in `service-server.ts` (line 100-103)
+
+**Current flow:**
+```
+set() → writeFileSync(path, json) → direct overwrite (non-atomic)
+persistLatestSnapshot() → writeFileSync(path, json) → direct overwrite (non-atomic)
+```
+
+**Required change:** Implement atomic write: write to temp file in same directory, then `rename()`. On Linux, `rename()` on the same filesystem is atomic -- the file is either the old version or the new version, never a partial write.
+
+**New flow:**
+```
+set() → Bun.write(tempPath, json) → rename(tempPath, path) → atomic swap
+```
+
+**New component needed:** `atomicWriteFileSync()` utility function in `apps/backend/src/utils/` (or inline in cache module). This is a shared helper since both `snapshot-cache.ts` and `service-server.ts` need atomic writes.
+
+**Specific pattern:**
 ```typescript
-// cache.ts (mirrors agent-bar-omarchy pattern)
-export class Cache {
-  private inflight = new Map<string, Promise<unknown>>();
+import { renameSync, unlinkSync } from 'node:fs';
 
-  async getOrFetch<T>(
-    key: string,
-    fetcher: () => Promise<T>,
-    ttlMs: number
-  ): Promise<T> {
-    const cached = await this.get<T>(key);
-    if (cached !== null) return cached;
-
-    // Deduplicate concurrent fetches
-    const existing = this.inflight.get(key);
-    if (existing) return existing as Promise<T>;
-
-    const promise = fetcher()
-      .then(async (data) => {
-        await this.set(key, data, ttlMs);
-        this.inflight.delete(key);
-        return data;
-      })
-      .catch((err) => {
-        this.inflight.delete(key);
-        throw err;
-      });
-
-    this.inflight.set(key, promise);
-    return promise;
+function atomicWriteFileSync(filePath: string, content: string): void {
+  const tempPath = `${filePath}.${process.pid}.tmp`;
+  try {
+    writeFileSync(tempPath, content, 'utf8');
+    renameSync(tempPath, filePath);
+  } catch (error) {
+    try { unlinkSync(tempPath); } catch {}
+    throw error;
   }
 }
 ```
 
-### Pattern 3: CLI-as-IPC-Contract (Subprocess Bridge)
+**Dependencies:** None for implementation. Should be introduced as a utility before the cache and service-server fixes consume it.
 
-**What:** The GNOME extension communicates with the backend exclusively through `Gio.Subprocess` spawning `agent-bar usage --json`. The backend outputs a JSON envelope to stdout. No Unix socket, no DBus, no shared memory.
+**Integration note:** `service-server.ts` `persistLatestSnapshot()` at line 100-103 has the identical problem and must also switch to `atomicWriteFileSync()`.
 
-**When to use:** For the GNOME extension to backend communication. The service daemon adds a Unix socket layer for faster repeated queries from the CLI itself, but the extension always goes through the subprocess path because GJS's Gio.Subprocess is the most reliable and review-approved IPC mechanism for GNOME extensions.
+### Zone 4: Global Error Handlers in Service Runtime (CRITICAL)
 
-**Trade-offs:**
-- PRO: GNOME extension review compliance -- subprocess spawning is the standard pattern.
-- PRO: Zero coupling -- the extension does not need to know about Bun, TypeScript, or any backend internal.
-- PRO: Testable in isolation -- mock the subprocess output, test the extension state machine.
-- CON: Process startup overhead per refresh (~15-50ms for Bun cold start). Mitigated by the service daemon: when running, the CLI short-circuits to the socket, returning cached data in <5ms.
+**Current problem:** `service-server.ts` `createAgentBarServiceRuntime()` has no global `uncaughtException` / `unhandledRejection` handlers. If an unhandled error propagates from a provider fetch, socket handler, or timer callback, the service silently dies. The systemd unit may or may not restart it depending on configuration.
 
-### Pattern 4: Dual-Path Resolution (Service vs Direct)
+**File:** `apps/backend/src/service/service-server.ts` (runtime) and `apps/backend/src/commands/service-command.ts` (entry)
 
-**What:** The CLI has two execution paths for `usage --json`:
-1. **Service path:** If `agent-bar service run` is active (systemd), the CLI connects to `$XDG_RUNTIME_DIR/agent-bar/service.sock` and reads cached data instantly.
-2. **Direct path:** If no service is running, the CLI fetches directly from providers (slower, no cache persistence).
+**Integration point:** `runServiceRunCommand()` in service-command.ts (lines 83-99) -- the process-level entry point for `agent-bar service run`.
 
-The GNOME extension always invokes `agent-bar usage --json` which auto-detects which path to use.
-
-**When to use:** Always. The service path is the default in production (systemd auto-starts it). The direct path is the fallback for development and debugging.
-
-### Pattern 5: Manual CLI Parsing
-
-**What:** Replace Commander with a hand-written switch/case parser. Commands are positional (`agent-bar setup`, `agent-bar usage --json`), flags are `--key value` pairs.
-
-**When to use:** For all CLI routing. This eliminates a runtime dependency and gives full control over error messages, typo suggestions (Levenshtein distance), and output formatting.
-
-**Example:**
-```typescript
-// cli.ts (mirrors agent-bar-omarchy pattern)
-function parseArgs(argv: string[]): CliOptions {
-  const options: CliOptions = { command: 'usage', json: false };
-
-  for (let i = 0; i < argv.length; i++) {
-    switch (argv[i]) {
-      case 'usage':   options.command = 'usage'; break;
-      case 'setup':   options.command = 'setup'; break;
-      case 'remove':  options.command = 'remove'; break;
-      case 'update':  options.command = 'update'; break;
-      case 'doctor':  options.command = 'doctor'; break;
-      case 'auth':    options.command = 'auth'; break;
-      case 'service': options.command = 'service'; break;
-      case '--json':  options.json = true; break;
-      case '--provider':
-        options.provider = argv[++i]; break;
-      case '--refresh':
-        options.refresh = true; break;
-      default:
-        if (argv[i].startsWith('-')) {
-          console.error(`Unknown flag: ${argv[i]}`);
-        } else {
-          suggestCommand(argv[i]);
-        }
-    }
-  }
-  return options;
-}
+**Current flow:**
+```
+runServiceRunCommand() → runtime.start() → listen on socket
+  ↓ (uncaught error)
+  Process crashes silently. No log. No cleanup.
 ```
 
-## Data Flow
+**Required change:** Register global error handlers before `runtime.start()`. Log the error. Attempt graceful shutdown. Exit with non-zero code so systemd can restart.
 
-### Primary Data Flow: GNOME Extension Refresh
-
+**New flow:**
 ```
-PollingService (setInterval, 150s)
-    │
-    ▼
-BackendClient.fetchUsageSnapshot()
-    │
-    ▼
-Gio.SubprocessLauncher.spawnv(["agent-bar", "usage", "--json", "--diagnostics"])
-    │
-    ▼
-CLI Router (cli.ts)
-    │
-    ├─ Service running? ──YES──► Socket client → service daemon → cached snapshot
-    │                                                                │
-    └─ No service? ──────────► Direct coordinator.getSnapshot()      │
-                                      │                              │
-                                      ▼                              │
-                               For each enabled provider:            │
-                               1. Check cache (file-based)           │
-                               2. Cache miss? → provider.getQuota()  │
-                               3. Store result in cache file         │
-                                      │                              │
-                                      ▼                              │
-                               Assemble SnapshotEnvelope             │
-                                      │                              │
-                                      ▼                              │
-                               JSON.stringify → stdout ◄─────────────┘
-    │
-    ▼
-BackendClient parses JSON from stdout
-    │
-    ▼
-PollingService calls onStateChange(applySnapshotSuccess(state, envelope))
-    │
-    ▼
-Indicator re-renders top-bar provider rows
+runServiceRunCommand()
+  → register process.on('uncaughtException', handler)
+  → register process.on('unhandledRejection', handler)
+  → runtime.start()
+  ↓ (uncaught error)
+  Log error → runtime.stop() → process.exit(1)
 ```
 
-### Provider Fetch Flow (per provider)
+**New component needed:** None as a separate module. The handlers are registered inline in `runServiceRunCommand()`. Optionally, a small `installGlobalErrorHandlers(cleanup: () => Promise<void>)` helper could be extracted to `apps/backend/src/utils/` for reuse.
 
+**Bun compatibility:** Bun supports `process.on('uncaughtException')` and `process.on('unhandledRejection')` since v1.1.8. HIGH confidence -- verified via Bun release notes and Sentry integration docs.
+
+**Dependencies:** None. Self-contained addition to the service startup path.
+
+### Zone 5: Subprocess Timeouts (HIGH -- 3 separate fixes)
+
+Three distinct locations need subprocess timeout enforcement:
+
+#### 5a. GNOME Extension BackendClient (no timeout)
+
+**Current problem:** `backend-client.js` `runGioSubprocess()` calls `communicate_utf8_async()` without a `Gio.Cancellable`. If the backend hangs, the extension freezes indefinitely since the polling service awaits the promise.
+
+**File:** `apps/gnome-extension/services/backend-client.js`
+
+**Integration point:** `runGioSubprocess()` function (lines 45-75)
+
+**Current flow:**
 ```
-coordinator.getSnapshot(request)
-    │
-    ▼
-For each provider in settings.providers:
-    │
-    ├─ cache.getOrFetch(provider.cacheKey, () => provider.getQuota())
-    │       │
-    │       ├─ Cache HIT → return cached ProviderQuota
-    │       │
-    │       └─ Cache MISS → provider.getQuota()
-    │               │
-    │               ├─ Copilot: HTTP fetch to api.github.com (token from Keyring/env)
-    │               │
-    │               ├─ Codex: Bun.spawn() with terminal option → parse CLI output
-    │               │     └─ Fallback: HTTP to local app-server if available
-    │               │
-    │               └─ Claude: HTTP fetch to api.anthropic.com (OAuth token from ~/.claude/)
-    │                     └─ Fallback: Bun.spawn() with terminal → parse CLI output
-    │
-    ▼
-Assemble { providers: ProviderQuota[], fetchedAt: ISO string }
+runGioSubprocess(argv) → launcher.spawnv(argv) → communicate_utf8_async(null, null, callback)
+                                                   ^--- no cancellable, no timeout
 ```
 
-### Settings + Config Flow
+**Required change:** Add a `Gio.Cancellable` with a `GLib.timeout_add()` that triggers `force_exit()` after a configurable timeout (default 30s).
 
+**New flow:**
 ```
-$XDG_CONFIG_HOME/agent-bar/settings.json
-    │
-    ▼
-loadSettings() → normalizeSettings() → migrateSettings(fromVersion)
-    │
-    ├─ providers: ["copilot", "codex", "claude"]  (which to show in topbar)
-    ├─ providerOrder: ["copilot", "codex", "claude"]  (display order)
-    └─ version: 1  (for future schema migrations)
-
-$XDG_CONFIG_HOME/agent-bar/config.json
-    │
-    ▼
-loadConfig() → { defaults: { ttlSeconds: 150 }, providers: [...] }
-    │
-    ├─ Per-provider: enabled, sourceMode, secretRef
-    └─ Global: TTL, timeouts
+runGioSubprocess(argv, { timeoutMs })
+  → launcher.spawnv(argv)
+  → GLib.timeout_add(PRIORITY_DEFAULT, timeoutMs, () => { proc.force_exit(); return false; })
+  → communicate_utf8_async(null, cancellable, callback)
+  → on completion: GLib.Source.remove(timeoutSourceId)
 ```
 
-## Key Architectural Decisions
+**Critical GJS subtlety:** `Gio.Cancellable.cancel()` does NOT kill the subprocess -- it only cancels the async operation. You MUST call `proc.force_exit()` explicitly. The timeout should call both `cancellable.cancel()` and `proc.force_exit()`.
 
-### Decision 1: Keep Subprocess IPC, Drop Unix Socket Dependency from Extension
+**New component needed:** None as a separate module. The timeout logic lives inside `runGioSubprocess()`.
 
-**Current state:** The GNOME extension uses `Gio.Subprocess` to spawn `agent-bar usage --json`. This works reliably.
+**Dependencies:** None. Self-contained.
 
-**Decision:** Keep this as the primary IPC mechanism. The Unix socket server stays for CLI-to-daemon fast-path only.
+#### 5b. BackendCoordinator (no global timeout)
 
-**Rationale:**
-- GJS can connect to Unix sockets via `Gio.SocketClient`, but subprocess spawning is the reviewed/approved pattern for GNOME extensions.
-- The socket path adds complexity for the extension (connection management, reconnection, partial reads) with minimal benefit -- the extension polls every 2.5 minutes, not every second.
-- The service daemon answers the CLI subprocess call via socket internally, giving the extension the speed benefit without socket management complexity.
+**Current problem:** `backend-coordinator.ts` `#resolveSnapshot()` calls `adapter.isAvailable()` and `adapter.getQuota()` with no per-provider timeout. If a provider adapter hangs (e.g., waiting for a CLI subprocess that never responds), the entire snapshot generation blocks indefinitely.
 
-### Decision 2: Replace node-pty with Bun.Terminal
+**File:** `apps/backend/src/core/backend-coordinator.ts`
 
-**Current state:** node-pty is a native addon that requires `build-essential` to compile. It works with Node.js but has NAPI compatibility issues with Bun.
+**Integration point:** `#resolveSnapshot()` method (lines 67-153) -- specifically the `adapter.isAvailable()` (line 117) and `adapter.getQuota()` (line 141) calls.
 
-**Decision:** Use `Bun.spawn()` with the `terminal` option (Bun.Terminal API, introduced in Bun v1.3.5).
-
-**Rationale:**
-- Bun.Terminal provides first-class PTY support on POSIX systems (Linux, macOS) without any native addon compilation.
-- Eliminates the `build-essential` dependency from the install prerequisites.
-- API surface is simpler: `Bun.spawn(cmd, { terminal: { cols, rows, data(term, chunk) {...} } })`.
-- The `data` callback replaces node-pty's `onData`, and `terminal.write()` replaces `term.write()`.
-
-**Confidence:** HIGH -- Bun docs confirm PTY support on Linux. The `interactive-command.ts` wrapper is a thin abstraction that maps cleanly to Bun.Terminal.
-
-### Decision 3: Eliminate shared-contract Package
-
-**Current state:** `packages/shared-contract` exports Zod schemas for `ProviderSnapshot`, `SnapshotEnvelope`, `DiagnosticsReport`, etc. Both backend and extension depend on it.
-
-**Decision:** Delete the package. Define plain TypeScript interfaces in the backend. The GNOME extension consumes raw JSON -- it never imported the Zod schemas anyway (GJS cannot run Zod).
-
-**Rationale:**
-- Zod is being removed entirely (PROJECT.md requirement).
-- The GNOME extension already parses `JSON.parse(stdout)` without validation -- the contract is the JSON shape, not a Zod schema.
-- Inline validation in the backend replaces Zod: simple type guards and boundary checks.
-- Removing the package simplifies the monorepo: no `build:shared` step before `build:backend`.
-
-### Decision 4: Service Daemon Uses Bun.serve() with Unix Socket
-
-**Current state:** The service server uses Node.js `net.createServer()` with newline-delimited JSON over a Unix socket.
-
-**Decision:** Migrate to `Bun.serve({ unix: socketPath, fetch(req) { ... } })`.
-
-**Rationale:**
-- `Bun.serve()` with `unix` option is well-documented and stable (since Bun v0.8.1).
-- Bun's `net.createServer()` compatibility has known reliability issues with TCP data integrity. The native `Bun.serve()` API avoids these issues.
-- The HTTP semantics (`fetch` handler, Request/Response) are simpler than raw newline-delimited JSON over a TCP socket.
-- The CLI client uses `fetch()` with `{ unix: socketPath }` -- Bun supports this natively.
-- This also enables `curl --unix-socket` debugging, which is easier than crafting raw JSON payloads.
-
-### Decision 5: Provider Interface Mirrors agent-bar-omarchy
-
-**Current state:** Providers implement `ProviderAdapter` with `isAvailable(context)` and `fetch(context)`, receiving a complex `ProviderAdapterContext` with request metadata, secrets, runtime info, subprocess helpers.
-
-**Decision:** Simplify to the omarchy interface: `isAvailable(): Promise<boolean>` and `getQuota(): Promise<ProviderQuota>`. Each provider resolves its own credentials internally.
-
-**Rationale:**
-- The context-passing pattern creates implicit coupling: every provider must understand the context shape, even if it only uses 2 of 8 fields.
-- Self-contained providers are easier to test: instantiate the class, call `getQuota()`, assert the result.
-- Credential resolution is provider-specific anyway (Copilot uses Keyring token, Claude reads `~/.claude/.credentials.json`, Codex reads `~/.codex/auth.json`).
-
-## Module Boundaries
-
-### Backend Internal Boundaries
-
+**Current flow:**
 ```
-                 ┌───────────────────────┐
-                 │      CLI Router       │
-                 │   (entry point)       │
-                 └─────────┬─────────────┘
-                           │ dispatches to
-          ┌────────────────┼────────────────┐
-          │                │                │
-          ▼                ▼                ▼
-   ┌─────────────┐  ┌────────────┐  ┌─────────────┐
-   │  Commands   │  │Coordinator │  │  Service    │
-   │  setup      │  │            │  │  server     │
-   │  remove     │  │  uses ▼    │  │  client     │
-   │  update     │  │            │  │             │
-   │  auth       │  │ Registry   │  └──────┬──────┘
-   │  doctor     │  │            │         │
-   └─────────────┘  └──────┬─────┘         │
-                           │               │
-                    ┌──────┴──────┐        │
-                    │  Providers  │  ◄─────┘ (service wraps coordinator)
-                    │             │
-                    │ ┌─────────┐ │
-                    │ │Copilot  │ │  ← imports ONLY from ../types + own files
-                    │ ├─────────┤ │
-                    │ │Codex    │ │  ← imports ONLY from ../types + own files
-                    │ ├─────────┤ │
-                    │ │Claude   │ │  ← imports ONLY from ../types + own files
-                    │ └─────────┘ │
-                    └─────────────┘
-                           │
-                    ┌──────┴──────┐
-                    │  Shared     │
-                    │  Utilities  │
-                    │  cache.ts   │
-                    │  config.ts  │
-                    │  settings.ts│
-                    │  secrets/*  │
-                    └─────────────┘
+#resolveSnapshot() → adapter.isAvailable(context) → no timeout
+                   → adapter.getQuota(context) → no timeout
 ```
 
-**Hard rules:**
-- Providers NEVER import from each other.
-- Providers import ONLY from `../types.ts` (the Provider interface) and their own sibling files.
-- Providers MAY import shared utilities (cache, config, secrets) but never the coordinator or CLI.
-- The coordinator imports the registry, which imports providers -- this is the only assembly point.
-- Commands import shared utilities but not each other.
+**Required change:** Wrap provider calls in a `Promise.race()` with a timeout, or use `AbortSignal.timeout()` (Bun supports this). A per-provider timeout of 30s is appropriate since CLI-based providers (Codex app-server, Claude) already have their own internal timeouts but those can fail to fire.
 
-### Backend ↔ Extension Boundary
-
-| Aspect | Backend Side | Extension Side | Contract |
-|--------|-------------|----------------|----------|
-| Invocation | CLI binary at `~/.local/bin/agent-bar` | `Gio.SubprocessLauncher.spawnv()` | Positional args: `usage --json [--refresh] [--provider <id>]` |
-| Output | `JSON.stringify(envelope)` to stdout | `parseStrictJson(stdout)` | JSON object with `schema_version`, `generated_at`, `providers[]` |
-| Error | stderr + non-zero exit code | BackendClientError with stderr context | Non-zero exit = retry with backoff |
-| Provider data | `ProviderQuota` objects in providers array | Direct property access on parsed JSON | `{ provider, displayName, available, error?, primary?, secondary?, meta? }` |
-
-**The extension must tolerate:**
-- Missing fields (defensive `?.` access)
-- Extra fields (ignore unknown properties)
-- Schema evolution (new fields added without breaking)
-
-### Backend ↔ systemd Boundary
-
-| Aspect | Detail |
-|--------|--------|
-| Unit file | `~/.config/systemd/user/agent-bar.service` |
-| ExecStart | `~/.local/bin/agent-bar service run` |
-| Socket | `$XDG_RUNTIME_DIR/agent-bar/service.sock` |
-| Protocol | HTTP over Unix socket (Bun.serve) |
-| Endpoints | `GET /status`, `GET /snapshot`, `POST /refresh` |
-| Restart | `on-failure`, RestartSec=2 |
-| Environment | Captured at install time via systemd override |
-
-## Build Order (Dependency Chain)
-
-The build order matters because some components depend on others existing first.
-
-### Phase Order Implication
-
+**New flow:**
 ```
-1. Provider types + interface          (no deps, foundational)
-     ↓
-2. Shared utilities (cache, config,    (no provider deps)
-   settings, secrets, subprocess/pty)
-     ↓
-3. Individual providers                (depend on types + utilities)
-     ↓
-4. Provider registry + coordinator     (depend on provider modules)
-     ↓
-5. CLI router + commands               (depend on coordinator + providers)
-     ↓
-6. Service daemon (server + client)    (depend on coordinator)
-     ↓
-7. Lifecycle commands (setup,          (depend on config + settings)
-   remove, update)
-     ↓
-8. GNOME extension updates             (depend on stable JSON contract)
+#resolveSnapshot()
+  → Promise.race([adapter.isAvailable(context), timeout(30_000)])
+  → Promise.race([adapter.getQuota(context), timeout(30_000)])
+  → on timeout: return error snapshot with 'provider_timeout' code
 ```
 
-**Key insight:** Steps 1-6 can proceed without changing the GNOME extension at all. The extension only needs updates if the JSON output format changes (which it should not -- the format is backward-compatible). Step 8 is for improvements like auto-refresh tuning, provider selection UI, and icon integration.
+**New component needed:** A small `withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T>` utility. This should go in `apps/backend/src/utils/` since it is useful beyond just the coordinator.
 
-### Parallel Work Opportunities
+**Dependencies:** None for implementation. The utility should exist before the coordinator fix.
 
-- Provider implementations (copilot, codex, claude) are fully independent and can be built/refactored in parallel.
-- Cache, config, and settings modules have no interdependencies and can be built in parallel.
-- Lifecycle commands (setup, remove, update) are independent of each other.
+#### 5c. Codex Appserver Subprocess (can dangle after settle)
 
-## Scaling Considerations
+**Current problem:** `codex-appserver-fetcher.ts` has a `settle()` function that calls `child.kill()` -- but the `child.stdout` reader loop (lines 182-192) continues running after settle. The `while(true)` async reader only checks `settled` after each `read()` call. If the child process doesn't close stdout promptly after kill, the reader hangs.
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 3 providers (current) | Single-process daemon, file cache, in-memory dedup. No changes needed. |
-| 5-8 providers | Add provider auto-discovery via directory convention. Registry scans `providers/*/index.ts`. Settings grow but schema migration handles it. |
-| 10+ providers | Consider per-provider cache TTL configuration. Group providers by refresh priority (primary vs secondary). Still single-process -- provider fetches are I/O-bound, not CPU-bound. |
+**File:** `apps/backend/src/providers/codex/codex-appserver-fetcher.ts`
 
-### Scaling Priorities
+**Integration point:** `fetchCodexUsageViaAppServer()` function (lines 64-218)
 
-1. **First bottleneck:** Provider fetch latency. PTY-based providers (Codex, Claude CLI fallback) take 2-5 seconds. Solution: prefer HTTP API paths, use PTY only as fallback. Cache aggressively.
-2. **Second bottleneck:** Extension startup time. If many providers are enabled, the first refresh blocks the top-bar render. Solution: the service daemon warms the cache at startup, so the first CLI call returns instantly.
+**Current flow:**
+```
+settle() → clearTimeout(timer) → child.kill() → resolve(snapshot)
+  BUT: async reader loop still running → may hang on reader.read()
+```
 
-## Anti-Patterns
+**Required change:** After `child.kill()`, cancel the reader explicitly. Use `reader.cancel()` to abort the pending `read()`. Additionally, ensure `child.exited` promise resolves cleanup so no dangling process reference remains.
 
-### Anti-Pattern 1: Provider Context Passing
+**New flow:**
+```
+settle() → clearTimeout(timer) → child.kill() → reader.cancel() → resolve(snapshot)
+```
 
-**What people do:** Create a rich context object (`ProviderAdapterContext`) that carries request metadata, secret resolution results, environment, time functions, subprocess helpers, and runtime metadata to every provider.
+**New component needed:** None. Fix within the existing function.
 
-**Why it's wrong:** It creates implicit coupling between providers and the orchestration layer. Providers must understand the context shape. Testing requires constructing complex context objects. Adding a new field to the context affects every provider's type signature.
+**Dependencies:** None. Self-contained.
 
-**Do this instead:** Providers are self-contained classes that resolve their own dependencies. The coordinator calls `provider.getQuota()` with no arguments. The provider reads credentials from the filesystem or Keyring directly.
+### Zone 6: Cross-Cutting Concerns (Supporting fixes)
 
-### Anti-Pattern 2: Shared Zod Schema Package
+These are not separate integration points but patterns that span multiple zones:
 
-**What people do:** Create a shared package with Zod schemas that both backend and extension depend on.
+#### 6a. Error Logging Consistency
 
-**Why it's wrong:** The GNOME extension runs in GJS, which cannot execute Zod. The shared package adds a build step, a workspace dependency, and version coordination overhead -- all for types that only matter at the JSON boundary.
+The service-server currently logs to `console.error` (line 265). After adding global error handlers, all service-level logging should use a consistent pattern. No new component needed -- just ensure the global handler uses the same format.
 
-**Do this instead:** Define plain TypeScript interfaces in the backend. Document the JSON output format. The extension parses JSON defensively with `?.` access. If type safety is needed for testing, use a separate test-only assertion file.
+#### 6b. Subprocess Utility Consolidation
 
-### Anti-Pattern 3: Unix Socket IPC from Extension
+`apps/backend/src/utils/subprocess.ts` already has a `runSubprocess()` with a configurable `timeoutMs` (default 15s). The backend coordinator should route through this when calling provider adapters that use subprocess execution, rather than having each adapter manage its own timeout independently.
 
-**What people do:** Connect the GNOME extension directly to the service daemon's Unix socket using `Gio.SocketClient`.
+#### 6c. Atomic Write Utility Sharing
 
-**Why it's wrong:** Socket lifecycle management in GJS is complex (connection pooling, reconnection, partial read handling). The GNOME extension review process may flag direct socket usage. If the service is not running, the extension needs a fallback path anyway.
+Both `snapshot-cache.ts` and `service-server.ts` need atomic file writes. The utility should be a single shared helper to avoid duplication.
 
-**Do this instead:** Always use subprocess spawning from the extension. The CLI auto-detects whether the service is running and uses the socket internally. The extension gets the same fast response without managing socket state.
+## Component Change Summary
 
-### Anti-Pattern 4: In-Memory-Only Cache
+| Component | File | Change Type | Zone |
+|-----------|------|-------------|------|
+| Indicator._render() | indicator.js | **Modify** -- add actor.destroy() | 1 |
+| Indicator.destroy() | indicator.js | **Verify** -- already adequate | 1 |
+| defaultOpenBrowser() | auth-command.ts | **Modify** -- exec to Bun.spawn | 2 |
+| atomicWriteFileSync() | utils/atomic-write.ts | **New** -- shared utility | 3 |
+| SnapshotCache.set() | snapshot-cache.ts | **Modify** -- use atomic write | 3 |
+| persistLatestSnapshot() | service-server.ts | **Modify** -- use atomic write | 3 |
+| runServiceRunCommand() | service-command.ts | **Modify** -- add global handlers | 4 |
+| runGioSubprocess() | backend-client.js | **Modify** -- add Gio.Cancellable + timeout | 5a |
+| BackendCoordinator.#resolveSnapshot() | backend-coordinator.ts | **Modify** -- add per-provider timeout | 5b |
+| withTimeout() | utils/timeout.ts | **New** -- small utility | 5b |
+| fetchCodexUsageViaAppServer() | codex-appserver-fetcher.ts | **Modify** -- cancel reader on settle | 5c |
 
-**What people do:** Use a `Map<string, CacheEntry>` in the service daemon for caching.
+**Summary: 2 new files, 8 modified files.**
 
-**Why it's wrong:** When systemd restarts the service (crash, OOM, update), all cached data is lost. The first request after restart triggers a full provider refresh (2-5 seconds for PTY providers).
+## Data Flow Changes
 
-**Do this instead:** Use file-based cache. The daemon reads cached data from disk at startup. Even after a restart, the first response is fast because file cache entries are still valid within their TTL.
+### Before v2.1 (Current)
 
-## Integration Points
+```
+PollingService
+  → BackendClient.fetchUsageSnapshot()     [NO timeout]
+    → Gio.Subprocess: agent-bar service snapshot --json   [NO timeout]
+      → ServiceServer handles request
+        → BackendCoordinator.getSnapshot()   [NO timeout per provider]
+          → adapter.getQuota()               [NO timeout]
+          → cache.set()                      [non-atomic write]
+        → socket.write(response)
+  → state update → Indicator._render()       [leaks actors]
+```
 
-### External Services
+### After v2.1
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| GitHub Copilot API | HTTP GET with OAuth token | Token from GNOME Keyring via `secret-tool` or env var |
-| Anthropic Usage API | HTTP GET with OAuth Bearer | Token from `~/.claude/.credentials.json` |
-| Codex App Server | HTTP GET to local socket | Fallback: PTY spawn of `codex` CLI |
-| GNOME Keyring | `secret-tool lookup` subprocess | For Copilot OAuth token storage |
-| systemd | User service unit | Manages long-running daemon lifecycle |
+```
+PollingService
+  → BackendClient.fetchUsageSnapshot()     [30s Gio.Cancellable + force_exit]
+    → Gio.Subprocess: agent-bar service snapshot --json   [killed on timeout]
+      → ServiceServer handles request       [global error handlers installed]
+        → BackendCoordinator.getSnapshot()
+          → withTimeout(adapter.getQuota(), 30_000)  [per-provider timeout]
+          → cache.set() → atomicWriteFileSync()     [atomic write-then-rename]
+        → socket.write(response)
+  → state update → Indicator._render()       [destroy old actors before rebuild]
+```
+
+### New Error Paths
+
+1. **GNOME subprocess timeout:** PollingService receives a `BackendClientError` with timeout info. Extension state transitions to `error`. Retry logic kicks in via existing `retryDelays` mechanism.
+
+2. **Provider adapter timeout:** BackendCoordinator catches the timeout, returns an error snapshot with `code: 'provider_timeout'`. Other providers still complete normally.
+
+3. **Codex appserver reader hang:** Reader is cancelled via `reader.cancel()`. Settle function fires with timeout error snapshot. No dangling process.
+
+4. **Service crash (uncaught):** Global handler logs error, calls `runtime.stop()`, exits with code 1. systemd restarts the service per `Restart=on-failure`.
+
+5. **Cache write failure:** Atomic write fails at rename step. Old cache file is preserved (not corrupted). Temp file is cleaned up. Error propagates to caller which produces a fresh fetch on next request.
+
+## Suggested Build Order
+
+The build order follows **dependency chains and risk reduction**: fix the most dangerous issues first, create shared utilities before consumers, and handle independent zones in parallel.
+
+### Phase 1: Critical Security + Shared Utilities (Foundation)
+
+**Rationale:** Shell injection is the only exploitable vulnerability. Atomic write utility is a prerequisite for Zone 3. Both are small, independent, and unblock later work.
+
+| Order | Task | Zone | Depends On | Est. Complexity |
+|-------|------|------|------------|-----------------|
+| 1.1 | Fix shell injection in `defaultOpenBrowser()` | 2 | Nothing | Low |
+| 1.2 | Create `atomicWriteFileSync()` utility | 3 | Nothing | Low |
+| 1.3 | Create `withTimeout()` utility | 5b | Nothing | Low |
+
+### Phase 2: Critical Runtime Stability (Backend)
+
+**Rationale:** Cache race condition and global error handlers protect against data corruption and silent service death. These affect every user on every service cycle.
+
+| Order | Task | Zone | Depends On | Est. Complexity |
+|-------|------|------|------------|-----------------|
+| 2.1 | Atomic writes in `snapshot-cache.ts` | 3 | 1.2 (utility) | Low |
+| 2.2 | Atomic writes in `service-server.ts` | 3 | 1.2 (utility) | Low |
+| 2.3 | Global error handlers in `runServiceRunCommand()` | 4 | Nothing | Low |
+
+### Phase 3: Subprocess Timeouts (Backend + Extension)
+
+**Rationale:** All three subprocess timeout fixes are HIGH severity but independent of each other. They can be done in parallel. The GNOME extension fix requires GJS-specific patterns (Gio.Cancellable) distinct from the Bun backend fixes.
+
+| Order | Task | Zone | Depends On | Est. Complexity |
+|-------|------|------|------------|-----------------|
+| 3.1 | Per-provider timeout in `BackendCoordinator` | 5b | 1.3 (utility) | Medium |
+| 3.2 | Gio.Subprocess timeout in `BackendClient` | 5a | Nothing | Medium |
+| 3.3 | Cancel reader in `codex-appserver-fetcher` | 5c | Nothing | Low |
+
+### Phase 4: GNOME Memory Leak (Extension)
+
+**Rationale:** Memory leak is CRITICAL severity but lower urgency than security/corruption -- the leak only accumulates over long sessions. It requires careful GJS actor lifecycle understanding and should be tested on a real GNOME desktop.
+
+| Order | Task | Zone | Depends On | Est. Complexity |
+|-------|------|------|------------|-----------------|
+| 4.1 | Destroy actors in `Indicator._render()` | 1 | Nothing | Medium |
+| 4.2 | Verify `Indicator.destroy()` cleanup completeness | 1 | 4.1 | Low |
+
+### Build Order Rationale
+
+```
+Phase 1 (Foundation)  ─→  Phase 2 (Runtime Stability)  ─→  Phase 3 (Timeouts)
+    ↓                                                           ↓
+    └────────────────────────────────────────────────→  Phase 4 (Memory Leak)
+```
+
+- **Phase 1 before 2:** Atomic write utility must exist before cache and server consume it.
+- **Phase 1 before 3:** Timeout utility must exist before coordinator consumes it.
+- **Phase 2 before 3:** Stabilize the service process (error handlers) before adding timeout complexity that generates new error paths.
+- **Phase 3 parallel:** All three timeout fixes are independent. Backend (5b, 5c) and extension (5a) can be developed in parallel.
+- **Phase 4 last:** The memory leak is in the extension UI layer which is the outermost ring. It has zero dependencies on backend changes and benefits from stable backend behavior underneath.
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Destroying Children via Parent Removal
+
+**What people do:** Call `parent.remove_child(child)` and assume GJS frees the actor.
+**Why it's wrong:** GJS actors have C-side reference counts. Removal from parent decrements one ref but the JS wrapper may hold another. The actor and its GL resources are never freed.
+**Do this instead:** Always call `child.destroy()` before dropping the reference. `destroy()` recursively destroys children.
+
+### Anti-Pattern 2: Shell String Interpolation for External Commands
+
+**What people do:** ``exec(`command ${userInput}`)``
+**Why it's wrong:** Any special shell characters in the input become executable code.
+**Do this instead:** Use `Bun.spawn([command, arg1, arg2])` or `execFile(command, [arg1, arg2])` which pass arguments as arrays to the OS directly, bypassing shell interpretation.
+
+### Anti-Pattern 3: Direct `writeFileSync` for State Persistence
+
+**What people do:** `writeFileSync(path, json)` assuming it's atomic.
+**Why it's wrong:** If the process crashes mid-write (or the disk is full), the file is truncated/corrupt. Next startup reads garbage and fails.
+**Do this instead:** Write to `${path}.tmp` then `renameSync(tmp, path)`. `rename()` is atomic on Linux within the same filesystem.
+
+### Anti-Pattern 4: Cancellable Without force_exit in GJS
+
+**What people do:** Pass a `Gio.Cancellable` to `communicate_utf8_async()` and assume cancelling it kills the subprocess.
+**Why it's wrong:** GJS `Gio.Cancellable.cancel()` only cancels the async operation, NOT the subprocess. The child process keeps running.
+**Do this instead:** Connect the cancellable to `proc.force_exit()` explicitly, or call `force_exit()` in the timeout handler alongside cancel.
+
+## Integration Boundaries
 
 ### Internal Boundaries
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Extension ↔ Backend | Gio.Subprocess stdout (JSON) | Extension spawns CLI, reads stdout |
-| CLI ↔ Service Daemon | HTTP over Unix socket | CLI auto-detects running service |
-| Coordinator ↔ Providers | Direct function call (getQuota) | In-process, no serialization |
-| Coordinator ↔ Cache | File I/O (Bun.file) | JSON files in XDG_CACHE_HOME |
-| Providers ↔ External APIs | HTTP fetch | Per-provider timeout + error handling |
-| Providers ↔ CLI tools | Bun.spawn with terminal option | PTY for interactive CLIs (Codex, Claude) |
+| Boundary | Communication | v2.1 Change |
+|----------|---------------|-------------|
+| GNOME Extension -> Backend | Gio.Subprocess (stdout JSON) | Add 30s timeout + force_exit |
+| PollingService -> BackendClient | Promise-based async | No change (timeout is in BackendClient) |
+| Indicator -> State | setState() push | No change (render fix is internal) |
+| CLI -> ServiceServer | Bun.connect Unix socket | No change |
+| BackendCoordinator -> Adapters | async adapter.getQuota() | Wrap in withTimeout(30s) |
+| SnapshotCache -> Filesystem | writeFileSync | Switch to atomicWriteFileSync |
+| ServiceServer -> Filesystem | writeFileSync | Switch to atomicWriteFileSync |
 
-## How Provider Independence Is Achieved
+### External Boundaries
 
-The v1 architecture has partial independence but leaks coupling through:
-
-1. **Shared `ProviderAdapterContext`** -- all providers must accept the same context shape.
-2. **Centralized `ProviderContextBuilder`** -- resolves secrets, source modes, and runtime metadata for all providers.
-3. **`shared-contract` Zod schemas** -- all providers must conform to `providerSnapshotSchema.parse()`.
-4. **Registry factory** -- hardcoded import of all provider factory functions.
-
-The v2 architecture achieves full independence through:
-
-1. **Minimal interface** -- `Provider { id, name, cacheKey, isAvailable(), getQuota() }`. That is the entire contract.
-2. **Self-contained credentials** -- each provider reads its own credential source directly. Copilot reads from Keyring, Claude reads `~/.claude/.credentials.json`, Codex reads `~/.codex/auth.json`.
-3. **No shared schema** -- each provider returns a `ProviderQuota` object. The coordinator does not validate or transform it beyond null-safety.
-4. **Directory-based discovery** -- the registry imports from `providers/copilot`, `providers/codex`, `providers/claude`. Adding a provider means creating a new directory and adding one line to the registry.
-5. **Independent testing** -- each provider can be tested by instantiating it directly and calling `getQuota()` with no mocks for context, registry, or coordinator.
+| Boundary | Integration | v2.1 Change |
+|----------|-------------|-------------|
+| auth-command -> xdg-open | exec() shell call | Replace with Bun.spawn array |
+| codex-appserver -> codex CLI | Bun.spawn + JSONRPC | Add reader.cancel() on settle |
+| Service -> systemd | Restart=on-failure | Benefits from non-zero exit on crash |
 
 ## Sources
 
-- [Bun.spawn() with terminal/PTY option](https://bun.com/docs/runtime/child-process) -- HIGH confidence, official docs
-- [Bun.serve() Unix socket support](https://bun.sh/guides/http/fetch-unix) -- HIGH confidence, official docs
-- [Bun v1.3.5 release (Bun.Terminal API)](https://bun.com/blog/bun-v1.3.5) -- HIGH confidence, official release notes
-- [Bun net.createServer TCP reliability issues](https://github.com/oven-sh/bun/issues/14836) -- MEDIUM confidence, GitHub issue
-- [GJS Subprocess guide](https://gjs.guide/guides/gio/subprocesses.html) -- HIGH confidence, official GJS documentation
-- [GNOME Shell extension socket example](https://github.com/jeffchannell/gnome-shell-socket) -- LOW confidence, community example
-- [Bun Node-API compatibility](https://bun.com/docs/runtime/node-api) -- HIGH confidence, official docs
-- [node-pty NAPI port PR](https://github.com/microsoft/node-pty/pull/644) -- MEDIUM confidence, shows Bun compatibility gaps
-- [bun-pty community library](https://github.com/sursaone/bun-pty) -- LOW confidence, alternative if Bun.Terminal is insufficient
-- [Bun.serve does not work with unix socket (resolved)](https://github.com/oven-sh/bun/issues/8044) -- MEDIUM confidence, shows feature evolution
+- [GJS Memory Management Guide](https://gjs.guide/guides/gjs/memory-management.html) -- actor lifecycle, destroy patterns, reference counting
+- [GNOME Shell Extensions Review Guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html) -- enable/disable contract, mandatory cleanup
+- [GJS Subprocesses Guide](https://gjs.guide/guides/gio/subprocesses.html) -- Gio.Cancellable + force_exit pattern
+- [Bun v1.1.8 Release Notes](https://bun.sh/blog/bun-v1.1.8) -- process.on uncaughtException support
+- [Bun.write API Reference](https://bun.com/reference/bun/write) -- file I/O capabilities and limitations
+- [write-file-atomic (npm)](https://github.com/npm/write-file-atomic) -- atomic write-then-rename pattern reference
+- [Gio.Subprocess GTK Docs](https://docs.gtk.org/gio/class.Subprocess.html) -- force_exit, cancellable behavior
 
 ---
-*Architecture research for: Agent Bar Ubuntu v2.0 refactor*
-*Researched: 2026-03-28*
+*Architecture research for: v2.1 Stability & Hardening*
+*Researched: 2026-04-05*

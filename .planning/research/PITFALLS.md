@@ -1,300 +1,562 @@
 # Pitfalls Research
 
-**Domain:** Node.js-to-Bun migration for a Linux systemd-based AI usage monitor with GNOME Shell extension frontend
-**Researched:** 2026-03-28
-**Confidence:** MEDIUM-HIGH (Bun Terminal API is new/December 2025; Unix socket edge cases verified via open issues)
+**Domain:** Stability and hardening fixes for an existing Bun/TypeScript backend + GNOME Shell extension (GJS)
+**Researched:** 2026-04-05
+**Confidence:** HIGH (issues verified against actual codebase; GJS/systemd/Bun patterns verified via official docs and community sources)
 
 ## Critical Pitfalls
 
-### Pitfall 1: node-pty Is Not Bun-Compatible -- Bun.Terminal API Has Different Semantics
+### Pitfall 1: GJS Actor Leak on Re-render -- `remove_child` Does Not `destroy()`
 
 **What goes wrong:**
-node-pty is a native N-API addon compiled against V8. Bun uses JavaScriptCore, not V8, so native N-API addon compatibility sits at roughly 34% according to ecosystem surveys. node-pty will almost certainly fail to load under Bun. The project currently uses `node-pty` in `interactive-command.ts` to run Codex CLI and Claude CLI commands inside a PTY from systemd (where no controlling terminal exists). A naive migration attempt would simply try to `import("node-pty")` under Bun and crash at runtime.
+The current `indicator.js` `_render()` method (line 129-131) iterates `this._box.get_children()`, calls `remove_child(child)` on each, then calls `this._providerActors.clear()`. **Removing a Clutter actor from its parent does NOT destroy it.** The actor (St.BoxLayout, St.Label, St.Icon, St.Bin) remains alive in memory, referenced by no JavaScript variable but still tracked by Clutter's internal allocation system. Each call to `setState()` triggers `_render()`, which creates 3 new provider slots (each with ~4 actors) and orphans 3 old ones. With a 2.5-minute polling interval, this leaks ~70 actors per hour. Over a desktop session of 8+ hours, this causes visible GNOME Shell sluggishness.
 
 **Why it happens:**
-Bun's N-API layer is incomplete for addons that depend on V8-specific internals. node-pty compiles C++ that calls `forkpty()` and binds through V8's N-API -- this binary is fundamentally incompatible with Bun's JavaScriptCore engine.
+In GTK, removing a widget from a container usually triggers its disposal. In Clutter/St (the GNOME Shell toolkit), `remove_child()` only detaches the actor from the parent's child list. The actor must be explicitly `destroy()`-ed to release its GPU texture, CSS style references, and GObject allocation. Developers coming from web/React backgrounds expect "remove from DOM" to be equivalent to "garbage collect," but Clutter does not work that way.
 
 **How to avoid:**
-Replace node-pty with Bun's built-in Terminal API (`Bun.spawn` with the `terminal` option), introduced in Bun v1.3.5 (December 2025). The API provides equivalent PTY functionality: `Bun.spawn(["codex", "usage"], { terminal: { cols: 120, rows: 30, data: (term, data) => { output += data.toString(); } } })`. Key differences from node-pty to handle during migration:
-- Output arrives via a callback in the `terminal.data` option, not via an `onData` event emitter
-- Exit is awaited via `await proc.exited` (returns exit code), not via an `onExit` callback
-- Input is written via `proc.terminal.write()`, not `term.write()`
-- Cleanup requires `proc.terminal.close()` explicitly
-- Only available on POSIX (Linux/macOS) -- not Windows, but that is irrelevant for this Ubuntu-only product
+Call `child.destroy()` after `remove_child(child)` in `_render()`. The correct pattern is:
 
-Create the Bun Terminal wrapper first and validate it against Codex CLI and Claude CLI output parsing before removing node-pty from dependencies.
-
-**Warning signs:**
-- `dynamic import failed` or `Module not found: node-pty` at runtime under Bun
-- Existing `interactive-command.ts` tests pass under Node but fail under Bun
-- Provider fetchers for Codex and Claude return empty/unparseable output
-
-**Phase to address:**
-Phase 1 (Bun runtime migration) -- this is the single most critical blocker since two of three providers depend on PTY execution.
-
----
-
-### Pitfall 2: Unix Socket Permissions Differ Between Bun and Node.js
-
-**What goes wrong:**
-The backend service communicates with the GNOME extension via a Unix domain socket created with `net.createServer` (see `service-server.ts`). Bun's `node:net` implementation creates socket files with different permissions than Node.js (confirmed in [oven-sh/bun#15686](https://github.com/oven-sh/bun/issues/15686), still open). The GNOME extension runs as the desktop user via `Gio.SubprocessLauncher`, so if the socket permissions are wrong, the extension cannot connect to the backend service. This failure is silent -- the extension just sees "backend unavailable" with no useful error.
-
-**Why it happens:**
-Bun's internal socket creation uses different `umask`/permission defaults than Node.js's libuv implementation. The socket file might be created with 0755 instead of 0777, or vice versa, preventing the GJS process from reading it.
-
-**How to avoid:**
-After creating the socket with `net.createServer`, explicitly `chmod` the socket file to the expected permissions (typically 0600 for user-only access, or 0660 if needed). Add a post-listen permission fix:
-```typescript
-import { chmod } from "node:fs/promises";
-server.listen(socketPath, async () => {
-  await chmod(socketPath, 0o600);
-});
+```javascript
+for (const child of this._box.get_children?.() ?? []) {
+  this._box.remove_child(child);
+  child.destroy();
+}
 ```
-Alternatively, evaluate migrating from `net.createServer` to `Bun.serve({ unix: socketPath })` which has better-tested Unix socket support in Bun. However, this changes the protocol from newline-delimited JSON over raw TCP to HTTP-style request/response, requiring GNOME extension client changes.
 
-**Warning signs:**
-- GNOME extension reports "backend unavailable" after migration even though systemd service is running
-- `ls -la` on the socket file shows unexpected permissions
-- Works when testing directly via `socat` but fails from GJS
+However, there is a subtlety: do NOT access the child after `destroy()` -- this triggers a critical GJS error ("Object has been already deallocated"). If any code holds a reference to the old actors (e.g., the `_providerActors` Map), those references must be nulled BEFORE iterating, or the Map must be cleared BEFORE destroy.
 
-**Phase to address:**
-Phase 1 (Bun runtime migration) -- must be validated in the same phase where the service server is migrated to Bun.
+The safer pattern is to cache the actors, clear the map, then destroy:
 
----
-
-### Pitfall 3: systemd Environment Variable Inheritance Breaks Under Bun
-
-**What goes wrong:**
-The current systemd service file (`agent-bar.service`) sets `ExecStart=%h/.local/bin/agent-bar service run` with `Environment=NODE_ENV=production`. The install script captures `PATH`, `DBUS_SESSION_BUS_ADDRESS`, and other user environment variables into a systemd override file. Bun handles environment variables differently than Node.js in systemd contexts:
-1. Bun may not find itself in `PATH` if installed via `curl` to `~/.bun/bin/bun` (not in systemd's default PATH)
-2. Environment values set via `Environment=` in unit files have been reported to not work correctly with Bun (see [oven-sh/bun#2710](https://github.com/oven-sh/bun/discussions/2710))
-3. The `ExecStart` path must point to the Bun binary with an absolute path, not rely on PATH resolution
-
-**Why it happens:**
-systemd user services have a minimal environment. Node.js is commonly installed system-wide (via apt/nvm) and appears in `/usr/bin/` or `/usr/local/bin/`. Bun is typically installed per-user at `~/.bun/bin/bun` which is NOT in systemd's default PATH. Additionally, Bun's handling of `Environment=` directives in service files has edge cases that differ from Node.js.
-
-**How to avoid:**
-1. Use absolute path to Bun binary in `ExecStart`: `ExecStart=/home/%u/.bun/bin/bun run /home/%u/.local/share/agent-bar/service.ts` (or wherever the compiled binary lands)
-2. In the setup command, resolve the Bun binary path with `which bun` and write it into the service file, not rely on PATH
-3. Ensure `DBUS_SESSION_BUS_ADDRESS` is captured via `systemctl --user import-environment DBUS_SESSION_BUS_ADDRESS` during setup (critical for `secret-tool` which uses D-Bus)
-4. Test the service file on a real Ubuntu VM before shipping -- not just a `bun run` from a terminal
-
-**Warning signs:**
-- `systemctl --user status agent-bar` shows `exec format error` or `executable not found`
-- Provider fetches work from terminal but fail from systemd service
-- `secret-tool` calls fail with D-Bus connection errors only when running as a service
-
-**Phase to address:**
-Phase 2 (setup/remove/update commands) and Phase 1 (service migration) -- the service file template must be updated in the same phase as the Bun migration, and the setup command must be hardened to resolve Bun's path.
-
----
-
-### Pitfall 4: Removing Zod Loses Runtime Validation at the Backend/Extension Boundary
-
-**What goes wrong:**
-Zod is used pervasively in `shared-contract` (the package that defines the snapshot envelope, provider schemas, and request types) and in `config-schema.ts`. These schemas serve a dual purpose: (1) TypeScript type inference via `z.infer<>`, and (2) runtime validation of JSON data crossing trust boundaries (backend -> GNOME extension, config file -> backend). Removing Zod without replacing runtime validation means the GNOME extension receives unvalidated JSON from the backend. If a provider returns malformed data, it propagates silently through the extension and causes cryptic GJS crashes or renders garbage in the GNOME panel.
-
-**Why it happens:**
-Developers see Zod schemas primarily as type generators and assume TypeScript's compile-time types are sufficient. They strip Zod, keep the `type` exports, and forget that JSON deserialization produces `unknown` at runtime. The GNOME extension is written in GJS (plain JavaScript) and has zero TypeScript protection.
-
-**How to avoid:**
-Do NOT remove runtime validation at trust boundaries. Replace Zod with targeted inline validation functions that check the shape of data at two critical points:
-1. **Config loading** (`config-loader.ts`): Validate the JSON config file matches expected shape before using it
-2. **Snapshot serialization** (`service-server.ts` response, `cli.ts` JSON output): Validate the snapshot envelope before sending it to the extension
-
-For the `shared-contract` package, replace Zod schemas with plain TypeScript interfaces + a `validate(input: unknown): Result<T>` function per type. This matches the agent-bar-omarchy pattern of zero validation deps. Keep validation thin but present:
-```typescript
-function validateSnapshotEnvelope(input: unknown): SnapshotEnvelope {
-  if (typeof input !== "object" || input === null) throw new ValidationError("expected object");
-  const obj = input as Record<string, unknown>;
-  if (obj.schema_version !== "1") throw new ValidationError("invalid schema_version");
-  if (!Array.isArray(obj.providers)) throw new ValidationError("providers must be array");
-  // ... validate each provider snapshot
-  return obj as SnapshotEnvelope;
+```javascript
+const staleActors = [...(this._box.get_children?.() ?? [])];
+this._providerActors.clear();
+for (const actor of staleActors) {
+  this._box.remove_child(actor);
+  actor.destroy();
 }
 ```
 
 **Warning signs:**
-- After removing Zod, backend tests still pass but GNOME extension shows `undefined` or `[object Object]` in the panel
-- Config file with a typo silently loads with wrong defaults instead of erroring
-- Provider adapter returns `null` for a field the extension assumes is always present
+- GNOME Shell memory usage grows linearly over time (`gnome-shell` process in `top`)
+- GJS log shows "Object Meta.* has been already deallocated" critical errors
+- GNOME Shell becomes sluggish after several hours with agent-bar enabled
+- Disabling and re-enabling the extension temporarily fixes the sluggishness
 
 **Phase to address:**
-Phase 3 (dependency removal) -- must be done carefully, NOT as a simple `npm uninstall zod`. Write inline validators first, wire them in, verify extension behavior, then remove Zod.
+Phase 1 (Critical Fixes) -- this is the highest-priority memory leak and the most impactful single fix.
 
 ---
 
-### Pitfall 5: Replacing Commander Without Preserving Subcommand Error Handling
+### Pitfall 2: Atomic File Write -- Same-Directory Temp File Requirement and fsync Gap
 
 **What goes wrong:**
-The CLI uses Commander for `usage`, `auth copilot`, `config`, `doctor`, and `service` subcommands. Commander handles: (1) `--help` generation, (2) unknown option rejection, (3) missing subcommand error messages, (4) argument coercion (e.g., `parseProviderId`). A manual `process.argv` parser that doesn't replicate these behaviors produces a CLI that silently ignores typos (`agent-bar usagee` does nothing instead of suggesting `usage`), crashes on unknown flags, or provides no help text.
+The current `snapshot-cache.ts` (line 73) and `service-server.ts` (line 102) both use `writeFileSync(path, data)` directly. This is a non-atomic write: if the process crashes, is killed, or the system loses power during the write, the file is left in a partially-written (corrupt) state. When the service restarts, it reads the corrupt JSON and `JSON.parse` throws, losing the cached data silently (the `catch {}` on line 60 swallows the error).
+
+The fix is "write to temp file, then rename." But this pattern has three gotchas that developers commonly miss:
+
+1. **EXDEV (cross-device rename):** If the temp file is created in `/tmp` but the target is in `~/.cache/agent-bar/`, and `/tmp` is a separate tmpfs mount (common on Ubuntu), `fs.renameSync()` throws `EXDEV: cross-device link not permitted`. The temp file MUST be in the same directory as the target.
+
+2. **Missing fsync before rename:** Without `fsync()` on the temp file's fd before renaming, the data may still be in the kernel's page cache. A power failure after rename but before the data is flushed to disk leaves a zero-length or corrupt file at the target path.
+
+3. **Temp file cleanup on failure:** If the write or fsync fails, the temp file is left behind as garbage. A `finally` block must `unlink` the temp file on any error.
 
 **Why it happens:**
-Manual argument parsing starts simple (`if (args[0] === "usage")`) and developers underestimate how many edge cases Commander handles. The initial manual parser works for happy paths but fails on: empty args, `--help`, `--version`, misspelled commands, `--unknown-flag`, and combined short flags.
+The "write temp + rename" recipe is widely known, but the EXDEV and fsync details are not. Most tutorials skip fsync because it is "slow." Developers test on machines that do not have `/tmp` on a separate mount, so they never encounter EXDEV.
 
 **How to avoid:**
-Before removing Commander, catalog every CLI behavior the current setup provides:
-1. List all commands and their options from `cli.ts` and `commands/*.ts`
-2. Document which error messages Commander generates (unknown command, missing arg, etc.)
-3. Write the manual parser to handle: (a) unknown commands with a suggestion, (b) `--help` at every level, (c) `--version`, (d) unknown flags with an error, (e) missing required arguments
-4. Use the agent-bar-omarchy `cli.ts` as reference -- it already implements manual parsing with `process.argv.slice(2)` and a command map
+Implement a dedicated `atomicWriteFileSync` utility:
 
-Write CLI integration tests that exercise error paths BEFORE removing Commander. Run the same test suite after to verify parity.
+```typescript
+import { writeFileSync, renameSync, unlinkSync, openSync, fsyncSync, closeSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { randomBytes } from 'node:crypto';
+
+function atomicWriteFileSync(filePath: string, data: string): void {
+  const dir = dirname(filePath);
+  const tmpPath = join(dir, `.tmp-${randomBytes(6).toString('hex')}`);
+  let fd: number | null = null;
+  try {
+    fd = openSync(tmpPath, 'w');
+    const buffer = Buffer.from(data, 'utf8');
+    // Bun's writeFileSync on fd is fine, but for safety use the low-level API
+    writeFileSync(tmpPath, data, 'utf8');
+    // fsync ensures data hits disk before rename
+    const syncFd = openSync(tmpPath, 'r');
+    fsyncSync(syncFd);
+    closeSync(syncFd);
+    renameSync(tmpPath, filePath);
+  } catch (error) {
+    try { unlinkSync(tmpPath); } catch {}
+    throw error;
+  }
+}
+```
+
+Key rules:
+- Temp file goes in `dirname(filePath)`, never `/tmp`
+- Call `fsyncSync` before `renameSync`
+- `unlinkSync` in the catch block
+- The temp file name uses random bytes to avoid collisions with concurrent writes (unlikely in this project but defensive)
 
 **Warning signs:**
-- `agent-bar --help` produces no output or crashes
-- `agent-bar unknowncommand` silently exits with code 0
-- `agent-bar auth` (without subcommand) hangs or crashes instead of showing help
-- The `setup` command added in v2.0 is unreachable due to parser bugs
+- Cache file contains `{}` or truncated JSON after a `SIGKILL` or power failure
+- `JSON.parse` errors in journalctl logs after service restarts
+- Snapshot data is silently lost between service restarts (the catch on line 60 swallows the parse error)
 
 **Phase to address:**
-Phase 3 (dependency removal) -- Commander removal should happen after the new commands (setup/remove/update) are implemented, so all commands are tested against the new parser simultaneously.
+Phase 1 (Critical Fixes) -- the race condition in snapshot-cache is already flagged as critical in the audit.
 
 ---
 
-### Pitfall 6: Developing on Non-Ubuntu Without a Validated Ubuntu Test Environment
+### Pitfall 3: Shell Injection in `defaultOpenBrowser` via `exec()` with String Interpolation
 
 **What goes wrong:**
-PROJECT.md explicitly states "Dev machine is NOT Ubuntu." This means:
-1. GNOME Shell extension cannot be tested locally (requires GNOME Shell + GJS runtime)
-2. systemd user services cannot be tested locally (requires systemd --user)
-3. `secret-tool` / GNOME Keyring integration cannot be tested locally
-4. D-Bus session bus behavior is untestable locally
-5. Provider CLIs (codex, claude) may behave differently on non-Ubuntu distros
-6. Bun binary location and PATH differ between distros and macOS
+The current `auth-command.ts` line 225 uses `exec(\`xdg-open ${url}\`)` where `url` comes from the GitHub Device Flow response (`deviceCode.verification_uri`). While GitHub's verification URL is currently always `https://github.com/login/device`, the value originates from an HTTP response and is not validated. If the response is intercepted (MITM) or the OAuth endpoint changes, the URL could contain shell metacharacters. `exec()` passes the entire string to `/bin/sh`, so a URL like `https://evil.com; rm -rf ~` would execute the injected command.
 
-The developer writes code that works on their machine, pushes to the Ubuntu target, and discovers fundamental breakage: the service won't start, the extension can't find the binary, or `secret-tool` returns nothing because D-Bus isn't forwarded.
+Even in the "safe" case, `exec()` spawns a shell process unnecessarily. `execFile()` or Bun's `Bun.spawn()` bypass the shell entirely, making the same call without any injection risk.
 
 **Why it happens:**
-The feedback loop is too long. Changes require: push -> SSH/deploy to Ubuntu -> test manually -> debug via journalctl. Without an automated Ubuntu validation step, regressions accumulate silently.
+`exec()` is the most convenient child_process API -- it takes a single string, requires no argument splitting. Developers use it for "one-off" commands like opening a URL without thinking about the shell interpretation layer. The `exec()` API name is misleading -- it does not just execute a binary, it runs a shell command.
 
 **How to avoid:**
-1. **Mandatory:** Set up an Ubuntu 24.04 VM or container (Distrobox, LXD, or QEMU) for integration testing. Not optional -- the GNOME extension and systemd service CANNOT be validated any other way
-2. **Minimum viable CI:** A GitHub Actions job on `ubuntu-24.04` that: installs Bun, runs backend tests, starts the service, sends a snapshot request to the socket, verifies JSON output
-3. **Layered testing strategy:**
-   - Unit tests (provider parsers, config validation) -- run on dev machine with Bun
-   - Integration tests (service start/stop, socket communication) -- run on Ubuntu VM/CI
-   - E2E tests (GNOME extension -> service -> providers) -- manual on Ubuntu with GNOME desktop
-4. **Script the deployment:** The setup command should be testable on the VM with one command, not a manual multi-step process
+Replace `exec()` with `Bun.spawn()` or `execFile()`. For `xdg-open`, the URL is the sole argument:
+
+```typescript
+import { execFile } from 'node:child_process';
+
+function defaultOpenBrowser(url: string): void {
+  // execFile does NOT invoke a shell -- url is passed as a single argument
+  execFile('xdg-open', [url], () => {
+    // Intentionally silent
+  });
+}
+```
+
+Or with Bun's native API:
+
+```typescript
+function defaultOpenBrowser(url: string): void {
+  try {
+    Bun.spawn(['xdg-open', url], { stdout: 'ignore', stderr: 'ignore' });
+  } catch {
+    // xdg-open may not be available
+  }
+}
+```
+
+Additionally, validate the URL before opening:
+
+```typescript
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+```
 
 **Warning signs:**
-- "It works when I run it manually" but fails under systemd
-- Extension tests require mocking `Gio` so heavily that the mocks hide real bugs
-- Provider fetchers work on Arch/Fedora/macOS but fail on Ubuntu due to different CLI binary locations
+- Static analysis tools (Biome, ESLint security plugin) flag `exec()` with template literal
+- Any user-facing URL is passed through `exec()` without validation
+- Code review finds string interpolation in any `exec()` or `spawn({ shell: true })` call
 
 **Phase to address:**
-Phase 0 (environment setup) -- establish the Ubuntu test environment BEFORE writing any migration code. Every subsequent phase depends on this.
+Phase 1 (Critical Fixes) -- shell injection is a security issue that should be fixed immediately.
 
 ---
 
-### Pitfall 7: Monorepo Structure Mismatch Between pnpm Workspaces and Bun
+### Pitfall 4: Adding Global Error Handlers That Swallow Errors Instead of Logging Them
 
 **What goes wrong:**
-The current project uses pnpm workspaces with three packages: `apps/backend`, `apps/gnome-extension`, and `packages/shared-contract`. The backend imports `shared-contract` as `"shared-contract": "workspace:*"`. Bun supports workspaces but the migration from pnpm has subtle differences:
-1. `workspace:*` protocol is supported but resolved differently -- Bun uses `bun.lock` instead of `pnpm-lock.yaml`
-2. The `shared-contract` package has a separate `tsc` build step (`build:shared`) that produces `dist/` -- Bun can run TypeScript directly, making this step potentially unnecessary but only if imports are updated
-3. The `exports` field in `shared-contract/package.json` maps `"."` to `{ "types": "./src/index.ts", "default": "./dist/index.js" }` -- under Bun's module resolution, it might resolve to the `.ts` source directly, skipping the build step and making the `dist/` output stale
+The audit flagged "no global error handlers" in the service runtime. The common fix is to add `process.on('uncaughtException', ...)` and `process.on('unhandledRejection', ...)`. But the pitfall is in HOW these handlers are implemented:
+
+1. **Swallowing errors:** `process.on('uncaughtException', () => {})` prevents the crash but the service continues in an undefined state. A provider that throws synchronously during fetch now runs with corrupted state, producing wrong usage numbers silently.
+
+2. **Logging but not exiting:** `process.on('uncaughtException', (err) => { console.error(err); })` logs the error but the process continues. Node.js/Bun docs explicitly warn: "It is not safe to resume normal operation after `uncaughtException` because the system becomes unreliable."
+
+3. **Missing SIGTERM/SIGINT handlers:** The service runs under systemd which sends SIGTERM on `systemctl stop`. Without a handler, the process exits immediately without cleaning up the socket file, leaving a stale socket that blocks the next start.
 
 **Why it happens:**
-Bun's package resolution prefers TypeScript source files when available, which is great for DX but breaks assumptions about build order. The developer removes the `build:shared` step thinking Bun handles it, then the production build (which might still use `dist/`) breaks.
+Developers want to prevent the service from crashing in production. The instinct is "catch everything, log it, keep running." But for uncaught exceptions specifically, the correct behavior is "log, clean up, exit, let systemd restart."
 
 **How to avoid:**
-Decide early: flatten the monorepo or keep workspaces. Given that v2.0 is removing dependencies and simplifying:
-1. **Recommended:** Flatten `shared-contract` into the backend as a local `src/contract/` directory. The GNOME extension already duplicates the contract via JSON parsing (it doesn't import `shared-contract` -- it just expects a specific JSON shape). This eliminates the workspace complexity entirely
-2. **If keeping workspaces:** Run `bun install` and verify it correctly migrates `pnpm-lock.yaml` to `bun.lock`. Update the `exports` field to point to `.ts` source directly. Remove the separate build step
+Implement error handlers with the correct severity response:
+
+```typescript
+// Uncaught exception: log and EXIT (systemd will restart)
+process.on('uncaughtException', (error) => {
+  console.error('[agent-bar] Uncaught exception:', error);
+  // Clean up socket file
+  try { unlinkSync(socketPath); } catch {}
+  process.exit(1);
+});
+
+// Unhandled rejection: log but DON'T exit (Bun default already does this)
+process.on('unhandledRejection', (reason) => {
+  console.error('[agent-bar] Unhandled rejection:', reason);
+  // Don't exit -- the coordinator uses Promise.allSettled so individual
+  // provider failures are expected to be caught. A truly unhandled rejection
+  // means a bug, but the service can continue.
+});
+
+// SIGTERM: graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('[agent-bar] Received SIGTERM, shutting down...');
+  await runtime.stop(); // Cleans up socket, stops timers
+  process.exit(0);
+});
+
+// SIGINT: same as SIGTERM for dev convenience
+process.on('SIGINT', async () => {
+  await runtime.stop();
+  process.exit(0);
+});
+```
+
+The critical distinction: `unhandledRejection` can be non-fatal (log and continue), but `uncaughtException` must be fatal (log, cleanup, exit). Systemd's `Restart=on-failure` will restart the service automatically.
 
 **Warning signs:**
-- `bun install` in the workspace root produces warnings about unresolved workspace references
-- Import errors like `Cannot find module 'shared-contract'` at runtime
-- Stale `dist/` files cause type mismatches between backend and contract
+- After adding error handlers, the service silently produces wrong data instead of crashing and restarting
+- Stale socket files block service restart (`Error: EADDRINUSE`)
+- `systemctl stop agent-bar` takes 90 seconds (the default timeout) because the process ignores SIGTERM
 
 **Phase to address:**
-Phase 1 (Bun runtime migration) -- the workspace/monorepo structure must be resolved before any other code changes, since every import depends on it.
+Phase 1 (Critical Fixes) -- global error handlers directly affect service reliability.
 
 ---
 
-### Pitfall 8: GNOME Extension Backend Command Resolution Hardcodes Node.js
+### Pitfall 5: Subprocess Timeout in GJS Uses `globalThis.setInterval` Instead of `GLib.timeout_add`
 
 **What goes wrong:**
-The GNOME extension's `backend-command.js` has a fallback mode (`workspace-dev`) that runs: `[nodeBinary, "--import", "tsx", joinPath(repoRoot, BACKEND_CLI_RELATIVE_PATH), ...args]`. The `nodeBinary` defaults to `findProgramInPath("node") ?? "node"`. After migrating to Bun, the installed binary will be `agent-bar` (backed by Bun), but the dev-mode fallback still looks for `node`. If the developer tests with the workspace-dev path, the extension tries to run the Bun/TypeScript code with Node.js (which may not have the right deps installed after migration), producing confusing errors.
+The GNOME extension's `polling-service.js` uses `globalThis.setInterval()` for its polling timer and retry delays. The GNOME Shell Extension Review Guidelines explicitly state that main loop sources must be managed via `GLib.timeout_add()` / `GLib.Source.remove()`. While `globalThis.setInterval` works in GJS, there are three problems:
 
-Additionally, the `installed` mode uses `findProgramInPath("agent-bar")` -- this path works regardless of runtime, but the binary itself now needs Bun in its shebang or be a Bun-compiled binary.
+1. **Cleanup reliability:** `clearInterval()` in GJS wraps `GLib.Source.remove()` internally, but the semantics may differ across GNOME Shell versions. The official pattern is `GLib.Source.remove(sourceId)`.
+
+2. **No subprocess timeout at all:** The `backend-client.js` uses `Gio.SubprocessLauncher.spawnv()` followed by `communicate_utf8_async()` with NO timeout. If the backend hangs (e.g., a provider CLI is stuck), the GNOME Shell extension blocks indefinitely waiting for the subprocess. The extension becomes unresponsive, the "Refreshing..." state persists forever, and the user must restart GNOME Shell.
+
+3. **Review guideline compliance:** If this extension were submitted to extensions.gnome.org, it would be rejected for using `globalThis.setInterval` instead of `GLib.timeout_add_seconds`.
 
 **Why it happens:**
-The GNOME extension is plain GJS/JavaScript -- it was written to invoke Node.js and doesn't know about Bun. The runtime migration changes the backend but the extension's subprocess invocation logic is a separate codebase that isn't automatically updated.
+The developer used familiar web APIs (`setInterval`/`clearInterval`) because they work in GJS. The abstracted `scheduler` object in polling-service.js is well-designed for testability, but its default implementation uses the wrong GJS primitive. For the subprocess timeout, the developer relied on the backend process having its own timeout, not realizing the GNOME extension needs an independent timeout guard.
 
 **How to avoid:**
-1. Update `backend-command.js` to detect whether `bun` is available and prefer it over `node`
-2. Change the workspace-dev fallback to: `[bunBinary, "run", cliPath, ...args]` (Bun runs `.ts` files directly, no `tsx` needed)
-3. For the installed mode, ensure the `agent-bar` binary has the correct shebang (`#!/usr/bin/env bun`) or is a Bun-compiled single-file executable
-4. Test both modes: installed (from `~/.local/bin/agent-bar`) and workspace-dev (from the repo checkout)
+1. **Replace the default scheduler** with `GLib.timeout_add_seconds` / `GLib.Source.remove`:
+
+```javascript
+import GLib from 'gi://GLib';
+
+function gnomeScheduler() {
+  return {
+    setInterval(callback, intervalMs) {
+      const seconds = Math.max(1, Math.round(intervalMs / 1000));
+      return GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => {
+        callback();
+        return GLib.SOURCE_CONTINUE;
+      });
+    },
+    clearInterval(sourceId) {
+      if (sourceId !== null) {
+        GLib.Source.remove(sourceId);
+      }
+    },
+    now() {
+      return new Date();
+    },
+  };
+}
+```
+
+2. **Add subprocess timeout to `backend-client.js`** using `Gio.Cancellable` + `GLib.timeout_add`:
+
+```javascript
+async function runGioSubprocessWithTimeout(argv, { Gio, cwd, timeoutMs = 30000 } = {}) {
+  const cancellable = new Gio.Cancellable();
+  const timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, timeoutMs, () => {
+    cancellable.cancel();
+    return GLib.SOURCE_REMOVE;
+  });
+
+  const launcher = new Gio.SubprocessLauncher({
+    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+  });
+  const subprocess = launcher.spawnv(argv);
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      subprocess.communicate_utf8_async(null, cancellable, (proc, asyncResult) => {
+        try {
+          resolve(normalizeCommunicateResult(proc, proc.communicate_utf8_finish(asyncResult)));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    GLib.Source.remove(timeoutId);
+    return result;
+  } catch (error) {
+    GLib.Source.remove(timeoutId);
+    if (cancellable.is_cancelled()) {
+      subprocess.force_exit();
+      throw new Error(`Backend command timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+```
 
 **Warning signs:**
-- Extension works in installed mode but crashes in dev mode (or vice versa)
-- Extension logs show `node: command not found` or `tsx: module not found`
-- Manual `agent-bar usage --json` works from terminal but fails from the extension
+- Extension shows "Refreshing..." indefinitely
+- GNOME Shell Extension review rejects the extension for improper main loop usage
+- `journalctl /usr/bin/gnome-shell` shows GLib warnings about orphaned sources
 
 **Phase to address:**
-Phase 1 (Bun runtime migration) -- must be updated alongside the backend migration since the extension calls the backend.
+Phase 2 (High Priority Fixes) -- subprocess timeouts are flagged as "high" severity in the audit.
 
 ---
 
-### Pitfall 9: Provider Decoupling Creates Circular or Missing Dependencies
+### Pitfall 6: systemd Hardening Directives That Silently Break User Services
 
 **What goes wrong:**
-The v2.0 goal is "providers 100% independent -- zero coupling between Copilot, Codex, Claude." The current providers share:
-- `providers/shared/interactive-command.ts` (PTY execution)
-- `core/backend-coordinator.ts` (orchestrates all providers)
-- `core/provider-adapter.ts` (common adapter interface with `env: NodeJS.ProcessEnv`)
-- `shared-contract` schemas (snapshot format)
-- `cache/` module (shared cache)
-- `secrets/` module (shared secret store)
+The audit recommends hardening the systemd service with `ProtectSystem`, `PrivateTmp`, etc. However, several of these directives have silent failure modes in user services:
 
-Decoupling providers means each provider must own its execution strategy, but they still need shared infrastructure (cache, secrets, config). The pitfall is over-decoupling: duplicating cache logic per provider, or creating a provider interface so abstract that adding a new provider requires implementing 15 methods. Alternatively, under-decoupling: pulling out the `shared/` directory but leaving implicit dependencies through the coordinator.
+1. **`ProtectHome=yes` blocks XDG paths:** `ProtectHome=yes` makes `/home/`, `/root`, and `/run/user` inaccessible. Since the service needs `~/.cache/agent-bar/`, `~/.config/agent-bar/`, `~/.local/share/agent-bar/`, and `XDG_RUNTIME_DIR` (typically `/run/user/<UID>`), this directive will completely break the service. The service starts, returns no errors, but all file operations silently fail or use fallback paths.
+
+2. **`ProtectSystem=strict` prevents writing to non-standard paths:** If the service writes anywhere outside `/tmp`, `/var/tmp`, and explicitly allowed paths, writes fail with `EROFS: read-only file system`. The error is not a crash -- `writeFileSync` throws, the catch blocks swallow it, and the service appears to work but never persists data.
+
+3. **Many sandboxing options are silently ignored in user services:** `ProtectSystem`, `ProtectHome`, `PrivateDevices`, etc. require mount namespace support which is not available to non-root processes. The directives are accepted without error but have no effect, giving a false sense of security.
+
+4. **`PrivateTmp=yes` with XDG_RUNTIME_DIR socket:** If the socket is created under `XDG_RUNTIME_DIR` (which is under `/run/user/`), and `ProtectHome` is enabled (which hides `/run/user/`), the socket becomes inaccessible to external processes.
 
 **Why it happens:**
-"Independent modules" is interpreted as "zero shared code," which is wrong. The goal is "zero runtime coupling" (Copilot failing doesn't affect Claude) not "zero shared infrastructure."
+systemd hardening guides are written for system services running as root. Copy-pasting those recommendations into a user service (`systemctl --user`) causes silent failures because the security model is fundamentally different.
 
 **How to avoid:**
-Define "independent" precisely:
-1. **Each provider is a self-contained module** that exports a single function: `async fetchUsage(context: ProviderContext): Promise<ProviderSnapshot>`
-2. **Shared infrastructure is injected**, not imported: cache, secrets, config, and env are passed via the `ProviderContext` parameter
-3. **The coordinator calls providers in parallel** with `Promise.allSettled()`, so one provider's failure is isolated
-4. **No provider imports another provider** -- this is the actual coupling to prevent
-5. Follow agent-bar-omarchy's pattern: each provider file (`claude.ts`, `codex.ts`, `copilot.ts`) is standalone with a `class XProvider implements Provider { async getQuota(): Promise<ProviderQuota> }` interface
+For user services, the safe hardening options are:
+
+```ini
+[Service]
+# These work in user services:
+NoNewPrivileges=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+
+# These are needed for file access:
+# Do NOT use ProtectHome or ProtectSystem in user services
+# Do NOT use PrivateTmp if the service uses XDG paths
+
+# Use ReadWritePaths if using ProtectSystem (only works with namespace support):
+# ProtectSystem=strict
+# ReadWritePaths=%h/.cache/agent-bar %h/.config/agent-bar %t/agent-bar
+```
+
+The safest approach: start with `NoNewPrivileges=yes` and `RestrictRealtime=yes` only (these always work in user services), then test each additional directive on an Ubuntu 24.04 VM before adding it.
+
+Use `systemd-analyze security agent-bar.service --user` to audit the current service security posture. It scores each directive and shows which ones are active vs. ignored.
 
 **Warning signs:**
-- A provider module has an `import` from another provider's directory
-- Adding a new provider requires modifying files outside the provider's own directory (besides registration)
-- A provider's unit test requires mocking other providers to run
+- Service starts but cache files are never written (check with `ls -la ~/.cache/agent-bar/`)
+- `secret-tool` calls fail because D-Bus socket is inaccessible
+- `journalctl --user -u agent-bar` shows `EROFS` or `Permission denied` errors
+- `systemd-analyze security` shows a high score but the directives are actually no-ops
 
 **Phase to address:**
-Phase 4 (provider independence) -- but the provider interface contract should be designed in Phase 1 so that the Bun Terminal wrapper and cache module are built with the independent-provider pattern in mind.
+Phase 3 (Production Hardening) -- systemd hardening must be tested on the target Ubuntu VM, not just added to the unit file.
 
 ---
 
-### Pitfall 10: Bun's `import.meta.main` Replaces Node's Entrypoint Detection
+### Pitfall 7: GNOME Theme Detection Breaking on GNOME 45+ Due to `gtk-theme` Deprecation
 
 **What goes wrong:**
-The current CLI entrypoint uses `if (import.meta.url === \`file://\${process.argv[1]}\`)` to detect whether the file is being run directly. This is a Node.js idiom. Under Bun, the correct check is `if (import.meta.main)`. If not updated, the CLI parser never runs when invoked via `bun run cli.ts`, because `import.meta.url` and `process.argv[1]` may not match under Bun's module resolution.
-
-Additionally, Bun 1.2.21+ has a known issue where compiled binaries include an extra argument in `process.argv`, which can break argument parsing if the manual parser assumes `process.argv[2]` is the first user argument.
+Starting with GNOME 45, enabling dark mode via the Quick Settings menu only changes the `color-scheme` GSettings key (`org.gnome.desktop.interface color-scheme`), NOT the `gtk-theme` key. Code that detects dark mode by checking if the `gtk-theme` contains "dark" or ends with "-dark" will fail on GNOME 45/46/47. The GNOME extension's CSS will not adapt to theme changes, showing light-mode styled widgets on a dark desktop (or vice versa).
 
 **Why it happens:**
-Small API differences between runtimes that aren't caught by TypeScript (both are valid JavaScript). The entrypoint check seems to work in some cases but fails in others (compiled binary vs. `bun run`).
+The `gtk-theme` approach worked for years (GNOME 3.x through 44). Most Stack Overflow answers and tutorials still recommend it. The change was introduced in GNOME 45 as part of the libadwaita/freedesktop color-scheme standardization, but it was not prominently documented.
 
 **How to avoid:**
-1. Replace `import.meta.url === \`file://\${process.argv[1]}\`` with `import.meta.main` (Bun's official recommendation)
-2. When building the manual CLI parser, use `Bun.argv` or `process.argv.slice(2)` consistently, and test with both `bun run src/cli.ts` and the compiled/installed binary
-3. Add a smoke test that runs the CLI with `bun run` and verifies `usage --json` produces valid JSON
+Use the `color-scheme` GSettings key as the primary detection mechanism:
+
+```javascript
+import Gio from 'gi://Gio';
+
+function isDarkTheme() {
+  const settings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
+  const colorScheme = settings.get_string('color-scheme');
+  return colorScheme === 'prefer-dark';
+}
+```
+
+For reactive theme changes, connect to the `changed::color-scheme` signal:
+
+```javascript
+const settings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
+const handlerId = settings.connect('changed::color-scheme', () => {
+  const isDark = settings.get_string('color-scheme') === 'prefer-dark';
+  // Update CSS classes accordingly
+});
+// MUST disconnect in disable():
+settings.disconnect(handlerId);
+```
+
+Ubuntu 24.04 ships GNOME 46, so this is the correct API. Do not also check `gtk-theme` as a fallback -- it adds complexity and is unnecessary on the target platform.
 
 **Warning signs:**
-- `bun run src/cli.ts usage --json` produces no output (entrypoint guard prevents execution)
-- CLI arguments are off-by-one (first argument is swallowed or duplicated)
-- Works via `bun run` but breaks when compiled with `bun build --compile`
+- Extension looks correct in light mode but does not change when user toggles to dark mode
+- CSS uses hardcoded colors instead of GNOME Shell theme variables
+- Theme detection works in GNOME 44 but breaks on GNOME 46 (Ubuntu 24.04)
 
 **Phase to address:**
-Phase 1 (Bun runtime migration) -- this is one of the first things to fix when switching the runtime.
+Phase 3 (Production Hardening) -- theme awareness is a medium-priority production polish item.
+
+---
+
+### Pitfall 8: AbortController/Promise.race Timeout Pattern Leaves Orphaned Operations
+
+**What goes wrong:**
+The backend coordinator fetches all providers with `Promise.all()` (line 51 of `backend-coordinator.ts`). Adding a per-provider timeout using `Promise.race([fetchPromise, timeoutPromise])` has a critical gotcha: when the timeout wins the race, the fetch promise keeps running in the background. The subprocess spawned by `Bun.spawn` continues executing. The timer created by `setTimeout` for the losing timeout also keeps ticking.
+
+This means:
+- A slow provider does not actually get cancelled -- it finishes eventually and writes to the cache after the coordinator already returned a timeout error
+- If the service has limited resources, multiple orphaned fetches accumulate across refresh cycles
+- The `setTimeout` timer from the losing race leaks unless explicitly cleared
+
+**Why it happens:**
+`Promise.race()` resolves when the first promise settles, but the other promises are NOT cancelled. This is a fundamental JavaScript limitation. Developers assume "the race is over" means "everything stopped," but it does not.
+
+**How to avoid:**
+Use `AbortController` + `AbortSignal.timeout()` to enable true cancellation:
+
+```typescript
+async function fetchWithTimeout(
+  adapter: ProviderAdapter,
+  context: ProviderContext,
+  timeoutMs: number,
+): Promise<ProviderSnapshot> {
+  const signal = AbortSignal.timeout(timeoutMs);
+  
+  try {
+    return await adapter.getQuota({ ...context, signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      return createErrorSnapshot(adapter.id, context.sourceMode, new Date().toISOString(), 
+        createProviderError('provider_timeout', `${adapter.id} timed out after ${timeoutMs}ms`, true));
+    }
+    throw error;
+  }
+}
+```
+
+The provider adapters must pass the `signal` to `Bun.spawn`:
+
+```typescript
+const proc = Bun.spawn([command, ...args], {
+  signal, // AbortSignal -- kills the process when aborted
+  stdout: 'pipe',
+  stderr: 'pipe',
+});
+```
+
+Bun's `Bun.spawn` natively supports `AbortSignal` -- when the signal fires, the subprocess is killed with `SIGTERM` (configurable via `killSignal`). This ensures no orphaned processes.
+
+Also change `Promise.all` to `Promise.allSettled` in the coordinator to ensure one provider's timeout does not block or reject others.
+
+**Warning signs:**
+- `ps aux | grep codex` shows multiple `codex usage` processes running simultaneously
+- Memory usage grows over time as orphaned fetch promises hold references
+- Provider timeout errors are followed by stale cache writes from the orphaned fetch
+
+**Phase to address:**
+Phase 2 (High Priority Fixes) -- coordinator timeout is flagged as a high-severity issue.
+
+---
+
+### Pitfall 9: Biome Strictness Escalation Causing a Flood of Unrelated Changes
+
+**What goes wrong:**
+The audit recommends improving Biome strictness. The pitfall is enabling strict rules (e.g., `noExplicitAny: "error"`, `useNodejsImportProtocol: "error"`) across the entire codebase at once. This produces hundreds of violations in existing code, creating a massive diff that:
+
+1. Makes code review impossible (signal drowns in noise)
+2. Introduces regressions in files that were otherwise stable
+3. Conflicts with every other open branch
+4. Breaks `git blame` for the entire codebase
+
+**Why it happens:**
+Biome's `check --write` auto-fixes many violations, making it tempting to "just fix everything." But auto-fixes can change behavior -- for example, `noExplicitAny` auto-fix replaces `any` with `unknown`, which may break downstream code that expected `any`'s implicit assignability.
+
+**How to avoid:**
+Use a phased approach:
+
+1. **Baseline current violations** before changing any rules: `bunx biome check . --reporter=json > .planning/biome-baseline.json`
+
+2. **New-code-only enforcement:** Use Biome's `--changed` flag in CI to lint only modified files. This prevents new violations without touching existing code:
+   ```yaml
+   - run: bunx biome check --changed --since=origin/main
+   ```
+
+3. **Per-rule escalation:** Enable one strict rule at a time, fix its violations in an isolated commit, then move to the next. Order by impact:
+   - First: `useNodejsImportProtocol` (mechanical, no behavior change)
+   - Second: `noExplicitAny` in new files only (via overrides)
+   - Last: `noNonNullAssertion` (requires careful review of each site)
+
+4. **Keep existing relaxed rules during v2.1:** The current `biome.json` disables `noForEach`, `noNonNullAssertion`, `useNodejsImportProtocol`, and `noExplicitAny`. These are intentional choices. Do not change them all at once.
+
+**Warning signs:**
+- A single Biome commit touches 50+ files
+- Auto-fix changes `any` to `unknown` and breaks type inference downstream
+- CI fails on every PR because the strictness PR conflicts with everyone's branches
+
+**Phase to address:**
+Phase 4 (DX Improvements) -- Biome strictness is low-priority relative to the critical/high fixes.
+
+---
+
+### Pitfall 10: CI Pipeline Testing Backend but Not the GNOME Extension Build
+
+**What goes wrong:**
+Setting up GitHub Actions CI for the backend (lint, typecheck, test) is straightforward with `oven-sh/setup-bun`. But the GNOME extension is plain JavaScript that runs in GJS -- not in Node.js or Bun. The extension's tests (under `apps/gnome-extension/test/`) currently run with Vitest (a Node.js test runner), which works because the tests mock all GJS-specific imports (`gi://Gio`, `gi://GLib`, `gi://St`). This means:
+
+1. **The tests pass in CI but the extension can fail in GNOME Shell** because the mocks hide real GJS behavioral differences
+2. **No type checking for the extension** -- it is plain `.js`, and Biome catches syntax/style issues but not logic errors
+3. **No validation that GJS imports are correct** -- if a test mocks `gi://St` but the real GJS API changed in GNOME 46, the test still passes
+
+Setting up actual GJS in CI is complex (requires a D-Bus session, GNOME Shell, or at minimum `gjs` binary). Most CI runs lack these.
+
+**Why it happens:**
+The GNOME extension lives in a different runtime world than the backend. It is written in a dialect of JavaScript (GJS) with platform-specific imports that do not exist outside GNOME Shell. CI is designed around the backend's Bun/TypeScript world.
+
+**How to avoid:**
+
+1. **Accept the limitation explicitly.** Real GJS testing in CI is impractical for v2.1. The extension tests with Vitest + mocks are valuable for logic verification, even if they do not catch GJS-specific issues.
+
+2. **Add `gjs` availability check to CI** (lightweight):
+   ```yaml
+   - name: Check GJS syntax (best-effort)
+     run: |
+       if command -v gjs &>/dev/null; then
+         gjs -c "imports.gi.versions.Gtk = '4.0'; print('GJS available')"
+       else
+         echo "::warning::GJS not available in CI -- extension not validated"
+       fi
+     continue-on-error: true
+   ```
+
+3. **Run the extension unit tests via Bun in CI** (they use Vitest which runs under Bun):
+   ```yaml
+   - run: bun run test:gnome
+   ```
+
+4. **Do NOT attempt to install gnome-shell in CI** just for extension testing -- the complexity is not worth it for v2.1. Manual testing on the Ubuntu VM remains the E2E validation path.
+
+**Warning signs:**
+- Backend CI is green but the extension crashes on load in GNOME Shell
+- A GJS API change (GNOME 46 to 47) breaks the extension but CI does not catch it
+- Tests mock so aggressively that they are testing the mocks, not the code
+
+**Phase to address:**
+Phase 3 (CI/CD) -- set up what is practical (backend lint + test + typecheck, extension unit tests) and document the manual testing gap.
 
 ---
 
@@ -304,12 +566,12 @@ Shortcuts that seem reasonable but create long-term problems.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Keep `node:net` Unix socket instead of migrating to `Bun.serve({ unix })` | Less code change, socket protocol stays the same | Inherits Bun's `node:net` compatibility gaps (permissions, reliability issues in #14836) | Acceptable for v2.0 if permission fix is applied; revisit in v2.1 |
-| Skip runtime validation after removing Zod | Fewer lines of code, faster startup | Silent data corruption at backend/extension boundary | Never -- always validate at trust boundaries |
-| Use `bun run src/cli.ts` in systemd instead of a compiled binary | Simpler deployment, no build step | Slower startup (parses TypeScript every time), depends on Bun's module resolution | Only during development; production must use compiled binary or at minimum a pre-transpiled JS entry |
-| Test only on dev machine, skip Ubuntu VM | Faster iteration cycle | Accumulates "works on my machine" bugs in systemd, D-Bus, GNOME integration | Never for integration-level changes |
-| Duplicate shared infrastructure in each provider instead of injecting it | Each provider is truly standalone | Cache, config, and secret logic maintained in 3 places; bugs fixed in one place don't propagate | Never -- use dependency injection |
-| Remove the `shared-contract` package but keep Zod in the backend | Simplifies the monorepo | Inconsistent: some validation with Zod, some without; confusing for contributors | Never -- make a clean cut |
+| Swallowing `catch {}` without logging the error | No noisy logs during normal operation | Silent failures make debugging impossible; corrupt cache goes unnoticed | Never -- always log at minimum `console.warn` in catch blocks |
+| Using `globalThis.setInterval` in GNOME extension instead of `GLib.timeout_add` | Familiar API, easier testing with Vitest | Extension rejected by GNOME review; potential cleanup issues across GNOME versions | Acceptable during development if the scheduler is abstracted (current design is good); must be replaced before release |
+| Fixing all 24 audit issues in a single branch | One PR, one review, done | Massive diff makes review impossible; a bug in one fix blocks all others | Never -- fix by severity group (critical, high, medium) in separate PRs |
+| Adding `ProtectSystem=strict` without testing on Ubuntu | Looks secure in the unit file | Service silently fails to write cache/config; appears working but data is lost | Never -- test every systemd directive on the target platform |
+| Using `Promise.all` instead of `Promise.allSettled` for multi-provider fetch | Simpler error handling (one try/catch) | One provider failure rejects the entire snapshot; user sees "Error" even when 2 of 3 providers work | Never -- the coordinator must use `Promise.allSettled` for fault isolation |
+| Skipping `fsync` in atomic write to improve performance | Writes are faster | Data loss on power failure; corrupt cache files on next boot | Acceptable for ephemeral cache only; not acceptable for config files or tokens |
 
 ## Integration Gotchas
 
@@ -317,12 +579,12 @@ Common mistakes when connecting to external services.
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| GNOME Keyring / `secret-tool` | Assuming D-Bus session bus is available in systemd service | Capture `DBUS_SESSION_BUS_ADDRESS` at install time and inject into systemd override via `systemctl --user import-environment` |
-| GitHub Device Flow OAuth (Copilot) | Hardcoding the poll interval; not handling `slow_down` response | Respect the `interval` field in the device code response; add exponential backoff on `slow_down`; this already works but must survive the migration |
-| Codex CLI (`codex usage`) | Expecting PTY output format to be stable across Codex versions | Parse defensively with fallbacks; the ANSI-stripping and line normalization in `interactive-command.ts` must be migrated to the Bun Terminal wrapper |
-| Claude CLI (`claude usage`) | Assuming Claude CLI is always at `/usr/local/bin/claude` | Resolve via `which claude` or PATH lookup; Bun's `Bun.which("claude")` API is a clean replacement for the current `resolveCommandInPath` utility |
-| GJS <-> Backend socket communication | Sending multiple JSON messages on the same connection without delimiters | Use newline-delimited JSON (current protocol) and ensure Bun's socket implementation sends the full message atomically |
-| Bun binary resolution in GNOME extension | Looking for `node` binary when the backend now runs on Bun | Update `backend-command.js` to check for `bun` first, fall back to `node` only for backward compatibility |
+| GJS `Gio.Subprocess` + backend CLI | No timeout -- subprocess hangs if backend is stuck | Use `Gio.Cancellable` + `GLib.timeout_add` to force-exit after 30s |
+| Bun `Bun.spawn` + provider CLI | Calling `proc.kill()` while reading stdout causes Bun to hang forever | Always race `proc.exited` against a timeout; use `AbortSignal` with `Bun.spawn` |
+| GNOME Keyring via `secret-tool` in systemd | Missing `DBUS_SESSION_BUS_ADDRESS` in service environment | Ensure setup command runs `systemctl --user import-environment DBUS_SESSION_BUS_ADDRESS` |
+| GSettings `color-scheme` for theme detection | Checking `gtk-theme` for "-dark" suffix (broken on GNOME 45+) | Read `org.gnome.desktop.interface color-scheme` and listen for `changed::color-scheme` signal |
+| GitHub Actions + Bun | Using `bun.lockb` (binary) as cache key | Migrate to text-based `bun.lock` with `bun install --save-text-lockfile`; use `hashFiles('**/bun.lock')` |
+| GitHub Actions + pnpm (for GNOME extension tests) | Forgetting that the project uses BOTH pnpm and Bun | Set up both `oven-sh/setup-bun` and `pnpm/action-setup` in CI; the GNOME extension workspace uses pnpm |
 
 ## Performance Traps
 
@@ -330,10 +592,10 @@ Patterns that work at small scale but fail as usage grows.
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Spawning a PTY per provider fetch | Slow refresh cycles (3 PTY spawns = 3+ seconds) | Cache aggressively with TTL; agent-bar-omarchy uses 5-minute cache. Only spawn PTY when cache is stale | At auto-refresh intervals < 60s with 3 providers |
-| Re-parsing TypeScript on every systemd restart | 500ms+ startup time on low-end Ubuntu machines | Use `bun build --compile` for production or pre-transpile to JS | Noticeable when service restarts frequently (crash loops) |
-| GNOME extension polling backend too frequently | High CPU usage visible in GNOME System Monitor; users blame the extension | Default poll interval >= 120s; make it configurable; respect system idle state | When poll interval < 30s |
-| Full snapshot refresh when only one provider changed | Unnecessary PTY spawns for providers that haven't changed | Per-provider cache with independent TTLs; refresh only the requested provider | When adding more providers in future versions |
+| Orphaned subprocesses from timed-out fetches | `ps aux` shows accumulated `codex usage` processes | Pass `AbortSignal` to `Bun.spawn`; signal kills the process on timeout | After several refresh cycles with a slow provider |
+| Re-rendering entire indicator on every state change | GNOME Shell frame drops during refresh | Diff the provider data; only destroy/recreate slots that changed | With more than 3 providers or frequent state updates |
+| Unbounded retry backoff accumulation | Extension fires retry attempts from multiple failed cycles simultaneously | Clear the previous retry timer before scheduling a new one (current code does this correctly via `clearRetry()`) | Not currently broken, but removing `clearRetry()` during refactor would cause it |
+| Synchronous `writeFileSync` in the service server hot path | Service blocks while writing snapshot to disk | Use async `writeFile` for the persistence path; keep sync only for atomic rename | With large snapshot payloads (many providers or verbose diagnostics) |
 
 ## Security Mistakes
 
@@ -341,10 +603,10 @@ Domain-specific security issues beyond general web security.
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Storing GitHub OAuth token in plaintext config file instead of GNOME Keyring | Token exposed to any process reading `~/.config/agent-bar/config.json` | Always use `secret-tool store` for tokens; never write tokens to disk in plaintext. The current `secret-tool-store.ts` implementation is correct -- preserve it |
-| Unix socket world-readable (0777 permissions) | Any process on the machine can send commands to the backend service | Socket should be 0600 (owner-only); verify after Bun migration since Bun creates sockets with different permissions |
-| Logging OAuth tokens or API keys in journalctl output | Tokens visible in `journalctl --user -u agent-bar` to any user with journal access | Scrub tokens from log output; use `[REDACTED]` for sensitive values; the current logging is careful about this but migration might introduce new log sites |
-| `DEFAULT_CLIENT_ID` placeholder shipped to production | Users authenticate with a shared client ID; GitHub may rate-limit or revoke it | Register a dedicated GitHub OAuth App before public release (already flagged in PROJECT.md) |
+| `exec()` with string interpolation for URL opening | Command injection via crafted verification URI | Replace with `execFile('xdg-open', [url])` or `Bun.spawn(['xdg-open', url])` |
+| Socket file with world-readable permissions | Any local process can query provider usage data and tokens | Set socket to `0600` after creation; verify permissions in CI smoke test |
+| Logging full provider CLI output to journalctl | API keys or tokens in CLI output visible in system journal | Scrub sensitive patterns before logging; log only exit code and error summary |
+| Global error handler catches exception but continues | Service runs with corrupted state; may serve wrong data | `uncaughtException` handler must exit after logging; rely on systemd `Restart=on-failure` |
 
 ## UX Pitfalls
 
@@ -352,25 +614,25 @@ Common user experience mistakes in this domain.
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| `agent-bar setup` fails silently when Bun is not installed | User thinks setup succeeded but service never starts | Check for Bun binary existence at setup start; provide clear install instructions with `curl -fsSL https://bun.sh/install \| bash` |
-| `agent-bar update` overwrites user config without backup | User loses custom provider settings after update | Backup config to `config.json.bak` before overwriting; merge settings where possible |
-| GNOME extension shows stale data without indicating staleness | User sees "75% used" but it's from 2 hours ago | Show timestamp of last successful refresh; dim/gray out data older than configured threshold |
-| Error messages from provider failures are too technical | User sees "EPIPE: broken pipe" in the GNOME panel | Map internal errors to user-friendly messages: "Codex CLI not found -- install with `npm i -g @openai/codex`" |
-| `agent-bar remove` also removes stored secrets | User reinstalls and has to re-authenticate all providers | `remove` should preserve GNOME Keyring entries; add `--purge` flag for full cleanup |
+| Subprocess timeout produces generic "Error" in GNOME panel | User does not know which provider failed or why | Show provider-specific timeout message: "Codex: timed out (check `codex` CLI)" |
+| Dark mode CSS not updating when user toggles theme | Extension looks broken -- white text on white background | Listen for `changed::color-scheme` signal and update CSS classes reactively |
+| Service restart after hardening loses in-memory state | User sees "--%" for all providers until next refresh cycle | Read persisted snapshot from XDG cache on startup (current code does this -- preserve it) |
+| `agent-bar doctor` does not report systemd hardening status | User cannot verify if sandboxing is active | Add a "systemd security" check to the doctor command |
 
 ## "Looks Done But Isn't" Checklist
 
 Things that appear complete but are missing critical pieces.
 
-- [ ] **Bun runtime migration:** Backend runs under `bun run` locally -- verify it also runs under `systemctl --user start agent-bar` on Ubuntu with correct env vars
-- [ ] **PTY replacement:** Codex CLI returns usage data via Bun Terminal -- verify ANSI stripping and line normalization produce identical parsed results to the node-pty implementation
-- [ ] **Commander removal:** `agent-bar usage --json` works -- verify `agent-bar --help`, `agent-bar auth --help`, `agent-bar unknowncmd`, and `agent-bar` (no args) all produce correct output
-- [ ] **Zod removal:** Config loads correctly -- verify malformed config files produce actionable error messages instead of cryptic crashes
-- [ ] **Provider independence:** Each provider fetches data independently -- verify that disabling one provider doesn't affect others, and that `Promise.allSettled` is used (not `Promise.all`)
-- [ ] **GNOME extension compatibility:** Extension loads and shows data -- verify it finds the Bun-backed `agent-bar` binary, not a stale Node.js one
-- [ ] **Socket communication:** Backend responds to socket requests -- verify socket file permissions allow GJS process to connect
-- [ ] **Auto-refresh:** Timer fires and refreshes data -- verify it works from systemd (not just from terminal), and respects TTL to avoid over-fetching
-- [ ] **Setup command:** `agent-bar setup` completes successfully -- verify it creates the systemd service file with the correct Bun path, enables the service, and the GNOME extension can immediately communicate with it
+- [ ] **Memory leak fix:** Actors destroyed in `_render()` -- verify `_providerActors` Map is cleared BEFORE calling `destroy()` on the actors, or references will point to finalized GObjects
+- [ ] **Atomic writes:** Using temp-file-rename pattern -- verify temp file is in SAME directory as target (not `/tmp`); verify `fsync` is called before rename; verify cleanup in `finally` block
+- [ ] **Shell injection fix:** Replaced `exec()` with `execFile()` -- verify the `shell: true` option is NOT set (this negates the security benefit)
+- [ ] **Global error handlers:** Added `uncaughtException` handler -- verify it calls `process.exit(1)` after logging, not just logging
+- [ ] **Subprocess timeout (GNOME):** Added `Gio.Cancellable` timeout -- verify the cancellable is passed to `communicate_utf8_async`; verify `force_exit()` is called when cancelled; verify timeout source is removed in `disable()`
+- [ ] **Subprocess timeout (backend):** Added `AbortSignal` to `Bun.spawn` -- verify the signal actually kills the process (check `proc.killed` after timeout)
+- [ ] **systemd hardening:** Added `ProtectSystem`/`ProtectHome` -- verify service can still write to `~/.cache/agent-bar/` and `~/.config/agent-bar/` on Ubuntu 24.04 VM
+- [ ] **Theme detection:** Using `color-scheme` GSettings key -- verify the signal connection ID is stored and disconnected in `disable()`; verify it works when user toggles theme while extension is active
+- [ ] **CI pipeline:** Backend tests run in GitHub Actions -- verify `bun install --frozen-lockfile` does not fail because `bun.lock` is missing (the project currently uses `pnpm-lock.yaml`)
+- [ ] **Biome strictness:** Enabled new rules -- verify `--changed` flag is used in CI so existing violations are not flagged on unrelated PRs
 
 ## Recovery Strategies
 
@@ -378,14 +640,16 @@ When pitfalls occur despite prevention, how to recover.
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| node-pty crashes under Bun | LOW | Already planned: replace with Bun Terminal API. If Bun Terminal API has issues, fallback to `Bun.spawn` with `stdio: "pipe"` (loses PTY but works for CLIs that don't require it) |
-| Socket permissions wrong | LOW | `chmod 0600 /run/user/$UID/agent-bar/agent-bar.sock` and add the chmod to the service startup code |
-| systemd can't find Bun | LOW | Add `Environment=PATH=/home/user/.bun/bin:/usr/local/bin:/usr/bin` to the service override file |
-| Zod removed but validation missing | MEDIUM | Add validation back at the two critical boundaries (config load, snapshot serialize). Can be done incrementally without re-adding Zod |
-| Commander removed but CLI broken | MEDIUM | The old Commander-based CLI can coexist temporarily. Ship the manual parser behind a feature flag or environment variable until it's validated |
-| Provider coupling not fully broken | MEDIUM | Audit imports with `grep -r "from.*providers/" src/providers/` -- any cross-provider import is a coupling violation. Fix by extracting to shared infrastructure |
-| GNOME extension can't find backend | LOW | Update `backend-command.js` to add `bun` to the binary search list. Quick fix, but must be deployed to the extension |
-| Ubuntu-specific bug discovered late | HIGH | If no Ubuntu VM exists, recovery requires setting one up under pressure. Prevention (Phase 0 VM setup) is far cheaper |
+| Actors not destroyed -- memory leak persists | LOW | Add `child.destroy()` in `_render()` loop; ship as hotfix. No architecture change needed |
+| Atomic write placed temp in `/tmp` -- EXDEV error | LOW | Move temp file to `dirname(targetPath)`. One-line change in the utility function |
+| `exec()` replaced with `execFile()` but `shell: true` was set | LOW | Remove `shell: true` option. One-line fix |
+| Global error handler swallows errors | LOW | Add `process.exit(1)` to `uncaughtException` handler |
+| systemd `ProtectHome` breaks file access | LOW | Remove `ProtectHome=yes` from service file; use `NoNewPrivileges=yes` only |
+| GJS subprocess timeout not wired up | MEDIUM | Implement `Gio.Cancellable` pattern in `backend-client.js`; requires testing on GNOME Shell |
+| Biome strictness committed too aggressively | MEDIUM | `git revert` the Biome commit; re-apply with `--changed` strategy instead |
+| CI runs but does not test GNOME extension | LOW | Accept this as documented gap; extension testing remains manual on Ubuntu VM |
+| Theme detection uses `gtk-theme` instead of `color-scheme` | LOW | Replace the GSettings key; single-point change with reactive signal |
+| Promise.race timeout leaves orphaned processes | MEDIUM | Refactor to use `AbortSignal` with `Bun.spawn`; requires changes in subprocess.ts and provider adapters |
 
 ## Pitfall-to-Phase Mapping
 
@@ -393,35 +657,40 @@ How roadmap phases should address these pitfalls.
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| node-pty incompatibility (#1) | Phase 1: Bun migration | Codex and Claude CLI fetchers return valid parsed data under Bun |
-| Unix socket permissions (#2) | Phase 1: Bun migration | `ls -la` on socket shows expected permissions; extension connects successfully |
-| systemd env vars (#3) | Phase 1 + Phase 2: setup command | `systemctl --user status agent-bar` shows active; `journalctl` shows no env errors |
-| Zod removal loses validation (#4) | Phase 3: dependency removal | Malformed config produces clear error; malformed provider response is caught before reaching extension |
-| Commander removal breaks CLI (#5) | Phase 3: dependency removal | CLI integration tests cover: --help, unknown command, missing args, all subcommands |
-| Non-Ubuntu dev environment (#6) | Phase 0: environment setup | Ubuntu VM or CI job exists and runs integration tests on every push |
-| Monorepo structure mismatch (#7) | Phase 1: Bun migration | `bun install` resolves all workspace references; `bun run` executes without import errors |
-| GNOME extension hardcodes Node (#8) | Phase 1: Bun migration | Extension's `resolveBackendInvocation` returns Bun-based argv; dev mode works without Node installed |
-| Provider over/under-decoupling (#9) | Phase 4: provider independence | `grep -r "from.*providers/" src/providers/` returns zero cross-provider imports; each provider has standalone unit tests |
-| Entrypoint detection (#10) | Phase 1: Bun migration | `bun run src/cli.ts usage --json` produces valid output; compiled binary produces same output |
+| Actor leak in `_render()` (#1) | Phase 1: Critical Fixes | GNOME Shell memory usage stable over 8+ hours with extension enabled |
+| Non-atomic cache writes (#2) | Phase 1: Critical Fixes | `kill -9` the service during a write; restart and verify cache is valid JSON |
+| Shell injection in auth (#3) | Phase 1: Critical Fixes | `grep -r "exec(" apps/backend/src/` returns zero non-`execFile` hits |
+| Error handlers swallowing (#4) | Phase 1: Critical Fixes | Send SIGTERM to service; verify clean shutdown and socket cleanup in < 2 seconds |
+| GJS subprocess timeout (#5) | Phase 2: High Priority | Backend hangs for 60s; extension recovers within 30s timeout + shows error |
+| systemd hardening (#6) | Phase 3: Production Hardening | `systemd-analyze security agent-bar.service --user` shows improved score; service reads/writes XDG paths correctly |
+| Theme detection (#7) | Phase 3: Production Hardening | Toggle dark/light mode in GNOME Settings; extension CSS updates within 1 second |
+| AbortController timeout (#8) | Phase 2: High Priority | Slow provider (simulated with `sleep 60`) times out; `ps aux` shows no orphaned process |
+| Biome strictness (#9) | Phase 4: DX Improvements | New-code-only linting in CI; zero Biome violations in modified files on every PR |
+| CI GNOME gap (#10) | Phase 3: CI/CD | CI runs backend lint + test + typecheck; extension unit tests pass; manual E2E gap is documented |
 
 ## Sources
 
-- [Bun Node-API documentation](https://bun.com/docs/runtime/node-api) - N-API compatibility status (HIGH confidence)
-- [Bun v1.3.5 release blog - Terminal API](https://bun.com/blog/bun-v1.3.5) - Built-in PTY support (HIGH confidence)
-- [Bun spawn/child_process docs](https://bun.com/docs/runtime/child-process) - Terminal option API surface (HIGH confidence)
-- [Bun systemd guide](https://bun.com/docs/guides/ecosystem/systemd) - Official service file template (HIGH confidence)
-- [oven-sh/bun#15686 - Socket permissions differ](https://github.com/oven-sh/bun/issues/15686) - Unix socket permissions bug (HIGH confidence, open issue)
-- [oven-sh/bun#2710 - Environment values in systemd](https://github.com/oven-sh/bun/discussions/2710) - systemd env handling (MEDIUM confidence)
-- [oven-sh/bun#4446 - SEGV in systemd service](https://github.com/oven-sh/bun/issues/4446) - Stability concern (MEDIUM confidence, may be fixed)
-- [oven-sh/bun#22157 - Extra argv in compiled binaries](https://github.com/oven-sh/bun/issues/22157) - process.argv edge case (HIGH confidence)
-- [Bun entrypoint detection guide](https://bun.com/docs/guides/util/entrypoint) - import.meta.main usage (HIGH confidence)
-- [Bun workspaces documentation](https://bun.com/docs/pm/workspaces) - Workspace support (HIGH confidence)
-- [Bun compatibility 2026](https://dev.to/alexcloudstar/bun-compatibility-in-2026-what-actually-works-what-does-not-and-when-to-switch-23eb) - Native addon compatibility at 34% (MEDIUM confidence)
-- [GJS subprocess guide](https://gjs.guide/guides/gio/subprocesses.html) - Gio.Subprocess usage in GNOME extensions (HIGH confidence)
-- [systemd user services - ArchWiki](https://wiki.archlinux.org/title/Systemd/User) - Environment import and D-Bus setup (HIGH confidence)
-- [Bun production deployment guide](https://oneuptime.com/blog/post/2026-01-31-bun-production-deployment/view) - Deployment best practices (MEDIUM confidence)
-- [Bun vs Node.js production comparison](https://dev.to/synsun/bun-vs-nodejs-in-production-what-three-months-of-real-traffic-taught-me-3d96) - Real-world migration lessons (MEDIUM confidence)
+- [GJS Memory Management Guide](https://gjs.guide/guides/gjs/memory-management.html) -- Clutter actor lifecycle, destroy() semantics, signal cleanup (HIGH confidence)
+- [GNOME Shell Extension Review Guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html) -- Required cleanup in disable(), timer/signal/actor rules (HIGH confidence)
+- [GJS Subprocesses Guide](https://gjs.guide/guides/gio/subprocesses.html) -- Gio.Subprocess, Gio.Cancellable patterns (HIGH confidence)
+- [GJS Asynchronous Programming](https://gjs.guide/guides/gjs/asynchronous-programming.html) -- GLib.timeout_add, main loop source management (HIGH confidence)
+- [npm/write-file-atomic](https://github.com/npm/write-file-atomic) -- Atomic write pattern reference, EXDEV handling (HIGH confidence)
+- [LWN.net: Atomic file creation](https://lwn.net/Articles/789600/) -- fsync requirement before rename (HIGH confidence)
+- [systemd.exec documentation](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html) -- ProtectSystem, ProtectHome, PrivateTmp semantics (HIGH confidence)
+- [systemd Sandboxing - ArchWiki](https://wiki.archlinux.org/title/Systemd/Sandboxing) -- User service sandboxing limitations (HIGH confidence)
+- [GNOME Dark Mode Switching - ArchWiki](https://wiki.archlinux.org/title/Dark_mode_switching) -- color-scheme vs gtk-theme for GNOME 45+ (HIGH confidence)
+- [GNOME Developer Docs: Dark Mode](https://developer.gnome.org/documentation/tutorials/beginners/getting_started/dark_mode.html) -- Official color-scheme API (HIGH confidence)
+- [Bun CI/CD Guide](https://bun.com/docs/guides/runtime/cicd) -- setup-bun action, frozen-lockfile, cache (HIGH confidence)
+- [oven-sh/setup-bun](https://github.com/oven-sh/setup-bun) -- Official GitHub Action for Bun (HIGH confidence)
+- [Bun Subprocess Documentation](https://bun.com/docs/runtime/child-process) -- AbortSignal support, killSignal, timeout (HIGH confidence)
+- [Bun stdout read + kill hang issue](https://github.com/oven-sh/bun/issues/1498) -- Known bug with proc.kill during read (HIGH confidence)
+- [AbortController Best Practices](https://kettanaito.com/blog/dont-sleep-on-abort-controller) -- Promise.race gotchas, AbortSignal.timeout (HIGH confidence)
+- [Secure Coding: exec vs execFile](https://securecodingpractices.com/prevent-command-injection-node-js-child-process/) -- Shell injection prevention in Node.js (HIGH confidence)
+- [GNOME Discourse: Subprocess child exit](https://discourse.gnome.org/t/how-to-make-a-glib-subprocess-having-childs-exit-responsibly/23260) -- GLib.Subprocess force_exit limitations (MEDIUM confidence)
+- [Biome Migration Guide 2026](https://dev.to/pockit_tools/biome-the-eslint-and-prettier-killer-complete-migration-guide-for-2026-27m) -- Baseline, --changed, gradual adoption (MEDIUM confidence)
+- [Biome Roadmap 2026](https://biomejs.dev/blog/roadmap-2026/) -- Official roadmap and feature plans (HIGH confidence)
+- [GJS setInterval/setTimeout polyfill](https://dontreinventbicycle.com/gjs-set-timeout-interval.html) -- globalThis timing API availability in GJS (MEDIUM confidence)
 
 ---
-*Pitfalls research for: Node.js-to-Bun migration of Agent Bar Ubuntu (systemd service + GNOME Shell extension)*
-*Researched: 2026-03-28*
+*Pitfalls research for: v2.1 Stability & Hardening of Agent Bar Ubuntu (Bun/TypeScript backend + GNOME Shell extension)*
+*Researched: 2026-04-05*

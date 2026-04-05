@@ -1,243 +1,582 @@
-# Stack Research: Bun Migration & Refactor
+# Stack Research: v2.1 Stability & Hardening
 
-**Domain:** Linux-native AI usage monitor -- Node.js-to-Bun migration, dependency reduction, TypeScript CLI lifecycle commands
-**Researched:** 2026-03-28
+**Domain:** Linux-native AI usage monitor -- stability fixes, security hardening, CI/CD, and theme awareness
+**Researched:** 2026-04-05
 **Confidence:** HIGH
 
-## Recommended Stack
+## Scope
 
-### Core Runtime
+This research covers ONLY the stack additions/changes needed for v2.1 hardening. The existing validated stack (Bun 1.3.x, TypeScript, @clack/prompts, Biome, GJS/St, systemd user service) is NOT re-researched.
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Bun | 1.3.11 | Runtime, package manager, test runner, bundler | Matches reference codebase (agent-bar-omarchy), eliminates tsc build step, native TypeScript execution, built-in test runner replaces vitest, built-in PTY support (v1.3.5+) eliminates node-pty. Current latest stable as of 2026-03-18. |
-| TypeScript | 5.9.3 | Type checking only (via `bun x tsc --noEmit`) | Bun executes .ts directly; TypeScript is only needed for `--noEmit` type-checking during CI/dev. Match reference codebase version. |
+Focus areas:
+1. Atomic file writes in Bun (fix race condition in snapshot-cache)
+2. GJS subprocess timeout patterns (fix missing timeouts in GNOME extension)
+3. GitHub Actions CI for Bun+TypeScript
+4. systemd service hardening
+5. GNOME theme detection (dark/light CSS awareness)
+6. GJS memory management (fix memory leak in indicator)
 
-### PTY Solution: `Bun.spawn({ terminal })` -- Native Built-in
+---
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Bun.Terminal API | Built-in (v1.3.5+) | PTY allocation for interactive CLI commands | **Replaces node-pty entirely.** No native addon compilation, no build-essential dependency, zero external deps. Works on Linux/macOS (POSIX). Provides `write()`, `resize()`, `setRawMode()`, `close()`. Available since Bun v1.3.5 (Dec 2025). |
+## 1. Atomic File Writes in Bun
 
-**Confidence: HIGH** -- Verified via official Bun docs at [bun.com/docs/runtime/child-process](https://bun.com/docs/runtime/child-process).
+**Problem:** `snapshot-cache.ts` line 73 uses `writeFileSync()` directly to the target path. A crash mid-write corrupts the cache file. This is the race condition audit finding.
 
-**Migration pattern from node-pty to Bun.Terminal:**
+**Solution:** Write to a temp file in the same directory, then atomically rename.
+
+### Pattern: temp + rename
+
+| API | Source | Purpose |
+|-----|--------|---------|
+| `Bun.write(path, data)` | Built-in | Write to temporary file (fast, optimized for platform) |
+| `rename()` from `node:fs/promises` | Bun compat layer (fully supported) | Atomic rename on same filesystem |
+| `renameSync()` from `node:fs` | Bun compat layer (fully supported) | Sync variant for the existing sync cache API |
+
+**Why this works:** POSIX guarantees `rename()` is atomic when source and destination are on the same filesystem. Writing to a temp file in the same directory (the XDG cache dir) ensures both are on the same mount.
+
+**Implementation pattern:**
 
 ```typescript
-// BEFORE: node-pty (current codebase)
-import pty from "node-pty";
-const term = pty.spawn(command, args, { cols: 120, rows: 30, env });
-term.onData((chunk) => { output += chunk; });
-term.write(input);
-term.onExit(({ exitCode }) => { /* resolve */ });
+import { renameSync, writeFileSync, unlinkSync } from 'node:fs';
+import { randomUUID } from 'node:crypto'; // or use Bun.hash / Date.now()
 
-// AFTER: Bun.Terminal (v2.0)
-const proc = Bun.spawn([command, ...args], {
-  env,
-  terminal: {
-    cols: 120,
-    rows: 30,
-    data(_terminal, chunk) { output += new TextDecoder().decode(chunk); },
-    exit() { /* resolve */ },
-  },
-});
-proc.terminal.write(input);
-const exitCode = await proc.exited;
+function atomicWriteSync(targetPath: string, data: string): void {
+  const tmpPath = `${targetPath}.${process.pid}.tmp`;
+  try {
+    writeFileSync(tmpPath, data, 'utf8');
+    renameSync(tmpPath, targetPath);
+  } catch (error) {
+    try { unlinkSync(tmpPath); } catch { /* cleanup best-effort */ }
+    throw error;
+  }
+}
 ```
 
-**Critical architectural note:** The reference codebase (agent-bar-omarchy) does NOT use PTY at all for providers. Instead:
-- **Claude:** Reads `~/.claude/.credentials.json` directly, calls the Anthropic HTTP API (`fetch()`) -- no CLI interaction needed.
-- **Codex:** Reads session `.jsonl` files from `~/.codex/sessions/` and uses `child_process.spawn('codex', ['app-server'])` over stdio (JSON-RPC, no PTY needed).
-- **Amp:** Uses `Bun.spawn([bin, 'usage'])` with stdout pipe -- no PTY needed.
+**No new dependencies needed.** This is a 10-line utility function using APIs Bun already supports at 100% compat.
 
-The current agent-bar-usage already has both paths implemented (`claude-api-fetcher.ts` + `codex-appserver-fetcher.ts`). The v2.0 migration should **prefer these non-PTY paths as primary** and keep `Bun.Terminal` only as a fallback for edge cases. This eliminates the PTY dependency entirely for the happy path.
+**Confidence: HIGH** -- `node:fs` and `node:fs/promises` are fully supported in Bun. The `rename` function is confirmed in Bun's API reference. POSIX atomic rename semantics are well-established.
 
-### CLI & TUI
-
-| Library | Version | Purpose | Why Recommended |
-|---------|---------|---------|-----------------|
-| @clack/prompts | 1.1.0 | Interactive TUI for setup/remove/update commands | Used by reference codebase. Beautiful, minimal API surface (intro, outro, confirm, select, spinner, note, log). Published 2026-03-03. Works with Bun (confirmed by reference codebase production use). |
-
-**Confidence: MEDIUM** -- @clack/prompts has had intermittent Bun stdin issues (GitHub issues #4835, #24615), but the reference codebase runs it in production with Bun. The key is: interactive prompts run in a terminal (user-facing), NOT in systemd services, so stdin is always available.
-
-**Manual CLI parsing replaces Commander.** The reference codebase demonstrates the exact pattern: a `parseArgs()` function with a switch statement over `process.argv.slice(2)`, Levenshtein-based typo suggestions, and typed return value. Zero dependencies needed. See `/home/othavio/Work/agent-bar-omarchy/src/cli.ts`.
-
-### Development Tools
-
-| Tool | Version | Purpose | Notes |
-|------|---------|---------|-------|
-| Biome | 2.4.9 | Linter + formatter (replaces ESLint + Prettier) | 10-100x faster than ESLint. Single config file. Type-aware linting in v2+. Used by reference codebase. Install as devDependency: `@biomejs/biome`. |
-| bun test | Built-in | Test runner (replaces vitest) | Jest-compatible API (`describe`, `it`, `expect`, `mock`). 3-10x faster than vitest. Snapshot testing, lifecycle hooks. No extra dependency needed. |
-| @types/bun | latest | Bun type definitions for TypeScript | Provides types for `Bun.spawn`, `Bun.file`, `Bun.Terminal`, `Bun.Glob`, etc. |
-
-### Supporting Libraries (Retained)
-
-| Library | Version | Purpose | Bun Compatible | Notes |
-|---------|---------|---------|----------------|-------|
-| ora | 9.3.0 | Spinner for non-interactive contexts (systemd logs) | Yes | Optional -- @clack/prompts has its own spinner for TUI contexts. Keep for non-TUI output if needed. |
-
-### Node.js APIs Used via Bun Compatibility Layer
-
-| Module | Bun Status | Usage in Project |
-|--------|-----------|-----------------|
-| `node:child_process` | Partially supported (missing `proc.gid`/`proc.uid` only) | Codex app-server spawn -- works fine |
-| `node:fs` / `node:fs/promises` | Fully supported (92% test suite) | Config files, credentials -- works fine. Prefer `Bun.file()` for new code. |
-| `node:os` | Fully supported (100% test suite) | `homedir()` -- works fine |
-| `node:path` | Fully supported (100% test suite) | Path manipulation -- works fine |
-| `node:readline` | Fully supported | JSON-RPC line parsing in Codex app-server -- works fine |
-| `node:http` | Fully supported | HTTP server for backend -- works fine. Can migrate to `Bun.serve()` later. |
-| `node:net` | Fully supported | Unix socket IPC -- works fine |
-
-**Confidence: HIGH** -- Verified via [bun.com/docs/runtime/nodejs-compat](https://bun.com/docs/runtime/nodejs-compat).
-
-## Installation
-
-```bash
-# Install Bun globally (if not already)
-curl -fsSL https://bun.sh/install | bash
-
-# Core dependencies (production)
-bun add @clack/prompts@1.1.0
-
-# Dev dependencies
-bun add -D @biomejs/biome@2.4.9 @types/bun typescript@5.9.3
-```
-
-**No build step needed.** Bun executes TypeScript directly. The `tsc` invocation is only for type-checking (`--noEmit`).
-
-## Dependencies Removed
-
-| Removed | Reason | Replacement |
-|---------|--------|-------------|
-| commander (14.0.x) | Unnecessary abstraction for simple CLI routing | Manual `parseArgs()` function -- 150 lines, zero deps, with typo suggestions. Pattern proven in reference codebase. |
-| zod (3.25.x) | Over-engineered for config/API validation | Inline validation with type guards and assertion functions. Config shapes are known at compile time. API responses get defensive field-by-field checks (reference codebase pattern). |
-| node-pty (1.0.x) | Native addon requiring build-essential + Python | `Bun.Terminal` API (built-in) for fallback PTY. Primary path uses HTTP API / file reads / stdio spawn (no PTY needed). |
-| vitest (3.2.x) | External test runner dependency | `bun test` built-in runner -- Jest-compatible, faster, zero deps. |
-| tsx (4.x) | TypeScript execution for Node.js | Bun executes .ts natively -- tsx is unnecessary. |
-| @types/node (24.x) | Node.js type definitions | `@types/bun` replaces this. Bun re-exports most Node.js types. |
-
-**Dependency count: from 4 production deps to 1** (`@clack/prompts`). Dev deps: from 4 to 3 (`@biomejs/biome`, `@types/bun`, `typescript`).
-
-## What NOT to Use
+### What NOT to use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| node-pty | Native C++ addon that requires `build-essential` + `python3` to compile. 34% native addon compatibility rate with Bun. Eliminated by the reference codebase entirely. | `Bun.Terminal` API for the rare PTY fallback. Prefer HTTP API / file read / stdio spawn for all provider data fetching. |
-| Commander | Adds 15KB+ for something that is 150 lines of hand-written code. The CLI surface is simple enough that a framework adds complexity, not value. | Manual `parseArgs()` with switch statement. See reference at `/home/othavio/Work/agent-bar-omarchy/src/cli.ts`. |
-| Zod | 55KB+ library for validation that can be done with 20-line type guard functions. Adds compile-time cost and bundle weight. Every config field is known at design time. | TypeScript type guards + inline assertions. `if (typeof x !== 'string') throw new Error(...)`. |
-| bun-pty (npm) | Third-party package using Rust FFI. Immature (low download count), unnecessary now that Bun has native Terminal API. | `Bun.Terminal` API (built-in, maintained by Oven team). |
-| ESLint + Prettier | Two tools, slow, complex config. Biome does both in one tool, 100x faster. | Biome 2.4.9 -- single `biome.json`, lints + formats in one pass. |
-| pnpm (as package manager) | Bun's built-in package manager is faster and supports workspaces. Running two package managers adds confusion. | `bun install` -- supports workspace:* protocol, npm registry, lockfile (`bun.lock`). |
+| `write-file-atomic` (npm) | Unnecessary dependency for a 10-line pattern | Manual temp+rename |
+| `Bun.write()` directly to target | Same race condition as current code | Write to temp, then rename |
+| `fsync` before rename | Overkill for a JSON cache file (not a database). The cache is regenerable. | Just temp+rename is sufficient |
 
-## Bun + systemd Compatibility
+---
 
-**Confidence: HIGH** -- Official docs at [bun.com/docs/guides/ecosystem/systemd](https://bun.com/docs/guides/ecosystem/systemd).
+## 2. GJS Subprocess Timeout Patterns
 
-Bun works as a systemd service with the `simple` service type. The service file pattern:
+**Problem:** The GNOME extension's `backend-client.js` spawns `Gio.Subprocess` via `communicate_utf8_async` with no timeout. If the backend hangs, the extension hangs indefinitely.
+
+### Pattern: GLib.timeout_add + Gio.Cancellable
+
+The correct GJS pattern combines `Gio.Cancellable` with `GLib.timeout_add` for subprocess timeouts.
+
+| API | Import | Purpose |
+|-----|--------|---------|
+| `GLib.timeout_add(priority, ms, callback)` | `gi://GLib` | Schedule a timeout callback on the main loop |
+| `GLib.timeout_add_seconds(priority, secs, callback)` | `gi://GLib` | Same but in seconds (prefer for >1s timeouts) |
+| `GLib.Source.remove(sourceId)` | `gi://GLib` | Cancel a scheduled timeout |
+| `Gio.Cancellable` | `gi://Gio` | Cancel async operations; connect to `force_exit()` |
+
+**Implementation pattern for subprocess with timeout:**
+
+```javascript
+import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
+
+const SUBPROCESS_TIMEOUT_MS = 15000;
+
+async function runWithTimeout(argv, timeoutMs = SUBPROCESS_TIMEOUT_MS) {
+  const cancellable = new Gio.Cancellable();
+  const proc = new Gio.Subprocess({
+    argv,
+    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+  });
+  proc.init(cancellable);
+
+  // Connect cancellable to force-kill the process
+  const cancelId = cancellable.connect(() => proc.force_exit());
+
+  // Schedule timeout
+  const timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, timeoutMs, () => {
+    cancellable.cancel();
+    return GLib.SOURCE_REMOVE;
+  });
+
+  try {
+    const [stdout, stderr] = await proc.communicate_utf8_async(null, cancellable);
+    GLib.Source.remove(timeoutId);
+    cancellable.disconnect(cancelId);
+    return { stdout, stderr, success: proc.get_successful() };
+  } catch (error) {
+    GLib.Source.remove(timeoutId);
+    cancellable.disconnect(cancelId);
+    throw error;
+  }
+}
+```
+
+**Critical cleanup requirement:** Per GNOME review guidelines, ALL `GLib.timeout_add` sources MUST be removed in `disable()`. The extension must track active timeout source IDs and clean them up.
+
+**Note on `force_exit` limitation:** `Gio.Subprocess.force_exit()` does NOT affect child processes of the subprocess. This is a known GLib limitation. For the agent-bar use case this is acceptable because the backend CLI process is a single process (not a process tree).
+
+**Note on `Gio._promisify`:** For cleaner async patterns, promisify the subprocess methods:
+
+```javascript
+Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async');
+```
+
+This allows `await proc.communicate_utf8_async(null, cancellable)` instead of callback-based patterns.
+
+**No new dependencies needed.** `GLib` and `Gio` are already imported in the extension.
+
+**Confidence: HIGH** -- Verified via official gjs.guide documentation for both subprocesses and async programming.
+
+---
+
+## 3. GitHub Actions CI for Bun + TypeScript
+
+**Problem:** No CI pipeline exists. Lint, typecheck, and test failures are only caught locally.
+
+### Recommended: `oven-sh/setup-bun@v2`
+
+| Tool | Version | Purpose | Notes |
+|------|---------|---------|-------|
+| `oven-sh/setup-bun` | `v2` | Install Bun in GitHub Actions | Official action from the Bun team |
+| `actions/checkout` | `v4` | Clone repository | Standard |
+
+**Workflow structure -- three parallel jobs:**
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+      - run: bun install --frozen-lockfile
+      - run: bun run biome:check
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+      - run: bun install --frozen-lockfile
+      - run: bun x tsc --noEmit -p apps/backend/tsconfig.json
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+      - run: bun install --frozen-lockfile
+      - run: cd apps/backend && bun test
+```
+
+**Key decisions:**
+
+| Decision | Rationale |
+|----------|-----------|
+| Pin `bun-version: "1.3.10"` | Current latest stable. Avoid `latest` to prevent surprise breakage. Update via PR when upgrading Bun. |
+| `--frozen-lockfile` | Fail CI if lockfile is out of date (prevents drift). |
+| Parallel jobs (not sequential `needs:`) | Lint, typecheck, and test are independent. Running in parallel gives faster feedback. |
+| No dependency caching action | Bun docs state: "`bun install` is faster than the GitHub Actions cache" in most cases. The `setup-bun` action caches the Bun binary itself. |
+| `ubuntu-latest` runner only | Project targets Ubuntu. No matrix needed -- single platform, single runtime version. |
+| No build step | Bun executes TypeScript directly. No compilation artifact to produce. |
+
+**GNOME extension tests:** The GNOME extension uses vitest (see `vitest.config.ts`). If those tests should run in CI, add a separate job:
+
+```yaml
+  test-gnome:
+    name: GNOME Extension Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: cd apps/gnome-extension && npm install && npm test
+```
+
+**Confidence: HIGH** -- `oven-sh/setup-bun@v2` is the official GitHub Action, verified via Bun docs and GitHub Marketplace. Workflow patterns confirmed from multiple sources.
+
+### What NOT to use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `actions/cache` for `node_modules` | `bun install` is fast enough that caching adds complexity without benefit | Let `setup-bun` cache the Bun binary only |
+| `bun-version: latest` | CI should be deterministic. `latest` can break builds without code changes. | Pin exact version: `"1.3.10"` |
+| Matrix strategy (multiple Bun versions) | Not a library -- single application with one target version | Single version pin |
+| `needs: lint` on test job | Makes CI sequential and slower for no reason | Run jobs in parallel |
+
+---
+
+## 4. systemd Service Hardening
+
+**Problem:** The current `agent-bar.service` is minimal (Type=simple, Restart=on-failure). No sandboxing or resource limits.
+
+### Critical Finding: User Services Cannot Use Most Sandboxing
+
+The current service is a **user** unit (`~/.config/systemd/user/` or `~/.local/share/systemd/user/`), managed via `systemctl --user`. Per the official `systemd.exec(5)` documentation:
+
+> "Many sandboxing features are not available in user services because they require privileged kernel features (mount namespaces) that an unprivileged user service manager cannot use."
+
+**Directives that DO NOT WORK in user services:**
+
+| Directive | Status in User Mode |
+|-----------|---------------------|
+| `ProtectSystem=` | **Does not work** -- requires mount namespace |
+| `ProtectHome=` | **Does not work** -- requires mount namespace |
+| `PrivateTmp=` | **Does not work** unless `PrivateUsers=true` |
+| `PrivateDevices=` | **Does not work** unless `PrivateUsers=true` |
+| `PrivateNetwork=` | **Does not work** unless `PrivateUsers=true` |
+
+**Directives that DO WORK in user services:**
+
+| Directive | Value | Purpose |
+|-----------|-------|---------|
+| `Restart=on-failure` | Already set | Restart on non-zero exit |
+| `RestartSec=2` | Already set | Delay between restart attempts |
+| `Environment=` | Already set | Set env vars |
+| `EnvironmentFile=-` | Add | Load env from file (- = ignore if missing) |
+| `StateDirectory=agent-bar` | Add | Auto-create `$XDG_STATE_HOME/agent-bar/` (or `~/.local/state/agent-bar/`) |
+| `CacheDirectory=agent-bar` | Add | Auto-create `$XDG_CACHE_HOME/agent-bar/` |
+| `WatchdogSec=60` | Add | systemd kills service if it stops responding (requires sd_notify integration) |
+| `TimeoutStartSec=30` | Add | Kill if startup takes too long |
+| `TimeoutStopSec=10` | Add | Kill if shutdown takes too long |
+| `MemoryMax=512M` | Add | Hard memory limit -- prevents runaway leaks from consuming system |
+| `CPUQuota=50%` | Add | Prevents runaway CPU consumption |
+| `TasksMax=50` | Add | Limits number of child processes |
+| `StartLimitIntervalSec=300` | Add (in `[Unit]`) | Crash loop detection window |
+| `StartLimitBurst=5` | Add (in `[Unit]`) | Max restarts within interval before giving up |
+| `StandardOutput=journal` | Add | Route stdout to systemd journal |
+| `StandardError=journal` | Add | Route stderr to systemd journal |
+
+### Recommended Hardened Service File
 
 ```ini
 [Unit]
-Description=Agent Bar Backend
-After=network.target
+Description=Agent Bar local backend service
+After=default.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
-User=%i
-WorkingDirectory=/path/to/agent-bar-usage
-ExecStart=/home/USER/.bun/bin/bun run src/service/service-server.ts
-Restart=always
-RestartSec=5
+ExecStart=%h/.local/bin/agent-bar service run
+Restart=on-failure
+RestartSec=2
+TimeoutStartSec=30
+TimeoutStopSec=10
 
-# Environment capture (same pattern as current Node.js service)
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
-EnvironmentFile=-/home/%i/.config/agent-bar/env
+# Resource limits (work in user services)
+MemoryMax=512M
+CPUQuota=50%
+TasksMax=50
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+EnvironmentFile=-%h/.config/agent-bar/env
+
+# Directories (auto-created by systemd, XDG-aware in user mode)
+CacheDirectory=agent-bar
+StateDirectory=agent-bar
 
 [Install]
 WantedBy=default.target
 ```
 
-**Key differences from current Node.js service:**
-1. `ExecStart` changes from `node dist/service-server.js` to `bun run src/service-server.ts` -- no build step needed.
-2. Bun binary path is typically `~/.bun/bin/bun` (installed via curl script) rather than system Node.js.
-3. No `node_modules/.bin` path manipulation needed for the entry point.
-4. Same `Environment` / `EnvironmentFile` patterns work identically.
+### Decision: Stay as User Service
 
-**Caveats:**
-- Bun binary must be installed per-user (not system-wide by default). The `setup` command should verify `~/.bun/bin/bun` exists.
-- `bun run src/file.ts` executes TypeScript directly -- no pre-compilation step. The systemd service runs the source files.
+| Option | Pros | Cons |
+|--------|------|------|
+| **User service (current, recommended)** | No root needed for install/manage. XDG dirs automatic. Access to user's DBUS session. Simple install UX. | Cannot use ProtectSystem/ProtectHome sandboxing. |
+| System service with `User=` | Full sandboxing available. | Requires root to install. DBUS session access is complex. Install script needs sudo. Worse UX for a desktop tool. |
 
-## Workspace Structure Migration
+**Recommendation:** Stay as user service. The agent-bar backend reads user config files, accesses user's GNOME Keyring (via DBUS), and is managed by the user. Converting to a system service for sandboxing adds significant complexity. The resource limits (`MemoryMax`, `CPUQuota`, `TasksMax`, `TimeoutStartSec`, crash loop detection) provide meaningful hardening without requiring root.
 
-**From:** pnpm monorepo with `apps/backend`, `apps/gnome-extension`, `packages/shared-contract`
-**To:** Bun workspace with simplified structure
+**Confidence: HIGH** -- Verified via systemd.exec(5) man page and Arch Wiki. User service limitations confirmed from multiple authoritative sources.
 
-The reference codebase is a **flat single-package** structure (not a monorepo). For agent-bar-usage, the recommendation depends on whether the `shared-contract` package adds value:
+---
 
-**Option A (Recommended): Flatten to single package + separate gnome-extension**
+## 5. GNOME Theme Detection (Dark/Light CSS Awareness)
+
+**Problem:** The extension stylesheet has hardcoded One Dark colors. On a light GNOME Shell theme (available since GNOME 45, default-capable on Ubuntu 24.04's GNOME 46), the extension looks jarring.
+
+### Approach: GSettings `color-scheme` + Dynamic CSS Classes
+
+| API | Import | Purpose |
+|-----|--------|---------|
+| `Gio.Settings` | `gi://Gio` | Read `org.gnome.desktop.interface` schema |
+| `settings.get_string('color-scheme')` | -- | Returns `'default'`, `'prefer-dark'`, or `'prefer-light'` |
+| `settings.connect('changed::color-scheme', callback)` | -- | React to theme changes in real time |
+| `St.ThemeContext.get_for_stage(global.stage)` | `gi://St` | React to shell CSS theme changes (already used in extension) |
+
+**Implementation pattern:**
+
+```javascript
+import Gio from 'gi://Gio';
+
+// In enable():
+this._interfaceSettings = new Gio.Settings({
+  schema_id: 'org.gnome.desktop.interface',
+});
+
+const scheme = this._interfaceSettings.get_string('color-scheme');
+this._isDark = scheme !== 'prefer-light'; // default and prefer-dark both treated as dark
+
+this._colorSchemeHandlerId = this._interfaceSettings.connect(
+  'changed::color-scheme',
+  () => {
+    const newScheme = this._interfaceSettings.get_string('color-scheme');
+    this._isDark = newScheme !== 'prefer-light';
+    this._updateThemeClass();
+  }
+);
+
+// In disable():
+if (this._colorSchemeHandlerId) {
+  this._interfaceSettings.disconnect(this._colorSchemeHandlerId);
+  this._colorSchemeHandlerId = null;
+}
+this._interfaceSettings = null;
 ```
-agent-bar-usage/
-  package.json          # Bun workspace root
-  src/                  # Backend + CLI (was apps/backend/src)
-  gnome-extension/      # GJS extension (no Bun deps, just GJS)
-  tests/
-  biome.json
-  tsconfig.json
-```
 
-**Rationale:** The `shared-contract` package exists primarily to share Zod schemas between backend and gnome-extension. With Zod removed, the contract becomes a simple TypeScript interface file that can live in `src/contracts/`. The gnome-extension is GJS (not TypeScript) and doesn't import from `shared-contract` at build time -- it reads JSON over the Unix socket at runtime.
+**CSS strategy:** Use CSS classes on the root container, NOT separate stylesheets.
 
-**Option B: Keep workspaces**
-```json
-{
-  "name": "agent-bar-usage",
-  "private": true,
-  "workspaces": ["apps/*", "packages/*"]
+```css
+/* Dark mode (default) */
+.agent-bar-ubuntu-indicator__provider {
+  background-color: rgba(40, 44, 52, 0.92);
+  color: #abb2bf;
+  border: 1px solid rgba(171, 178, 191, 0.16);
+}
+
+/* Light mode override */
+.agent-bar--light .agent-bar-ubuntu-indicator__provider {
+  background-color: rgba(255, 255, 255, 0.92);
+  color: #383a42;
+  border: 1px solid rgba(56, 58, 66, 0.16);
 }
 ```
 
-Bun supports `workspace:*` protocol identically to pnpm. But this adds complexity for no clear benefit in a 2-person, 1-backend project.
+**Why `color-scheme` instead of `St.ThemeContext`:** `St.ThemeContext.changed` fires when the shell CSS theme is swapped, but does NOT expose a dark/light boolean. The GSettings `color-scheme` key is the canonical source for dark vs. light preference since GNOME 42 and is what libadwaita/GTK4 apps use.
+
+**Ubuntu 24.04 ships GNOME 46** -- `color-scheme` GSettings key is fully available.
+
+**No new dependencies needed.** `Gio.Settings` is already imported and available in the extension.
+
+**Confidence: HIGH** -- GSettings `color-scheme` key verified via GNOME documentation (introduced GNOME 42). Ubuntu 24.04 ships GNOME 46.
+
+---
+
+## 6. GJS Memory Management (Indicator Memory Leak Fix)
+
+**Problem:** `indicator.js` `_render()` method (line 129-131) removes children from `_box` but never calls `.destroy()` on the removed actors. This leaks GObject/Clutter actors on every re-render (every 2.5 minutes from polling).
+
+### Pattern: Destroy Actors Before Removing
+
+Per GNOME Shell review guidelines: "Any objects or widgets created by an extension MUST be destroyed in `disable()`." This extends to actors created in render cycles.
+
+| API | Purpose |
+|-----|---------|
+| `actor.destroy()` | Destroys the Clutter actor and releases its resources |
+| `container.destroy_all_children()` | Destroys all children of a container (convenience) |
+
+**Fix pattern for the _render() method:**
+
+```javascript
+_render() {
+  const summary = buildIndicatorSummaryViewModel(this._state);
+
+  // CRITICAL FIX: destroy old actors, not just remove them
+  for (const [, slot] of this._providerActors) {
+    slot.container.destroy(); // destroys children recursively
+  }
+  this._providerActors.clear();
+
+  // Or alternatively, use the container method:
+  // this._box.destroy_all_children();
+
+  // ... create new provider slots ...
+}
+```
+
+**Why `destroy()` is needed:** In GJS/Clutter, `remove_child()` detaches an actor from its parent but does NOT free its resources. The actor continues to exist in memory. Only `destroy()` releases the underlying C resources (GObject ref count, Clutter allocations, signal connections). Since `_render()` is called every poll cycle (~2.5 min) and on every state change, this leak compounds over time.
+
+**Additional cleanup requirements per GNOME review guidelines:**
+
+| Requirement | Status in Current Code | Fix |
+|-------------|----------------------|-----|
+| Destroy all actors in `disable()` | Partially done (`destroy()` called on `this` via PanelMenu.Button) | Ensure `_providerActors` are destroyed before `super.destroy()` |
+| Remove all GLib sources in `disable()` | Current code uses `globalThis.setInterval`, not `GLib.timeout_add` | Migrate to `GLib.timeout_add_seconds` and track source IDs |
+| Disconnect all signals in `disable()` | No signal connections in indicator | OK (but will need for theme detection) |
+
+**No new dependencies needed.** `destroy()` is a built-in method on all Clutter/St actors.
+
+**Confidence: HIGH** -- Verified via GNOME Shell review guidelines at gjs.guide.
+
+---
+
+## 7. Backend Subprocess Timeouts (Bun Side)
+
+**Problem:** The backend coordinator and some provider fetchers may hang without timeouts.
+
+### Pattern: AbortSignal.timeout() with Bun.spawn
+
+Bun supports the standard `AbortSignal.timeout()` API. For subprocess timeouts on the backend side:
+
+```typescript
+// For fetch()-based providers (Claude API):
+const response = await fetch(url, {
+  signal: AbortSignal.timeout(10_000), // 10s timeout
+  headers: { ... },
+});
+
+// For Bun.spawn-based providers:
+// Already implemented in codex-appserver-fetcher.ts with setTimeout+settle pattern.
+// The existing pattern is correct -- just needs consistent application.
+```
+
+The Codex appserver fetcher already has a proper timeout (`REQUEST_TIMEOUT_MS = 10_000`). The pattern needs to be applied consistently to all providers.
+
+**No new dependencies needed.** `AbortSignal.timeout()` is a web standard available in Bun.
+
+**Confidence: HIGH** -- Standard Web API, supported in Bun.
+
+---
+
+## 8. Shell Injection Fix (Auth Command)
+
+**Problem:** `auth-command.ts` line 225 uses `exec(\`xdg-open ${url}\`)` which is vulnerable to shell injection if the URL contains shell metacharacters.
+
+### Fix: Use `Bun.spawn` with Array Arguments (No Shell)
+
+```typescript
+// BEFORE (vulnerable):
+exec(`xdg-open ${url}`, () => {});
+
+// AFTER (safe):
+function defaultOpenBrowser(url: string): void {
+  try {
+    Bun.spawn(['xdg-open', url], {
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+  } catch {
+    // Best-effort: xdg-open may not be available
+  }
+}
+```
+
+**Why this works:** `Bun.spawn()` with an array argument does NOT invoke a shell. Each element is passed directly as a separate argument to `execvp()`, preventing shell interpretation of metacharacters.
+
+**No new dependencies needed.** `Bun.spawn` is already used throughout the codebase.
+
+**Confidence: HIGH** -- Standard subprocess safety pattern. Bun.spawn with array arguments confirmed to bypass shell.
+
+---
+
+## Recommended Stack (v2.1 Additions Summary)
+
+### New Capabilities (No New Dependencies)
+
+| Capability | Implementation | Source |
+|------------|---------------|--------|
+| Atomic file writes | `writeFileSync` + `renameSync` (temp+rename pattern) | `node:fs` via Bun compat |
+| GJS subprocess timeouts | `GLib.timeout_add` + `Gio.Cancellable` | `gi://GLib`, `gi://Gio` (already imported) |
+| Theme detection | `Gio.Settings` + `color-scheme` GSettings key | `gi://Gio` (already imported) |
+| Actor memory cleanup | `actor.destroy()` on re-render | `gi://Clutter`, `gi://St` (already imported) |
+| Shell injection fix | `Bun.spawn(['xdg-open', url])` | Built-in Bun API |
+| Backend timeouts | `AbortSignal.timeout()` / existing setTimeout pattern | Web standard |
+| Crash loop detection | `StartLimitIntervalSec` + `StartLimitBurst` in systemd | systemd directives |
+| Resource limits | `MemoryMax`, `CPUQuota`, `TasksMax` in systemd | systemd directives |
+
+### New CI Tooling
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| `oven-sh/setup-bun` (GitHub Action) | `v2` | Install Bun in CI runners |
+| `actions/checkout` (GitHub Action) | `v4` | Standard checkout |
+
+### No New npm Dependencies
+
+**v2.1 adds ZERO new production or dev dependencies.** Every fix uses APIs already available in the existing stack (Bun built-ins, node:fs compat, GJS/GLib/Gio introspection, systemd directives, web standards).
+
+---
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `write-file-atomic` npm package | Unnecessary for a 10-line pattern | Manual `writeFileSync` + `renameSync` |
+| `proper-lockfile` npm package | Cache is single-writer (systemd service) | Atomic rename is sufficient |
+| `node:child_process.exec()` for subprocess | Invokes shell, enables injection | `Bun.spawn()` with array args |
+| System-level systemd service | Requires root, complicates DBUS/Keyring access | User service with resource limits |
+| `ProtectSystem=strict` in user service | **Does not work** in user units | `MemoryMax` + `TasksMax` + crash loop detection |
+| Separate dark/light CSS files | Complex to load/unload dynamically | CSS class toggle on root container |
+| `St.ThemeContext` for dark/light detection | Does not expose dark/light boolean | `Gio.Settings` + `color-scheme` GSettings key |
+| `setTimeout`/`setInterval` in GNOME extension | Not tracked by GLib main loop, cannot be cleaned up in `disable()` | `GLib.timeout_add_seconds` with source ID tracking |
+
+---
 
 ## Version Compatibility Matrix
 
-| Package | Requires | Compatible With | Notes |
-|---------|----------|-----------------|-------|
-| Bun 1.3.11 | Linux x64/arm64, macOS | TypeScript 5.9.x | Terminal API requires POSIX (Linux/macOS) |
-| @clack/prompts 1.1.0 | Bun 1.3.0+ | Bun 1.3.11 | Avoid Bun 1.3.2 specifically (stdin EPERM bug). 1.3.11 is safe. |
-| @biomejs/biome 2.4.9 | Node 18+ or Bun | TypeScript 5.x | Standalone binary, no runtime dependency. Type-aware linting in v2+. |
-| TypeScript 5.9.3 | - | Bun 1.3.x | Used only for `--noEmit` type checking |
+| Component | Version | Compatible With | Notes |
+|-----------|---------|-----------------|-------|
+| Bun | 1.3.10 | `node:fs` rename (100% compat) | Latest stable as of 2026-03-18 |
+| `oven-sh/setup-bun` | v2 | Bun 1.3.x, GitHub Actions `ubuntu-latest` | Official Bun CI action |
+| GNOME Shell | 46 (Ubuntu 24.04 LTS) | `color-scheme` GSettings key (GNOME 42+) | Fully available |
+| `Gio.Subprocess` | GLib 2.40+ | GNOME 46, `communicate_utf8_async` | Fully available |
+| `GLib.timeout_add` | GLib 2.0+ | All GNOME versions | Core GLib API |
+| systemd `MemoryMax` | systemd 231+ | Ubuntu 24.04 (systemd 255) | Works in user units |
+| systemd `TasksMax` | systemd 228+ | Ubuntu 24.04 (systemd 255) | Works in user units |
+| systemd `StartLimitBurst` | systemd 229+ | Ubuntu 24.04 (systemd 255) | Works in user units |
 
-## Stack Patterns by Context
-
-**For provider data fetching (systemd service context):**
-- Use `fetch()` for HTTP APIs (Claude usage endpoint)
-- Use `Bun.file()` for reading credential/session files (Claude credentials, Codex session logs)
-- Use `Bun.spawn()` with stdio pipes for CLI tools (Codex app-server JSON-RPC)
-- **Do NOT use PTY** -- no terminal exists in systemd context. The reference codebase proves all 3 providers work without PTY.
-
-**For user-facing CLI commands (terminal context):**
-- Use `@clack/prompts` for interactive flows (setup, remove, update, auth)
-- Use `Bun.Terminal` API only if a provider truly requires PTY interaction (no current provider does)
-- Use `Bun.spawn()` with stdout pipe for non-interactive subprocesses (git fetch, bun install)
-
-**For test execution:**
-- Use `bun test` directly
-- Mock with `bun:test` built-in mock functions
-- Use `Bun.file()` for fixture file access in tests
+---
 
 ## Sources
 
-- [Bun docs: Spawn / Terminal API](https://bun.com/docs/runtime/child-process) -- PTY support via `terminal` option, verified HIGH confidence
-- [Bun docs: systemd guide](https://bun.com/docs/guides/ecosystem/systemd) -- Service file template, verified HIGH confidence
-- [Bun docs: Node.js compatibility](https://bun.com/docs/runtime/nodejs-compat) -- Module compat matrix, verified HIGH confidence
-- [Bun docs: Workspaces](https://bun.com/docs/guides/install/workspaces) -- Workspace config, verified HIGH confidence
-- [Bun blog: v1.3.5](https://bun.com/blog/bun-v1.3.5) -- Bun.Terminal API introduction (Dec 2025), verified HIGH confidence
-- [Bun releases](https://github.com/oven-sh/bun/releases) -- Latest v1.3.11 (March 18, 2026), verified HIGH confidence
-- [Bun compatibility 2026](https://dev.to/alexcloudstar/bun-compatibility-in-2026-what-actually-works-what-does-not-and-when-to-switch-23eb) -- Native addon 34% compat rate, MEDIUM confidence (blog post)
-- [@clack/prompts npm](https://www.npmjs.com/package/@clack/prompts) -- v1.1.0 published 2026-03-03, verified HIGH confidence
-- [Biome](https://biomejs.dev/) -- v2.4.9 with 465 lint rules, verified HIGH confidence
-- [bun:test docs](https://bun.com/docs/test) -- Jest-compatible test runner, verified HIGH confidence
-- Reference codebase: `/home/othavio/Work/agent-bar-omarchy/` -- Production-proven Bun patterns, HIGH confidence (first-party code)
+- [Bun docs: File I/O](https://bun.com/docs/runtime/file-io) -- Bun.write() API, verified HIGH confidence
+- [Bun API Reference: fs/promises/rename](https://bun.com/reference/node/fs/promises/rename) -- node:fs rename compat, verified HIGH confidence
+- [Bun docs: CI/CD with GitHub Actions](https://bun.com/docs/guides/runtime/cicd) -- setup-bun action, verified HIGH confidence
+- [oven-sh/setup-bun GitHub](https://github.com/oven-sh/setup-bun) -- Action v2 features, caching, verified HIGH confidence
+- [Bun releases](https://github.com/oven-sh/bun/releases) -- v1.3.10 latest stable (2026-03-18), verified HIGH confidence
+- [GJS Guide: Subprocesses](https://gjs.guide/guides/gio/subprocesses.html) -- Gio.Subprocess + Cancellable patterns, verified HIGH confidence
+- [GJS Guide: Async Programming](https://gjs.guide/guides/gjs/asynchronous-programming.html) -- GLib.timeout_add patterns, verified HIGH confidence
+- [GJS Guide: Extension Review Guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html) -- Actor destruction, source cleanup, signal disconnection, verified HIGH confidence
+- [systemd.exec(5) man page (Arch)](https://man.archlinux.org/man/systemd.exec.5.en) -- Sandboxing directive availability in user vs system services, verified HIGH confidence
+- [Arch Wiki: systemd/Sandboxing](https://wiki.archlinux.org/title/Systemd/Sandboxing) -- User service limitations, verified HIGH confidence
+- [GNOME Discourse: Read dark/light mode from shell](https://discourse.gnome.org/t/how-to-read-dark-light-mode-status-from-shell/12038) -- color-scheme GSettings approach, MEDIUM confidence
+- [GNOME Blog: Dark Style Preference](https://blogs.gnome.org/alicem/2021/10/04/dark-style-preference/) -- color-scheme key introduction (GNOME 42), MEDIUM confidence
+- [GJS Guide: Port to GNOME Shell 42](https://gjs.guide/extensions/upgrading/gnome-shell-42.html) -- color-scheme adoption, verified HIGH confidence
+- [systemd hardening gist (ageis)](https://gist.github.com/ageis/f5595e59b1cddb1513d1b425a323db04) -- Comprehensive directive reference, MEDIUM confidence
+- [Fedora SystemdSecurityHardening](https://fedoraproject.org/wiki/Changes/SystemdSecurityHardening) -- Distro-level hardening initiative, MEDIUM confidence
 
 ---
-*Stack research for: Bun Migration & Refactor -- Agent Bar Ubuntu v2.0*
-*Researched: 2026-03-28*
+*Stack research for: v2.1 Stability & Hardening -- Agent Bar Ubuntu*
+*Researched: 2026-04-05*
