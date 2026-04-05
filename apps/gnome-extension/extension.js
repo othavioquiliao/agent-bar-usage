@@ -1,6 +1,5 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-import St from 'gi://St';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { Indicator } from './panel/indicator.js';
@@ -14,15 +13,12 @@ export default class AgentBarUbuntuExtension extends Extension {
     this._indicator = null;
     this._backendClient = null;
     this._pollingService = null;
-    this._stylesheetFile = null;
   }
 
   enable() {
     if (this._indicator) {
       return;
     }
-
-    this._loadStylesheet();
 
     const initialState = createInitialState();
     const findProgramInPath = (name) => {
@@ -71,7 +67,6 @@ export default class AgentBarUbuntuExtension extends Extension {
       this._backendClient = null;
       this._indicator = null;
       indicator.destroy();
-      this._unloadStylesheet();
       throw error;
     }
   }
@@ -87,31 +82,5 @@ export default class AgentBarUbuntuExtension extends Extension {
     this._indicator = null;
 
     indicator?.destroy();
-    this._unloadStylesheet();
-  }
-
-  _loadStylesheet() {
-    if (this._stylesheetFile) {
-      return;
-    }
-
-    const stylesheetFile = this.dir.get_child('stylesheet.css');
-    if (!stylesheetFile.query_exists(null)) {
-      return;
-    }
-
-    const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
-    theme.load_stylesheet(stylesheetFile);
-    this._stylesheetFile = stylesheetFile;
-  }
-
-  _unloadStylesheet() {
-    if (!this._stylesheetFile) {
-      return;
-    }
-
-    const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
-    theme.unload_stylesheet(this._stylesheetFile);
-    this._stylesheetFile = null;
   }
 }
