@@ -1,0 +1,218 @@
+.agent-bar-ubuntu-panel-button {
+  -natural-hpadding: 6px;
+  -minimum-hpadding: 4px;
+}
+
+.agent-bar-ubuntu-indicator {
+  spacing: 6px;
+  padding: 2px 0;
+}
+
+.agent-bar-ubuntu-indicator__provider {
+  spacing: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: rgba(255, 255, 255, 0.92);
+  color: #5e5c64;
+}
+
+.agent-bar-ubuntu-indicator__provider-icon-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.agent-bar-ubuntu-indicator__provider-icon-box--codex {
+  background-color: rgba(21, 121, 203, 0.10);
+}
+
+.agent-bar-ubuntu-indicator__provider-icon-box--claude {
+  background-color: rgba(153, 110, 30, 0.10);
+}
+
+.agent-bar-ubuntu-indicator__provider-icon-box--copilot {
+  background-color: rgba(86, 127, 57, 0.10);
+}
+
+.agent-bar-ubuntu-indicator__provider-icon {
+  icon-size: 12px;
+}
+
+.agent-bar-ubuntu-indicator__provider-usage {
+  min-width: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2e3436;
+}
+
+.agent-bar-ubuntu-indicator__provider-usage--placeholder {
+  color: #9a9996;
+}
+
+.agent-bar-ubuntu-indicator__provider--ok {
+  border-color: rgba(86, 127, 57, 0.36);
+  background-color: rgba(255, 255, 255, 0.96);
+}
+
+.agent-bar-ubuntu-indicator__provider--degraded {
+  border-color: rgba(153, 110, 30, 0.42);
+  background-color: rgba(153, 110, 30, 0.04);
+}
+
+.agent-bar-ubuntu-indicator__provider--error {
+  border-color: rgba(214, 62, 74, 0.48);
+  background-color: rgba(214, 62, 74, 0.04);
+}
+
+.agent-bar-ubuntu-indicator__provider--error .agent-bar-ubuntu-indicator__provider-usage {
+  color: #d63e4a;
+}
+
+.agent-bar-ubuntu-indicator__provider--unavailable,
+.agent-bar-ubuntu-indicator__provider--idle {
+  border-color: rgba(0, 0, 0, 0.08);
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.agent-bar-ubuntu-indicator__provider--loading {
+  border-color: rgba(21, 121, 203, 0.36);
+}
+
+.agent-bar-ubuntu-indicator__provider--refreshing {
+  opacity: 0.94;
+}
+
+.agent-bar-ubuntu-indicator__provider--stale {
+  opacity: 0.82;
+}
+
+.agent-bar-ubuntu-menu .popup-menu-content {
+  color: #5e5c64;
+  background-color: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 18px;
+  padding: 8px;
+}
+
+.agent-bar-ubuntu-section-label {
+  color: #9a9996;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.agent-bar-ubuntu-summary-item,
+.agent-bar-ubuntu-provider-row,
+.agent-bar-ubuntu-footer-item,
+.agent-bar-ubuntu-error-item,
+.agent-bar-ubuntu-empty-state {
+  border-radius: 12px;
+  padding: 6px 10px;
+}
+
+.agent-bar-ubuntu-summary-item {
+  color: #2e3436;
+  background-color: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(21, 121, 203, 0.12);
+}
+
+.agent-bar-ubuntu-provider-row {
+  color: #3d3846;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.agent-bar-ubuntu-provider-row__content {
+  spacing: 4px;
+}
+
+.agent-bar-ubuntu-provider-row__header {
+  color: #2e3436;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agent-bar-ubuntu-provider-row__usage {
+  color: #3d3846;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.agent-bar-ubuntu-provider-row__meta {
+  color: #5e5c64;
+  font-size: 11px;
+}
+
+.agent-bar-ubuntu-provider-row--codex {
+  border-left: 3px solid #1579cb;
+}
+
+.agent-bar-ubuntu-provider-row--claude {
+  border-left: 3px solid #996e1e;
+}
+
+.agent-bar-ubuntu-provider-row--copilot {
+  border-left: 3px solid #567f39;
+}
+
+.agent-bar-ubuntu-provider-row--error {
+  background-color: rgba(214, 62, 74, 0.04);
+}
+
+.agent-bar-ubuntu-provider-row--degraded {
+  background-color: rgba(153, 110, 30, 0.04);
+}
+
+.agent-bar-ubuntu-provider-row--unavailable {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.agent-bar-ubuntu-progress {
+  height: 6px;
+  margin: 2px 0 1px;
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.agent-bar-ubuntu-progress-fill {
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.24);
+}
+
+.agent-bar-ubuntu-progress-fill--codex {
+  background-color: #3799ea;
+}
+
+.agent-bar-ubuntu-progress-fill--claude {
+  background-color: #bf8a25;
+}
+
+.agent-bar-ubuntu-progress-fill--copilot {
+  background-color: #6da148;
+}
+
+.agent-bar-ubuntu-progress-fill--error {
+  background-color: #d63e4a;
+}
+
+.agent-bar-ubuntu-progress-fill--degraded {
+  background-color: #bf8a25;
+}
+
+.agent-bar-ubuntu-progress-fill--unavailable,
+.agent-bar-ubuntu-progress-fill--unknown {
+  background-color: #9a9996;
+}
+
+.agent-bar-ubuntu-footer-item {
+  color: #9a9996;
+}
+
+.agent-bar-ubuntu-error-item {
+  color: #d63e4a;
+  background-color: rgba(214, 62, 74, 0.04);
+}
+
+.agent-bar-ubuntu-empty-state {
+  color: #9a9996;
+}
