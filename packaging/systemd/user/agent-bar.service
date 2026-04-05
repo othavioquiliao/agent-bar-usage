@@ -1,12 +1,22 @@
 [Unit]
 Description=Agent Bar local backend service
 After=default.target
+StartLimitBurst=5
+StartLimitIntervalSec=300
 
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/agent-bar service run
 Restart=on-failure
 RestartSec=2
+Nice=10
+MemoryHigh=256M
+MemoryMax=512M
+TasksMax=50
+TimeoutStartSec=30
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target
