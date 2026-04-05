@@ -78,8 +78,8 @@ describe('defaultOpenBrowser security (SEC-01)', () => {
 });
 
 describe('runAuthClaudeCommand', () => {
-  let stdoutSpy: any;
-  let stderrSpy: any;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
   let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {
@@ -116,8 +116,8 @@ describe('runAuthClaudeCommand', () => {
 });
 
 describe('runAuthCodexCommand', () => {
-  let stdoutSpy: any;
-  let stderrSpy: any;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
   let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {
@@ -153,8 +153,8 @@ describe('runAuthCodexCommand', () => {
 });
 
 describe('runAuthCopilotCommand', () => {
-  let stdoutSpy: any;
-  let stderrSpy: any;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
   let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {

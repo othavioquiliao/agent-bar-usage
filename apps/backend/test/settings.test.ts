@@ -41,7 +41,7 @@ mock.module('../src/lifecycle/paths.js', () => ({
 
 // Import after mocking
 import { loadSettings, loadSettingsSync, normalizeSettings, saveSettings } from '../src/settings/settings.js';
-import { CURRENT_VERSION, DEFAULT_SETTINGS } from '../src/settings/settings-schema.js';
+import { CURRENT_VERSION, DEFAULT_SETTINGS, type Settings } from '../src/settings/settings-schema.js';
 
 describe('settings', () => {
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('settings', () => {
     });
 
     it('calls migrateSettings and returns current version when version < CURRENT_VERSION', () => {
-      const result = normalizeSettings({ version: 0, extraField: 'x' } as any);
+      const result = normalizeSettings({ version: 0, extraField: 'x' } as unknown as Partial<Settings>);
       expect(result.version).toBe(CURRENT_VERSION);
     });
   });

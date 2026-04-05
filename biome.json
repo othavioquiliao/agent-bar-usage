@@ -27,11 +27,11 @@
         "noForEach": "off"
       },
       "style": {
-        "noNonNullAssertion": "off",
-        "useNodejsImportProtocol": "off"
+        "noNonNullAssertion": "error",
+        "useNodejsImportProtocol": "error"
       },
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "error"
       }
     }
   }

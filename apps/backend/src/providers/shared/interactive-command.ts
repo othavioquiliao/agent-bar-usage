@@ -44,9 +44,10 @@ export async function runInteractiveCommand(
 
   // Delay input: CLI needs time to initialize its prompt before accepting input
   if (options.input) {
+    const inputText = options.input;
     setTimeout(() => {
       if (!settled) {
-        proc.terminal?.write(options.input!);
+        proc.terminal?.write(inputText);
       }
     }, 200);
   }

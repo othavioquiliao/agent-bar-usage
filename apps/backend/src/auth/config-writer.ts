@@ -66,7 +66,10 @@ export async function ensureCopilotSecretRef(configPath: string, secretRef: Secr
     return;
   }
 
-  const existing = providers[copilotIndex]!;
+  const existing = providers[copilotIndex];
+  if (!existing) {
+    throw new Error(`Provider at index ${copilotIndex} not found`);
+  }
   const existingRef = existing.secretRef;
 
   if (
