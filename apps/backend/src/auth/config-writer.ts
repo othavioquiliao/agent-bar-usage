@@ -94,8 +94,8 @@ function buildDefaultConfig(secretRef: SecretReference): RawConfig {
     defaults: { ttlSeconds: 30 },
     providers: [
       buildCopilotEntry(secretRef),
-      { id: 'codex', enabled: true, sourceMode: 'cli' },
-      { id: 'claude', enabled: true, sourceMode: 'cli' },
+      { id: 'codex', enabled: true, sourceMode: 'auto' },
+      { id: 'claude', enabled: true, sourceMode: 'auto' },
     ],
   };
 }

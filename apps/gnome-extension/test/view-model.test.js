@@ -185,6 +185,54 @@ describe('provider view models', () => {
     expect(row.suggestedCommandText).toBe('Run: sudo apt install libsecret-tools');
   });
 
+  it('exposes secondary (7-day) usage fields when the snapshot includes them', () => {
+    const row = buildProviderRowViewModel(
+      {
+        provider: 'claude',
+        status: 'ok',
+        source: 'api',
+        updated_at: '2026-04-09T18:13:13.726Z',
+        connected_account: { status: 'connected' },
+        usage: { kind: 'quota', used: 68, limit: 100, percent_used: 68 },
+        reset_window: { resets_at: '2026-04-09T21:00:00.000Z', label: 'Resets in 2h 46m' },
+        secondary_usage: { kind: 'quota', used: 64, limit: 100, percent_used: 64 },
+        secondary_reset_window: { resets_at: '2026-04-13T10:00:00.000Z', label: 'Resets in 3d 18h' },
+        error: null,
+      },
+      {
+        now: new Date('2026-04-09T18:14:00.000Z'),
+      },
+    );
+
+    expect(row.hasSecondaryUsage).toBe(true);
+    expect(row.secondaryUsageText).toBe('7-day: 64 / 100 (64%)');
+    expect(row.secondaryProgressPercent).toBe(64);
+    expect(row.secondaryProgressVisible).toBe(true);
+    expect(row.secondaryResetText).toMatch(/^Reset \(7d\): /);
+  });
+
+  it('leaves secondary fields empty when the snapshot does not include them', () => {
+    const row = buildProviderRowViewModel(
+      {
+        provider: 'copilot',
+        status: 'ok',
+        source: 'api',
+        updated_at: '2026-04-09T18:13:13.726Z',
+        usage: { kind: 'quota', used: 10, limit: 100, percent_used: 10 },
+        reset_window: null,
+        error: null,
+      },
+      {
+        now: new Date('2026-04-09T18:14:00.000Z'),
+      },
+    );
+
+    expect(row.hasSecondaryUsage).toBe(false);
+    expect(row.secondaryUsageText).toBeNull();
+    expect(row.secondaryProgressPercent).toBeNull();
+    expect(row.secondaryResetText).toBeNull();
+  });
+
   it('maps an unavailable provider snapshot without losing the placeholder text', () => {
     const row = buildProviderRowViewModel(
       {

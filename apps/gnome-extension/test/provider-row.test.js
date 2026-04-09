@@ -66,4 +66,47 @@ describe('provider row layout model', () => {
     });
     expect(hiddenWithoutPercent.showProgressBar).toBe(false);
   });
+
+  it('propagates secondary (7-day) usage fields into the layout model when present', () => {
+    const layout = buildProviderRowLayoutModel({
+      providerId: 'claude',
+      title: 'Claude',
+      status: 'ok',
+      statusText: 'Healthy',
+      quotaText: 'Usage: 68 / 100 (68%)',
+      progressPercent: 68,
+      progressVisible: true,
+      resetText: 'Reset: Resets in 2h 46m',
+      secondaryUsageText: '7-day: 64 / 100 (64%)',
+      secondaryResetText: 'Reset (7d): Resets in 3d 18h',
+      secondaryProgressPercent: 64,
+      secondaryProgressVisible: true,
+      hasSecondaryUsage: true,
+    });
+
+    expect(layout.hasSecondary).toBe(true);
+    expect(layout.secondaryQuotaLine).toBe('7-day: 64 / 100 (64%)');
+    expect(layout.secondaryResetText).toBe('Reset (7d): Resets in 3d 18h');
+    expect(layout.secondaryProgressPercent).toBe(64);
+    expect(layout.showSecondaryProgressBar).toBe(true);
+    expect(layout.showSecondaryProgressFill).toBe(true);
+  });
+
+  it('keeps secondary fields hidden when the view model does not include them', () => {
+    const layout = buildProviderRowLayoutModel({
+      providerId: 'copilot',
+      title: 'Copilot',
+      status: 'ok',
+      statusText: 'Healthy',
+      quotaText: 'Usage: 10 / 100 (10%)',
+      progressPercent: 10,
+      progressVisible: true,
+      hasSecondaryUsage: false,
+    });
+
+    expect(layout.hasSecondary).toBe(false);
+    expect(layout.secondaryQuotaLine).toBeNull();
+    expect(layout.secondaryResetText).toBeNull();
+    expect(layout.showSecondaryProgressBar).toBe(false);
+  });
 });

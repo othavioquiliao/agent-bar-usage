@@ -143,6 +143,12 @@ describe('ensureCopilotSecretRef', () => {
       service: 'agent-bar',
       account: 'copilot',
     });
+
+    const codex = written.providers.find((provider) => provider.id === 'codex') as Record<string, unknown> | undefined;
+    const claude = written.providers.find((provider) => provider.id === 'claude') as Record<string, unknown> | undefined;
+
+    expect(codex?.sourceMode).toBe('auto');
+    expect(claude?.sourceMode).toBe('auto');
   });
 
   it('does not rewrite a config file that already has the expected Copilot secret reference', async () => {

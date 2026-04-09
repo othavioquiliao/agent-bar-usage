@@ -3,6 +3,7 @@ import type { ProviderSnapshot } from 'shared-contract';
 import { resolveCommandInPath } from '../../utils/subprocess.js';
 
 const REQUEST_TIMEOUT_MS = 15_000;
+const STDIN_CLOSE_DELAY_MS = 5_000;
 
 interface RateLimitPrimary {
   usedPercent: number;
@@ -59,6 +60,7 @@ export interface AppServerDependencies {
   env?: NodeJS.ProcessEnv;
   codexBinary?: string;
   timeoutMs?: number;
+  stdinCloseDelayMs?: number;
 }
 
 export async function fetchCodexUsageViaAppServer(dependencies: AppServerDependencies = {}): Promise<ProviderSnapshot> {
@@ -78,13 +80,17 @@ export async function fetchCodexUsageViaAppServer(dependencies: AppServerDepende
     };
   }
 
+  const stdinCloseDelay = dependencies.stdinCloseDelayMs ?? STDIN_CLOSE_DELAY_MS;
+
   return new Promise<ProviderSnapshot>((resolve) => {
     let settled = false;
+    let closeTimer: ReturnType<typeof setTimeout>;
 
     const settle = (snapshot: ProviderSnapshot) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(closeTimer);
       child.kill();
       resolve(snapshot);
     };
@@ -95,9 +101,6 @@ export async function fetchCodexUsageViaAppServer(dependencies: AppServerDepende
       stdout: 'pipe',
       stderr: 'pipe',
     });
-
-    let stdout = '';
-    let initDone = false;
 
     const timer = setTimeout(() => {
       settle({
@@ -111,12 +114,33 @@ export async function fetchCodexUsageViaAppServer(dependencies: AppServerDepende
       });
     }, timeoutMs);
 
-    function processChunk(chunk: string) {
-      stdout += chunk;
-      const lines = stdout.split('\n');
-      stdout = lines.pop() ?? '';
+    // Collect ALL stdout, then parse after process exits.
+    // This avoids a race between child.exited and the stream reader —
+    // in a busy event loop (e.g. systemd service), child.exited can resolve
+    // before the reader processes the flushed stdout bytes.
+    const stdoutChunks: string[] = [];
+    const streamDone = (async () => {
+      const reader = child.stdout.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || settled) break;
+          stdoutChunks.push(new TextDecoder().decode(value));
+        }
+      } catch {
+        // Stream closed
+      }
+    })();
 
-      for (const line of lines) {
+    child.exited.then(async () => {
+      clearTimeout(closeTimer);
+      // Wait for the stream reader to drain any remaining buffered data
+      await streamDone;
+      if (settled) return;
+
+      // Parse all collected stdout for the rateLimits response (id=2)
+      const output = stdoutChunks.join('');
+      for (const line of output.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed) continue;
 
@@ -127,14 +151,6 @@ export async function fetchCodexUsageViaAppServer(dependencies: AppServerDepende
           continue;
         }
 
-        // Response to initialize (id=1)
-        if (msg.id === 1 && !initDone) {
-          initDone = true;
-          child.stdin.write('{"jsonrpc":"2.0","method":"account/rateLimits/read","id":2,"params":{}}\n');
-          child.stdin.flush();
-        }
-
-        // Response to rateLimits (id=2)
         if (msg.id === 2) {
           if (msg.error) {
             settle({
@@ -174,45 +190,37 @@ export async function fetchCodexUsageViaAppServer(dependencies: AppServerDepende
           return;
         }
       }
-    }
 
-    // Read stdout as a stream via ReadableStream reader
-    const reader = child.stdout.getReader();
-
-    (async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done || settled) break;
-          processChunk(new TextDecoder().decode(value));
-        }
-      } catch {
-        // Stream closed -- handled by exited promise below
-      }
-    })();
-
-    child.exited.then(() => {
-      if (!settled) {
-        settle({
-          provider: 'codex',
-          status: 'error',
-          source: 'cli',
-          updated_at: new Date().toISOString(),
-          usage: null,
-          reset_window: null,
-          error: {
-            code: 'codex_cli_failed',
-            message: 'Codex app-server exited before returning rate limits.',
-            retryable: true,
-          },
-        });
-      }
+      settle({
+        provider: 'codex',
+        status: 'error',
+        source: 'cli',
+        updated_at: new Date().toISOString(),
+        usage: null,
+        reset_window: null,
+        error: {
+          code: 'codex_cli_failed',
+          message: 'Codex app-server exited before returning rate limits.',
+          retryable: true,
+        },
+      });
     });
 
-    // Send initialize request immediately
+    // Send both requests at once — codex app-server uses block-buffered stdout
+    // when connected to a pipe, so responses only arrive when the process exits.
+    // We close stdin after a delay to trigger exit + flush.
     child.stdin.write(
-      '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"clientInfo":{"name":"agent-bar","version":"1.0.0"}}}\n',
+      '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"clientInfo":{"name":"agent-bar","version":"1.0.0"}}}\n' +
+        '{"jsonrpc":"2.0","method":"account/rateLimits/read","id":2,"params":{}}\n',
     );
     child.stdin.flush();
+
+    closeTimer = setTimeout(() => {
+      try {
+        child.stdin.end();
+      } catch {
+        // stdin may already be closed if process exited early
+      }
+    }, stdinCloseDelay);
   });
 }

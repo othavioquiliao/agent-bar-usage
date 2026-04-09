@@ -1,4 +1,4 @@
-import type { ProviderSnapshot } from 'shared-contract';
+import type { ProviderSnapshot, ResetWindow, UsageSnapshot } from 'shared-contract';
 import { type ClaudeCredentials, readClaudeCredentials } from './claude-credentials.js';
 
 const USAGE_ENDPOINT = 'https://api.anthropic.com/api/oauth/usage';
@@ -11,10 +11,28 @@ interface UsageWindow {
   resets_at: string | null;
 }
 
+interface ExtraUsageWindow {
+  is_enabled?: boolean;
+  monthly_limit?: number | null;
+  used_credits?: number | null;
+  utilization?: number | null;
+}
+
 interface ClaudeUsageResponse {
   five_hour?: UsageWindow | null;
   seven_day?: UsageWindow | null;
+  seven_day_sonnet?: UsageWindow | null;
+  seven_day_opus?: UsageWindow | null;
+  extra_usage?: ExtraUsageWindow | null;
   [key: string]: unknown;
+}
+
+type PrimarySource = 'five_hour' | 'seven_day' | 'extra_usage' | 'seven_day_sonnet';
+
+interface PrimaryResolution {
+  source: PrimarySource;
+  utilization: number;
+  resets_at: string | null;
 }
 
 function formatResetLabel(resetsAt: string | null): string {
@@ -23,32 +41,98 @@ function formatResetLabel(resetsAt: string | null): string {
   const resetMs = new Date(resetsAt).getTime();
   const diffMs = resetMs - now;
   if (diffMs <= 0) return 'Resets soon';
-  const hours = Math.floor(diffMs / 3_600_000);
+  const days = Math.floor(diffMs / 86_400_000);
+  const hours = Math.floor((diffMs % 86_400_000) / 3_600_000);
   const minutes = Math.floor((diffMs % 3_600_000) / 60_000);
+  if (days > 0) return `Resets in ${days}d ${hours}h`;
   if (hours > 0) return `Resets in ${hours}h ${minutes}m`;
   return `Resets in ${minutes}m`;
 }
 
-function mapToSnapshot(response: ClaudeUsageResponse): ProviderSnapshot {
-  const fiveHour = response.five_hour;
-  const sevenDay = response.seven_day;
-  const primary = fiveHour ?? sevenDay;
-  const utilization = primary?.utilization ?? null;
+function toQuotaSnapshot(utilization: number): UsageSnapshot {
+  const rounded = Math.round(utilization);
+  return { kind: 'quota', used: rounded, limit: 100, percent_used: rounded };
+}
 
-  const status = utilization === null ? 'unavailable' : utilization >= 90 ? 'degraded' : 'ok';
+function toResetWindow(resetsAt: string | null): ResetWindow | null {
+  return resetsAt ? { label: formatResetLabel(resetsAt), resets_at: resetsAt } : null;
+}
+
+function resolvePrimary(response: ClaudeUsageResponse): PrimaryResolution | null {
+  const fiveHour = response.five_hour?.utilization ?? null;
+  if (fiveHour !== null) {
+    return { source: 'five_hour', utilization: fiveHour, resets_at: response.five_hour?.resets_at ?? null };
+  }
+  const sevenDay = response.seven_day?.utilization ?? null;
+  if (sevenDay !== null) {
+    return { source: 'seven_day', utilization: sevenDay, resets_at: response.seven_day?.resets_at ?? null };
+  }
+  const extra = response.extra_usage?.utilization ?? null;
+  if (extra !== null) {
+    return { source: 'extra_usage', utilization: extra, resets_at: null };
+  }
+  const sonnet = response.seven_day_sonnet?.utilization ?? null;
+  if (sonnet !== null) {
+    return {
+      source: 'seven_day_sonnet',
+      utilization: sonnet,
+      resets_at: response.seven_day_sonnet?.resets_at ?? null,
+    };
+  }
+  return null;
+}
+
+function mapToSnapshot(response: ClaudeUsageResponse): ProviderSnapshot {
+  const primary = resolvePrimary(response);
+  const updatedAt = new Date().toISOString();
+
+  if (primary === null) {
+    console.error('[agent-bar] claude: all utilization fields null — possible API schema change', response);
+    return {
+      provider: 'claude',
+      status: 'error',
+      source: 'api',
+      updated_at: updatedAt,
+      usage: null,
+      reset_window: null,
+      error: {
+        code: 'claude_usage_transient',
+        message: 'Anthropic API returned no usage data (temporary). Data will refresh on next cycle.',
+        retryable: true,
+      },
+    };
+  }
+
+  if (primary.source !== 'five_hour') {
+    console.warn('[agent-bar] claude: five_hour.utilization null, using fallback', {
+      fallback_source: primary.source,
+      five_hour: response.five_hour?.utilization ?? null,
+      seven_day: response.seven_day?.utilization ?? null,
+      extra_usage: response.extra_usage?.utilization ?? null,
+      seven_day_sonnet: response.seven_day_sonnet?.utilization ?? null,
+    });
+  }
+
+  const status: ProviderSnapshot['status'] = primary.utilization >= 90 ? 'degraded' : 'ok';
+
+  // Secondary (7-day) only populated when primary is five_hour, to avoid duplication
+  // when the fallback itself was seven_day.
+  const includeSecondary = primary.source === 'five_hour';
+  const sevenDayUtilization = response.seven_day?.utilization ?? null;
+  const secondary_usage: UsageSnapshot | null =
+    includeSecondary && sevenDayUtilization !== null ? toQuotaSnapshot(sevenDayUtilization) : null;
+  const secondary_reset_window: ResetWindow | null =
+    includeSecondary && response.seven_day?.resets_at ? toResetWindow(response.seven_day.resets_at) : null;
 
   return {
     provider: 'claude',
     status,
     source: 'api',
-    updated_at: new Date().toISOString(),
-    usage:
-      utilization !== null
-        ? { kind: 'quota', used: Math.round(utilization), limit: 100, percent_used: Math.round(utilization) }
-        : null,
-    reset_window: primary?.resets_at
-      ? { label: formatResetLabel(primary.resets_at), resets_at: primary.resets_at }
-      : null,
+    updated_at: updatedAt,
+    usage: toQuotaSnapshot(primary.utilization),
+    reset_window: toResetWindow(primary.resets_at),
+    secondary_usage,
+    secondary_reset_window,
     error: null,
   };
 }

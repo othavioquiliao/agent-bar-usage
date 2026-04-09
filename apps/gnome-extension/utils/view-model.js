@@ -189,6 +189,24 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
   const diagnosticsSummaryText = formatDiagnosticsSummary(providerSnapshot);
   const suggestedCommandText = formatSuggestedCommand(providerSnapshot);
 
+  const secondaryUsage = providerSnapshot?.secondary_usage ?? null;
+  const hasSecondaryUsage = Boolean(secondaryUsage && secondaryUsage.kind === 'quota');
+  const secondaryUsageText = hasSecondaryUsage
+    ? formatUsageText(secondaryUsage).replace(/^Usage:/, '7-day:')
+    : null;
+  const secondaryResetText = hasSecondaryUsage
+    ? formatResetWindowText(providerSnapshot?.secondary_reset_window ?? null, { now }).replace(
+        /^Reset:/,
+        'Reset (7d):',
+      )
+    : null;
+  const secondaryProgressPercent =
+    hasSecondaryUsage &&
+    typeof secondaryUsage.percent_used === 'number' &&
+    Number.isFinite(secondaryUsage.percent_used)
+      ? Math.round(secondaryUsage.percent_used)
+      : null;
+
   return {
     providerId,
     title,
@@ -212,6 +230,11 @@ export function buildProviderRowViewModel(providerSnapshot, { now = new Date() }
     hasError: Boolean(errorText),
     hasUsage: Boolean(providerSnapshot?.usage),
     isUnavailable: status === 'unavailable',
+    secondaryUsageText,
+    secondaryResetText,
+    secondaryProgressPercent,
+    secondaryProgressVisible: hasSecondaryUsage,
+    hasSecondaryUsage,
   };
 }
 

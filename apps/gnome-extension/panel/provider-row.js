@@ -51,6 +51,23 @@ export function createProviderRow(viewModel) {
   }
 
   content.add_child(createLabel(layout.resetText, 'agent-bar-ubuntu-provider-row__meta'));
+
+  if (layout.hasSecondary) {
+    content.add_child(createLabel(layout.secondaryQuotaLine, 'agent-bar-ubuntu-provider-row__usage'));
+    if (layout.showSecondaryProgressBar) {
+      content.add_child(
+        createProgressBar({
+          percent: layout.secondaryProgressPercent ?? 0,
+          accentClass: layout.accentClass,
+          showFill: layout.showSecondaryProgressFill,
+        }),
+      );
+    }
+    if (layout.secondaryResetText) {
+      content.add_child(createLabel(layout.secondaryResetText, 'agent-bar-ubuntu-provider-row__meta'));
+    }
+  }
+
   row.add_child(content);
 
   return row;

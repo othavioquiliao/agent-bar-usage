@@ -22,6 +22,34 @@ describe('fetchClaudeUsageViaApi', () => {
     expect(result.error).toBeNull();
   });
 
+  it('populates secondary_usage from seven_day when primary is five_hour', async () => {
+    const result = await fetchClaudeUsageViaApi({
+      credentials: { accessToken: 'sk-test', expiresAt: null },
+      fetch: mockFetch(200, {
+        five_hour: { utilization: 68.0, resets_at: '2026-04-09T21:00:00Z' },
+        seven_day: { utilization: 64.0, resets_at: '2026-04-13T10:00:00Z' },
+      }),
+    });
+
+    expect(result.usage?.percent_used).toBe(68);
+    expect(result.secondary_usage?.kind).toBe('quota');
+    expect(result.secondary_usage?.percent_used).toBe(64);
+    expect(result.secondary_usage?.limit).toBe(100);
+    expect(result.secondary_reset_window?.resets_at).toBe('2026-04-13T10:00:00Z');
+    expect(result.secondary_reset_window?.label).toContain('Resets in');
+  });
+
+  it('leaves secondary_usage null when seven_day is absent', async () => {
+    const result = await fetchClaudeUsageViaApi({
+      credentials: { accessToken: 'sk-test', expiresAt: null },
+      fetch: mockFetch(200, { five_hour: { utilization: 45.0, resets_at: null } }),
+    });
+
+    expect(result.usage?.percent_used).toBe(45);
+    expect(result.secondary_usage ?? null).toBeNull();
+    expect(result.secondary_reset_window ?? null).toBeNull();
+  });
+
   it('returns degraded when utilization >= 90', async () => {
     const result = await fetchClaudeUsageViaApi({
       credentials: { accessToken: 'sk-test', expiresAt: null },
@@ -41,17 +69,23 @@ describe('fetchClaudeUsageViaApi', () => {
     expect(result.status).toBe('ok');
   });
 
-  it('returns unavailable when utilization is null', async () => {
+  it('falls back to seven_day when five_hour.utilization is null', async () => {
     const result = await fetchClaudeUsageViaApi({
       credentials: { accessToken: 'sk-test', expiresAt: null },
-      fetch: mockFetch(200, { five_hour: { utilization: null, resets_at: null } }),
+      fetch: mockFetch(200, {
+        five_hour: { utilization: null, resets_at: null },
+        seven_day: { utilization: 30.0, resets_at: '2026-03-29T00:00:00Z' },
+      }),
     });
 
-    expect(result.status).toBe('unavailable');
-    expect(result.usage).toBeNull();
+    expect(result.status).toBe('ok');
+    expect(result.usage?.percent_used).toBe(30);
+    expect(result.error).toBeNull();
+    // secondary must be null to avoid duplicating the primary when fallback itself was seven_day
+    expect(result.secondary_usage ?? null).toBeNull();
   });
 
-  it('falls back to seven_day when five_hour is missing', async () => {
+  it('falls back to seven_day when five_hour object is missing entirely', async () => {
     const result = await fetchClaudeUsageViaApi({
       credentials: { accessToken: 'sk-test', expiresAt: null },
       fetch: mockFetch(200, { seven_day: { utilization: 30.0, resets_at: '2026-03-29T00:00:00Z' } }),
@@ -59,6 +93,65 @@ describe('fetchClaudeUsageViaApi', () => {
 
     expect(result.status).toBe('ok');
     expect(result.usage?.percent_used).toBe(30);
+    expect(result.secondary_usage ?? null).toBeNull();
+  });
+
+  it('falls back to extra_usage when five_hour and seven_day are both null', async () => {
+    const result = await fetchClaudeUsageViaApi({
+      credentials: { accessToken: 'sk-test', expiresAt: null },
+      fetch: mockFetch(200, {
+        five_hour: { utilization: null, resets_at: null },
+        seven_day: { utilization: null, resets_at: null },
+        extra_usage: { is_enabled: true, monthly_limit: 100_000, used_credits: 47_600, utilization: 47.6 },
+      }),
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.usage?.percent_used).toBe(48);
+    expect(result.error).toBeNull();
+  });
+
+  it('falls back to seven_day_sonnet as last resort', async () => {
+    const result = await fetchClaudeUsageViaApi({
+      credentials: { accessToken: 'sk-test', expiresAt: null },
+      fetch: mockFetch(200, {
+        five_hour: { utilization: null, resets_at: null },
+        seven_day: { utilization: null, resets_at: null },
+        extra_usage: { utilization: null },
+        seven_day_sonnet: { utilization: 20.0, resets_at: '2026-04-13T13:00:00Z' },
+      }),
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.usage?.percent_used).toBe(20);
+  });
+
+  it('returns error claude_usage_transient when all utilization fields are null', async () => {
+    const result = await fetchClaudeUsageViaApi({
+      credentials: { accessToken: 'sk-test', expiresAt: null },
+      fetch: mockFetch(200, {
+        five_hour: { utilization: null, resets_at: null },
+        seven_day: { utilization: null, resets_at: null },
+        extra_usage: { utilization: null },
+        seven_day_sonnet: { utilization: null, resets_at: null },
+      }),
+    });
+
+    expect(result.status).toBe('error');
+    expect(result.error?.code).toBe('claude_usage_transient');
+    expect(result.error?.retryable).toBe(true);
+    expect(result.error?.message).toContain('temporary');
+    expect(result.usage).toBeNull();
+  });
+
+  it('returns error claude_usage_transient when response has no known fields', async () => {
+    const result = await fetchClaudeUsageViaApi({
+      credentials: { accessToken: 'sk-test', expiresAt: null },
+      fetch: mockFetch(200, {}),
+    });
+
+    expect(result.status).toBe('error');
+    expect(result.error?.code).toBe('claude_usage_transient');
   });
 
   it('returns claude_auth_expired on 401', async () => {

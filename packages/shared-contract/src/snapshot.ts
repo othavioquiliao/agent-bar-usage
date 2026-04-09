@@ -50,6 +50,8 @@ export interface ProviderSnapshot {
   connected_account?: ConnectedAccount | null;
   usage?: UsageSnapshot | null;
   reset_window?: ResetWindow | null;
+  secondary_usage?: UsageSnapshot | null;
+  secondary_reset_window?: ResetWindow | null;
   error: ProviderError | null;
   diagnostics?: ProviderDiagnostics;
 }
@@ -217,7 +219,19 @@ export function assertProviderSnapshot(value: unknown, label = 'provider'): Prov
   assertRecord(value, label);
   assertNoExtraKeys(
     value,
-    ['provider', 'status', 'source', 'updated_at', 'connected_account', 'usage', 'reset_window', 'error', 'diagnostics'],
+    [
+      'provider',
+      'status',
+      'source',
+      'updated_at',
+      'connected_account',
+      'usage',
+      'reset_window',
+      'secondary_usage',
+      'secondary_reset_window',
+      'error',
+      'diagnostics',
+    ],
     label,
   );
 
@@ -245,6 +259,22 @@ export function assertProviderSnapshot(value: unknown, label = 'provider'): Prov
       ? {
           reset_window:
             value.reset_window === null ? null : assertResetWindow(value.reset_window, `${label}.reset_window`),
+        }
+      : {}),
+    ...(value.secondary_usage !== undefined
+      ? {
+          secondary_usage:
+            value.secondary_usage === null
+              ? null
+              : assertUsageSnapshot(value.secondary_usage, `${label}.secondary_usage`),
+        }
+      : {}),
+    ...(value.secondary_reset_window !== undefined
+      ? {
+          secondary_reset_window:
+            value.secondary_reset_window === null
+              ? null
+              : assertResetWindow(value.secondary_reset_window, `${label}.secondary_reset_window`),
         }
       : {}),
     error: value.error === null ? null : assertProviderError(value.error, `${label}.error`),

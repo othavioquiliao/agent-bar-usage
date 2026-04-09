@@ -24,6 +24,20 @@ export function buildProviderRowLayoutModel(viewModel = {}) {
         .trim()
         .toLowerCase()}`;
 
+  const secondaryQuotaLine =
+    typeof viewModel.secondaryUsageText === 'string' && viewModel.secondaryUsageText.trim()
+      ? viewModel.secondaryUsageText.trim()
+      : null;
+  const secondaryResetText =
+    typeof viewModel.secondaryResetText === 'string' && viewModel.secondaryResetText.trim()
+      ? viewModel.secondaryResetText.trim()
+      : null;
+  const secondaryProgressPercent = Number.isFinite(viewModel.secondaryProgressPercent)
+    ? Math.max(0, Math.min(100, Math.round(viewModel.secondaryProgressPercent)))
+    : null;
+  const showSecondaryProgressBar = Boolean(viewModel.secondaryProgressVisible && secondaryProgressPercent !== null);
+  const hasSecondary = Boolean(viewModel.hasSecondaryUsage && secondaryQuotaLine);
+
   return {
     providerId: viewModel.providerId ?? 'provider',
     title: viewModel.title ?? 'Provider',
@@ -37,5 +51,11 @@ export function buildProviderRowLayoutModel(viewModel = {}) {
     showProgressBar,
     showProgressFill: showProgressBar && progressPercent > 0,
     accentClass,
+    hasSecondary,
+    secondaryQuotaLine,
+    secondaryResetText,
+    secondaryProgressPercent,
+    showSecondaryProgressBar,
+    showSecondaryProgressFill: showSecondaryProgressBar && secondaryProgressPercent > 0,
   };
 }
